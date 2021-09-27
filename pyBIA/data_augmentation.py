@@ -6,11 +6,13 @@ Created on Thu Sep 27 08:28:20 2021
 @author: daniel
 """
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from data_processing import fixed_size_subset
+import numpy as np
 
 def generator_parameters():
 	"""
 	Random image processing 
-	paremeters
+	paremeters for data augmentation
 	"""
 
 	rotation = 180
@@ -37,14 +39,37 @@ def generator_parameters():
 		zca, zca_epsilon, brightness, shear, zoom, rescale, sample_norm,
 		feature_norm, std_norm, sample_std, data_format, split
 
-def augmentation(data, batch_size, resize = True):
+def resize(data, size=50):
+	"""
+	Resize image
+	"""
+
+	if len(data.shape) == 3:
+    	width = data[0].shape[0]
+    	height = data[0].shape[1]
+    elif len(data.shape) == 2:
+    	width = data.shape[0]
+    	height = data.shape[1]
+    else:
+    	raise ValueError("Channel must either be 2D for a single image or 3D for multiple images.")
+
+	resized_images = []
+	for i in np.arange(0, len(data)):
+    	resized_data = fixed_size_subset(data[i][:, :, 0], width/2., height/2., size)
+    	resized_images.append(resized_data)
+    
+	augmented_data = np.array(data)
+
+	return augmented_data
+
+def augmentation(data, batch_size, resize=True):
 	"""
 	Performs data augmentation on 
 	non-normalized data and 
 	resizes image to 50x50
 	"""
 
-	rotation, width, height, horizontal, vertical, fill = generator_parameters()[:5]
+	rotation, width, height, horizontal, vertical, fill = generator_parameters()[:6]
 
 	datagen = ImageDataGenerator(
         rotation_range=rotation,
@@ -55,25 +80,27 @@ def augmentation(data, batch_size, resize = True):
         fill_mode=fill)
 
 
-	if data.shape != (4,1):
-		data = np.array(np.expand_dims(blob, axis=-1))
+	if len(data.shape) != 4:
+		if len(data.shape) == 3:
+			data = np.array(np.expand_dims(blob, axis=-1))
+		elif len(data.shape) == 2:
+			data = np.array(np.expand_dims(blob, axis=-1))
+		else:
+			raise ValueError("Input data must be 2D for single sample or 3D for multiple sampels")
 
 	augmented_data = []
 	for i in np.arange(0, len(data)):
     	original_data = data[i].reshape((1,) + data[-i].shape)
 	    for k in range(batch_size):
-        	augemented_data = datagen.flow(original_data, batch_size=1)#, target_size=(50, 50))
+        	augemented_data = datagen.flow(original_data, batch_size=1)
         	augmented_data.append(augemented_data[0][0])
 
 	augmented_data = np.array(augmented_data)
 
 	if resize == True:
-		data = []
-		for i in np.arange(0, len(augmented_data)):
-    		resized_data = fixed_size_subset(augmented_data[i][:, :, 0], 50, 50, 50)
-    		data.append(resized_data)
-    
-		augmented_data = np.array(data)
+		augmented_data = resize(augmented_data, size=50)
 
 	return augmented_data
+
+
 

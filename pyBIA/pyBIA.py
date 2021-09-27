@@ -5,6 +5,17 @@ Created on Thu Sep 16 22:40:39 2021
 
 @author: daniel
 """
+import os
+import numpy as np
+
+#from keras import optimizers
+from keras.models import Sequential
+from keras.initializers import VarianceScaling
+from tensorflow.keras.optimizers import Adam, SGD
+from tensorflow.keras.losses import categorical_crossentropy
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2D, Flatten, BatchNormalization
+
 from data_processing import process_class, create_training_set
 
 def hyperparameters():
@@ -81,7 +92,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1):
     model.add(Dense(num_classes, activation='softmax',
                     kernel_initializer='TruncatedNormal'))
 
-    optimizer = optimizers.SGD(lr=lr, momentum=momentum,
+    optimizer = SGD(lr=lr, momentum=momentum,
                          decay=decay, nesterov=nesterov)
     model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
     model.fit(X_train, Y_train, batch_size=batch_size, epochs=no_epochs, verbose=1)
@@ -89,13 +100,16 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1):
     return model
 
 
-def predict(data, model, normalize = True):
+def predict(data, model, normalize=True):
     """
     Returns class prediction
+    0 for blob
+    1 for other
     """
     if normalize == True:
         data = process_class(data)
 
     pred = model.predict(data)
+    pred = np.argmax(pred)
 
     return pred

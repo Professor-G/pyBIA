@@ -6,6 +6,7 @@ Created on Thu Sep 16 21:43:16 2021
 @author: daniel
 """
 import numpy as np
+from keras.utils import np_utils
 
 class Preprocess:
 	"""

@@ -7,29 +7,42 @@ Created on Thu Sep 16 22:40:39 2021
 """
 from data_processing import process_class, create_training_set
 
+def hyperparameters():
+    """
+    Sets the hyperparemeters to be used when 
+    constructing the convolutional NN.
+    """
+    epochs=100
+    batch_size=32
+    lr=0.0001
+    momentum=0.9
+    decay=0.0005
+    nesterov=False
+    loss='categorical_crossentropy'
+    return epochs, batch_size, lr, momentum, decay, nesterov, loss
+
+
 def pyBIA_model(blob_data, other_data, img_num_channels=1):
     """
     The CNN model infrastructure presented by AlexNet, with
     modern modifications
     """
-    if len(blob_data.shape) == 3:
+    if len(blob_data.shape) != len(other_data.shape):
+        raise ValueError("Shape of blob and other data must be the same.")
+
+
+    if len(blob_data.shape) == 3: #if matrix is 3D - contains multiple sampels
         img_width = blob_data[0].shape[0]
         img_height = blob_data[0].shape[1]
 
-    elif len(blob_data.shape) == 2:
+    elif len(blob_data.shape) == 2: #if matrix is 2D - contains one sample
         img_width = blob_data.shape[0]
         img_height = blob_data.shape[1]
 
     X_train, Y_train = create_training_set(blob_data, other_data)
     input_shape = (img_width, img_height, img_num_channels)
 
-    epochs=100
-    batch_size=64
-    lr=0.0001
-    momentum=0.9
-    decay=0.0
-    nesterov=False
-    loss='categorical_crossentropy'
+    epochs, batch_size, lr, momentum, decay, nesterov, loss = hyperparameters()
    
     # Uniform scaling initializer
     num_classes = 2
@@ -76,11 +89,13 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1):
     return model
 
 
-def predict(data, model):
+def predict(data, model, normalize = True):
     """
     Returns class prediction
     """
-    data = process_class(data)
+    if normalize == True:
+        data = process_class(data)
+
     pred = model.predict(data)
 
     return pred

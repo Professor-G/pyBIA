@@ -7,8 +7,8 @@ Created on Thu Sep 16 22:40:39 2021
 """
 import os
 import numpy as np
+from data_processing import process_class
 
-#from keras import optimizers
 from keras.models import Sequential
 from keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import Adam, SGD
@@ -25,12 +25,12 @@ def hyperparameters():
     """
     epochs=100
     batch_size=32
-    lr=0.0001
+    learning_rate=0.0001
     momentum=0.9
     decay=0.0005
     nesterov=False
     loss='categorical_crossentropy'
-    return epochs, batch_size, lr, momentum, decay, nesterov, loss
+    return epochs, batch_size, learning_rate, momentum, decay, nesterov, loss
 
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1):
@@ -92,8 +92,9 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1):
     model.add(Dense(num_classes, activation='softmax',
                     kernel_initializer='TruncatedNormal'))
 
-    optimizer = SGD(lr=lr, momentum=momentum,
+    optimizer = SGD(learning_rate=learning_rate, momentum=momentum,
                          decay=decay, nesterov=nesterov)
+
     model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
     model.fit(X_train, Y_train, batch_size=batch_size, epochs=no_epochs, verbose=1)
 

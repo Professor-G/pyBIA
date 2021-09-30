@@ -63,7 +63,7 @@ def resize(data, size=50):
 	augmented_data = np.array(data)
 
 	return augmented_data
-
+	
 def augmentation(data, batch_size, resize=True):
 	"""
 	Performs data augmentation on 

@@ -39,31 +39,30 @@ def generator_parameters():
 		zca, zca_epsilon, brightness, shear, zoom, rescale, sample_norm,
 		feature_norm, std_norm, sample_std, data_format, split
 
+
 def resize(data, size=50):
 	"""
 	Resize image
 	"""
 
 	if len(data.shape) == 3:
-    	width = data[0].shape[0]
-    	height = data[0].shape[1]
-
+    		width = data[0].shape[0]
+    		height = data[0].shape[1]
 	elif len(data.shape) == 2:
-    	width = data.shape[0]
-    	height = data.shape[1]
-
+    		width = data.shape[0]
+    		height = data.shape[1]
 	else:
-    	raise ValueError("Channel must either be 2D for a single image or 3D for multiple images.")
+    		raise ValueError("Channel must either be 2D for a single image or 3D for multiple images.")
 
 	resized_images = []
 	for i in np.arange(0, len(data)):
-    	resized_data = fixed_size_subset(data[i][:, :, 0], width/2., height/2., size)
-    	resized_images.append(resized_data)
+    		resized_data = fixed_size_subset(data[i][:, :, 0], width/2., height/2., size)
+    		resized_images.append(resized_data)
     
 	augmented_data = np.array(data)
 
 	return augmented_data
-	
+
 def augmentation(data, batch_size, resize=True):
 	"""
 	Performs data augmentation on 

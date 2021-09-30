@@ -48,7 +48,7 @@ def resize(data, size=50):
     	width = data[0].shape[0]
     	height = data[0].shape[1]
 
- elif len(data.shape) == 2:
+	elif len(data.shape) == 2:
     	width = data.shape[0]
     	height = data.shape[1]
 

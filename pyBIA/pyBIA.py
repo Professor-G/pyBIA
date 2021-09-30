@@ -65,12 +65,12 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1):
 
     model.add(Conv2D(96, 11, strides=4, activation='relu', input_shape=input_shape,
                      padding='same', kernel_initializer=uniform_scaling))
-    model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+    #model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
     model.add(BatchNormalization())
 
     model.add(Conv2D(256, 5, activation='relu', padding='same',
                      kernel_initializer=uniform_scaling))
-    model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+    #model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
     model.add(BatchNormalization())
 
     model.add(Conv2D(384, 3, activation='relu', padding='same',
@@ -79,7 +79,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1):
                      kernel_initializer=uniform_scaling))
     model.add(Conv2D(256, 3, activation='relu', padding='same',
                      kernel_initializer=uniform_scaling))
-    model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+    #model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
     model.add(BatchNormalization())
 
     model.add(Flatten())

@@ -16,8 +16,8 @@ def generator_parameters():
 	"""
 
 	rotation = 180
-	width = 0.125
-	height = 0.125
+	width = 0.05
+	height = 0.05
 	horizontal = True
 	vertical = True
 	fill = 'nearest'

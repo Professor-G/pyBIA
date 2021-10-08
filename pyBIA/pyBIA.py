@@ -7,7 +7,6 @@ Created on Thu Sep 16 22:40:39 2021
 """
 import os
 import numpy as np
-from data_processing import process_class
 
 from keras.models import Sequential
 from keras.initializers import VarianceScaling

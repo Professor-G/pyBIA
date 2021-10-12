@@ -33,7 +33,7 @@ def fixed_size_subset(array, x, y, size):
     o, r = np.divmod(size, 2)
     l = (x-(o+r-1)).clip(0)
     u = (y-(o+r-1)).clip(0)
-    print(array.shape)
+
     array_ = array[l: x+o+1, u:y+o+1]
     out = np.full((size, size), np.nan, dtype=array.dtype)
     out[:array_.shape[0], :array_.shape[1]] = array_

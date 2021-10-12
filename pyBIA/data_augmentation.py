@@ -71,7 +71,6 @@ def augmentation(data, batch_size, image_width=50):
     """
 
     rotation, width, height, horizontal, vertical, fill = generator_parameters()[:6]
-    #data = np.array(np.expand_dims(data, axis=-1))
 
     datagen = ImageDataGenerator(
         rotation_range=rotation,

@@ -42,6 +42,7 @@ def generator_parameters():
 def resize(data, size=50):
 	"""
 	Resize image
+	size x size
 	"""
 
 	if len(data.shape) == 3:
@@ -63,7 +64,7 @@ def resize(data, size=50):
 	return augmented_data
 
 
-def augmentation(data, batch_size, resize=True):
+def augmentation(data, batch_size, image_width=50):
     """
     Performs data augmentation on 
     non-normalized data and 
@@ -97,8 +98,7 @@ def augmentation(data, batch_size, resize=True):
         	augmented_data.append(augemented_data[0][0])
 
     augmented_data = np.array(augmented_data)
-
-    if resize == True:
-        augmented_data = resize(augmented_data, size=50)
+    augmented_data = resize(augmented_data, size=image_width)
 
     return augmented_data
+

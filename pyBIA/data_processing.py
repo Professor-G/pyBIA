@@ -33,9 +33,11 @@ def fixed_size_subset(array, x, y, size):
     o, r = np.divmod(size, 2)
     l = (x-(o+r-1)).clip(0)
     u = (y-(o+r-1)).clip(0)
+    print(array.shape)
     array_ = array[l: x+o+1, u:y+o+1]
     out = np.full((size, size), np.nan, dtype=array.dtype)
     out[:array_.shape[0], :array_.shape[1]] = array_
+
     return out
 
 def concat_channels(R, G, B):
@@ -106,7 +108,7 @@ def process_class(channel, label=None, normalize=True):
     	img_height = channel.shape[1]
     	axis = 1
     else:
-    	raise ValueError("Channel must either be 2D for a single image or 3D for multiple images.")
+    	raise ValueError("Channel must either be 2D for a single sample or 3D for multiple samples.")
 
     img_num_channels = 1
     data = channel.reshape(axis, img_width, img_height, img_num_channels)

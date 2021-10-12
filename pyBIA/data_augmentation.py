@@ -83,9 +83,9 @@ def augmentation(data, batch_size, resize=True):
 
     if len(data.shape) != 4:
         if len(data.shape) == 3:
-            data = np.array(np.expand_dims(blob, axis=-1))
+            data = np.array(np.expand_dims(data, axis=-1))
         elif len(data.shape) == 2:
-            data = np.array(np.expand_dims(blob, axis=-1))
+            data = np.array(np.expand_dims(data, axis=-1))
         else:
             raise ValueError("Input data must be 2D for single sample or 3D for multiple sampels")
 

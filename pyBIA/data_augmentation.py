@@ -44,25 +44,22 @@ def resize(data, size=50):
     Resize image
     size x size
     """
-    if len(data.shape) == 4:
-        data = data[:, :, :, 0]
-        print("Only one channel allowed, removing 4th dimension in image array...")
 
-    if len(data.shape) == 3:
+    if len(data.shape) == 3 or len(data.shape) == 4:
         width = data[0].shape[0]
         height = data[0].shape[1]
     elif len(data.shape) == 2:
         width = data.shape[0]
         height = data.shape[1]
     else:
-        raise ValueError("Channel must either be 2D for a single image or 3D for multiple images.")
+        raise ValueError("Channel cannot be one dimensional")
 
     resized_images = []
     for i in np.arange(0, len(data)):
-        resized_data = fixed_size_subset(data[i][:, :,], width/2., height/2., size)
+        resized_data = fixed_size_subset(data[i][:, :, 0], int(width/2.), int(height/2.), size)
         resized_images.append(resized_data)
-    
-    augmented_data = np.array(data)
+
+    augmented_data = np.array(resized_images)
 
     return augmented_data
 
@@ -74,6 +71,7 @@ def augmentation(data, batch_size, image_width=50):
     """
 
     rotation, width, height, horizontal, vertical, fill = generator_parameters()[:6]
+    #data = np.array(np.expand_dims(data, axis=-1))
 
     datagen = ImageDataGenerator(
         rotation_range=rotation,
@@ -85,9 +83,7 @@ def augmentation(data, batch_size, image_width=50):
 
 
     if len(data.shape) != 4:
-        if len(data.shape) == 3:
-            data = np.array(np.expand_dims(data, axis=-1))
-        elif len(data.shape) == 2:
+        if len(data.shape) == 3 or len(data.shape) == 2:
             data = np.array(np.expand_dims(data, axis=-1))
         else:
             raise ValueError("Input data must be 2D for single sample or 3D for multiple sampels")
@@ -96,11 +92,11 @@ def augmentation(data, batch_size, image_width=50):
     for i in np.arange(0, len(data)):
         original_data = data[i].reshape((1,) + data[-i].shape)
         for k in range(batch_size):
-        	augemented_data = datagen.flow(original_data, batch_size=1)
-        	augmented_data.append(augemented_data[0][0])
+        	augement = datagen.flow(original_data, batch_size=1)
+        	augmented_data.append(augement[0][0])
 
     augmented_data = np.array(augmented_data)
     augmented_data = resize(augmented_data, size=image_width)
-
+    
     return augmented_data
 

@@ -8,12 +8,12 @@ Created on Thu Sep 16 22:40:39 2021
 import os
 import numpy as np
 
-from keras.models import Sequential
-from keras.initializers import VarianceScaling
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.losses import categorical_crossentropy
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2D, Flatten, BatchNormalization
+from tensorflow.keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2D, Flatten, BatchNormalization
 
 from data_processing import process_class, create_training_set
 

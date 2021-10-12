@@ -6,28 +6,7 @@ Created on Thu Sep 16 21:43:16 2021
 @author: daniel
 """
 import numpy as np
-from keras.utils import np_utils
-
-class Preprocess:
-	"""
-	Parameters
-    __________
-    channel_1, channel_2, channel_3 : RGB channels
-
-    """
-	def __init__(self, channel_1, channel_2=None, channel_3=None)
-
-		if not isinstance(channel_1, np.ndarray):
-        	channel_1 = np.array(channel_1)
-    	if not isinstance(channel_2, np.ndarray):
-            channel_2 = np.array(channel_2)
-    	if not isinstance(channel_1, np.ndarray):
-            channel_3 = np.array(channel_3)
-
-        self.channel_1 = channel_1
-        self.channel_2 = channel_2
-        self.channel_2 = channel_3
-
+from tensorflow.keras.utils import to_categorical
 
 def fixed_size_subset(array, x, y, size):
     """
@@ -59,26 +38,26 @@ def fixed_size_subset(array, x, y, size):
     out[:array_.shape[0], :array_.shape[1]] = array_
     return out
 
-
 def concat_channels(R, G, B):
-	"""
-	Concatenates three 2D arrays to make a three channel matrix.
+    """
+    Concatenates three 2D arrays to make a three channel matrix.
 
-	Parameters
+    Parameters
     __________
     R, G, B: array
-    	2D array of the channel
+        2D array of the channel
 
     Outputs
     _______   
-	RGB : array
-		3D array with each channel stacked.
-	"""
+    RGB : array
+        3D array with each channel stacked.
+    """
 
-	if R.ndim != 2 or G.ndim != 2 or B.ndim != 2:
-		raise ValueError("Every input channel must be a 2-dimensional array (width + height)")
-
+    if R.ndim != 2 or G.ndim != 2 or B.ndim != 2:
+        raise ValueError("Every input channel must be a 2-dimensional array (width + height)")
+        
     RGB = (R[..., np.newaxis], G[..., np.newaxis], B[..., np.newaxis])
+
     return np.concatenate(RGB, axis=-1)
 
 
@@ -149,7 +128,7 @@ def create_training_set(blob_data, other_data):
 	training_labels = np.r_[gb_label, other_label]
 
 	#one-hot encoding 
-	training_labels = np_utils.to_categorical(training_labels, no_classes)
+	training_labels = to_categorical(training_labels, no_classes)
 
 	return training_data, training_labels
 

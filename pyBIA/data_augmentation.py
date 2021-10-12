@@ -40,29 +40,31 @@ def generator_parameters():
     feature_norm, std_norm, sample_std, data_format, split
 
 def resize(data, size=50):
-	"""
-	Resize image
-	size x size
-	"""
+    """
+    Resize image
+    size x size
+    """
+    if len(data.shape) == 4:
+        data = data[:, :, :, 0]
+        print("Only one channel allowed, removing 4th dimension in image array...")
 
-	if len(data.shape) == 3:
-    		width = data[0].shape[0]
-    		height = data[0].shape[1]
-	elif len(data.shape) == 2:
-    		width = data.shape[0]
-    		height = data.shape[1]
-	else:
-    		raise ValueError("Channel must either be 2D for a single image or 3D for multiple images.")
+    if len(data.shape) == 3:
+        width = data[0].shape[0]
+        height = data[0].shape[1]
+    elif len(data.shape) == 2:
+        width = data.shape[0]
+        height = data.shape[1]
+    else:
+        raise ValueError("Channel must either be 2D for a single image or 3D for multiple images.")
 
-	resized_images = []
-	for i in np.arange(0, len(data)):
-    		resized_data = fixed_size_subset(data[i][:, :, 0], width/2., height/2., size)
-    		resized_images.append(resized_data)
+    resized_images = []
+    for i in np.arange(0, len(data)):
+            resized_data = fixed_size_subset(data[i][:, :, 0], width/2., height/2., size)
+            resized_images.append(resized_data)
     
-	augmented_data = np.array(data)
+    augmented_data = np.array(data)
 
-	return augmented_data
-
+    return augmented_data
 
 def augmentation(data, batch_size, image_width=50):
     """
@@ -98,6 +100,7 @@ def augmentation(data, batch_size, image_width=50):
         	augmented_data.append(augemented_data[0][0])
 
     augmented_data = np.array(augmented_data)
+    print(augmented_data.shape)
     augmented_data = resize(augmented_data, size=image_width)
 
     return augmented_data

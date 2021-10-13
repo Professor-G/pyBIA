@@ -6,6 +6,7 @@ Created on Thu Sep 16 21:43:16 2021
 @author: daniel
 """
 import numpy as np
+from warnings import warn
 from tensorflow.keras.utils import to_categorical
 
 def fixed_size_subset(array, x, y, size):
@@ -77,47 +78,51 @@ def normalize_pixels(channel):
 
 def process_class(channel, label=None, normalize=True):
     """
-    Gets a subset of 2D array given a set of (x,y) coordinates
-    and an output size. If the slices exceed the bounds 
-    of the input array, the non overlapping values
-    are filled with NaNs.
-
-    Parameters
+    Takes image data from one class, as well as corresponding
+    label (0 for blob, 1 for other), and returns the reshaped
+    data and the label arrays. This reshaping is required
+    for training/testing the classifier
+    
     __________
     channel : array
         2D array 
     label : int 
-    	Class label
+        Class label
     normalize : bool 
-    	True will normalize the data
+        True will normalize the data
 
     Outputs
     _______       
-    subset: array
-        Subset of the input array
+    data : array
+        Reshaped data
+    label : array
+        Label array
+
     """
     if normalize:
-    	channel = normalize_pixels(channel)
+        channel = normalize_pixels(channel)
 
     if len(channel.shape) == 3:
-    	img_width = channel[0].shape[0]
-    	img_height = channel[0].shape[1]
-    	axis = channel.shape[0]
+        img_width = channel[0].shape[0]
+        img_height = channel[0].shape[1]
+        axis = channel.shape[0]
     elif len(channel.shape) == 2:
-    	img_width = channel.shape[0]
-    	img_height = channel.shape[1]
-    	axis = 1
+        img_width = channel.shape[0]
+        img_height = channel.shape[1]
+        axis = 1
     else:
-    	raise ValueError("Channel must either be 2D for a single sample or 3D for multiple samples.")
+        raise ValueError("Channel must either be 2D for a single sample or 3D for multiple samples.")
 
     img_num_channels = 1
     data = channel.reshape(axis, img_width, img_height, img_num_channels)
 
     if label is None:
-    	return data
+        warn("Returning processed data only, as no corresponding label was input.")
+        return data
 
     label = np.expand_dims(np.array([label]*len(channel)), axis=1).astype('uint8')
     return data, label
+
 
 def create_training_set(blob_data, other_data):
 	"""

@@ -22,7 +22,7 @@ def hyperparameters():
     Sets the hyperparemeters to be used when 
     constructing the convolutional NN.
     """
-    epochs=100
+    epochs=3
     batch_size=32
     learning_rate=0.0001
     momentum=0.9
@@ -32,22 +32,25 @@ def hyperparameters():
     return epochs, batch_size, learning_rate, momentum, decay, nesterov, loss
 
 
-def pyBIA_model(blob_data, other_data, img_num_channels=1):
+def pyBIA_model(blob_data, other_data, validation_X = None, validation_Y = None, img_num_channels=1):
     """
     The CNN model infrastructure presented by AlexNet, with
-    modern modifications
+    modern modifications.
     """
     if len(blob_data.shape) != len(other_data.shape):
         raise ValueError("Shape of blob and other data must be the same.")
+    if len(validation_X) != len(validation_Y):
+        raise ValueError("Size of validation data and validation labels must be the same.")
+    if validation_X is not None and validation_Y is None:
+        raise ValueError("Need to input validation data labels (validation_Y).")
+    if validation_y is not None and validation_X is None:
+        raise ValueError("Need to input validation data (validation_X).")
 
-
-    if len(blob_data.shape) == 3: #if matrix is 3D - contains multiple sampels
+    if len(blob_data.shape) == 3: #if matrix is 3D - contains multiple samples
         img_width = blob_data[0].shape[0]
         img_height = blob_data[0].shape[1]
-
-    elif len(blob_data.shape) == 2: #if matrix is 2D - contains one sample
-        img_width = blob_data.shape[0]
-        img_height = blob_data.shape[1]
+    else:
+        raise ValueError("Data must be 3D, first dimension is number of samples, followed by width and height.")
 
     X_train, Y_train = create_training_set(blob_data, other_data)
     input_shape = (img_width, img_height, img_num_channels)
@@ -64,12 +67,12 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1):
 
     model.add(Conv2D(96, 11, strides=4, activation='relu', input_shape=input_shape,
                      padding='same', kernel_initializer=uniform_scaling))
-    #model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+    model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
     model.add(BatchNormalization())
 
     model.add(Conv2D(256, 5, activation='relu', padding='same',
                      kernel_initializer=uniform_scaling))
-    #model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+    model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
     model.add(BatchNormalization())
 
     model.add(Conv2D(384, 3, activation='relu', padding='same',
@@ -78,7 +81,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1):
                      kernel_initializer=uniform_scaling))
     model.add(Conv2D(256, 3, activation='relu', padding='same',
                      kernel_initializer=uniform_scaling))
-    #model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+    model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
     model.add(BatchNormalization())
 
     model.add(Flatten())
@@ -95,7 +98,11 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1):
                          decay=decay, nesterov=nesterov)
 
     model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
-    model.fit(X_train, Y_train, batch_size=batch_size, epochs=no_epochs, verbose=1)
+    
+    if validation_X is None:
+        model.fit(X_train, Y_train, batch_size=batch_size, epochs=no_epochs, verbose=1)
+    elif validation_X is not None:
+        model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(validation_X, validation_Y), epochs=no_epochs, verbose=1)
 
     return model
 

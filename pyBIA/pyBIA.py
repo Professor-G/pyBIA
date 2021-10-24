@@ -32,19 +32,23 @@ def hyperparameters():
     return epochs, batch_size, learning_rate, momentum, decay, nesterov, loss
 
 
-def pyBIA_model(blob_data, other_data, validation_X = None, validation_Y = None, img_num_channels=1):
+def pyBIA_model(blob_data, other_data, normalize=True, validation_X=None, validation_Y=None, img_num_channels=1, pooling=True):
     """
     The CNN model infrastructure presented by AlexNet, with
     modern modifications.
     """
     if len(blob_data.shape) != len(other_data.shape):
         raise ValueError("Shape of blob and other data must be the same.")
-    if len(validation_X) != len(validation_Y):
-        raise ValueError("Size of validation data and validation labels must be the same.")
-    if validation_X is not None and validation_Y is None:
-        raise ValueError("Need to input validation data labels (validation_Y).")
-    if validation_y is not None and validation_X is None:
-        raise ValueError("Need to input validation data (validation_X).")
+
+    if validation_X is not None:
+        if validation_Y is None:
+            raise ValueError("Need to input validation data labels (validation_Y).")
+    if validation_Y is not None:
+        if validation_X is None:
+            raise ValueError("Need to input validation data (validation_X).")
+    if validation_X is not None:
+        if len(validation_X) != len(validation_Y):
+            raise ValueError("Size of validation data and validation labels must be the same.")
 
     if len(blob_data.shape) == 3: #if matrix is 3D - contains multiple samples
         img_width = blob_data[0].shape[0]
@@ -52,7 +56,7 @@ def pyBIA_model(blob_data, other_data, validation_X = None, validation_Y = None,
     else:
         raise ValueError("Data must be 3D, first dimension is number of samples, followed by width and height.")
 
-    X_train, Y_train = create_training_set(blob_data, other_data)
+    X_train, Y_train = create_training_set(blob_data, other_data, normalize=normalize)
     input_shape = (img_width, img_height, img_num_channels)
 
     epochs, batch_size, lr, momentum, decay, nesterov, loss = hyperparameters()
@@ -67,12 +71,14 @@ def pyBIA_model(blob_data, other_data, validation_X = None, validation_Y = None,
 
     model.add(Conv2D(96, 11, strides=4, activation='relu', input_shape=input_shape,
                      padding='same', kernel_initializer=uniform_scaling))
-    model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+    if pooling is True:
+        model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
     model.add(BatchNormalization())
 
     model.add(Conv2D(256, 5, activation='relu', padding='same',
                      kernel_initializer=uniform_scaling))
-    model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+    if pooling is True:
+        model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
     model.add(BatchNormalization())
 
     model.add(Conv2D(384, 3, activation='relu', padding='same',
@@ -81,7 +87,8 @@ def pyBIA_model(blob_data, other_data, validation_X = None, validation_Y = None,
                      kernel_initializer=uniform_scaling))
     model.add(Conv2D(256, 3, activation='relu', padding='same',
                      kernel_initializer=uniform_scaling))
-    model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+    if pooling is True:
+        model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
     model.add(BatchNormalization())
 
     model.add(Flatten())
@@ -94,15 +101,15 @@ def pyBIA_model(blob_data, other_data, validation_X = None, validation_Y = None,
     model.add(Dense(num_classes, activation='softmax',
                     kernel_initializer='TruncatedNormal'))
 
-    optimizer = SGD(learning_rate=learning_rate, momentum=momentum,
+    optimizer = SGD(learning_rate=lr, momentum=momentum,
                          decay=decay, nesterov=nesterov)
 
     model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
     
     if validation_X is None:
-        model.fit(X_train, Y_train, batch_size=batch_size, epochs=no_epochs, verbose=1)
+        model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, verbose=1)
     elif validation_X is not None:
-        model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(validation_X, validation_Y), epochs=no_epochs, verbose=1)
+        model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(validation_X, validation_Y), epochs=epochs, verbose=1)
 
     return model
 

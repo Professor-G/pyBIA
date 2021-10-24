@@ -56,12 +56,15 @@ def resize(data, size=50):
 
     resized_images = []
     for i in np.arange(0, len(data)):
-        resized_data = fixed_size_subset(data[i][:, :, 0], int(width/2.), int(height/2.), size)
+        if len(data[i].shape) == 2:
+            resized_data = fixed_size_subset(np.array(np.expand_dims(data[i], axis=-1))[:, :, 0], int(width/2.), int(height/2.), size)
+        else:
+            resized_data = fixed_size_subset(data[i][:, :, 0], int(width/2.), int(height/2.), size)
         resized_images.append(resized_data)
 
-    augmented_data = np.array(resized_images)
+    resized_data = np.array(resized_images)
 
-    return augmented_data
+    return resized_data
 
 def augmentation(data, batch_size, image_width=50):
     """

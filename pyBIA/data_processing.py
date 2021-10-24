@@ -64,17 +64,18 @@ def concat_channels(R, G, B):
     return np.concatenate(RGB, axis=-1)
 
 
-def normalize_pixels(channel):
-	"""
-	Convert pixel data to Unsigned integer (0 to 255)
-	and float32, followed by normalization
-	"""
+def normalize_pixels(channel, minimum=650, maximum=2500):
+    """
+    NDWFS min: 654.746
+    NDWFS max for class_star < 0.8: 25560.1 | 99.9%: 7367.51 | 99%: 366.97
+    Convert pixel data to Unsigned integer (0 to 255)
+    and float32, followed by normalization
+    """
 
-	channel = np.array(channel).astype('uint8')
-	channel = channel.astype('float32')
-	channel /= 255
+    channel = np.array(channel).astype('float32')
+    channel = (channel - minimum)/(maximum-minimum)
 
-	return channel
+    return channel
 
 def process_class(channel, label=None, normalize=True):
     """
@@ -99,6 +100,7 @@ def process_class(channel, label=None, normalize=True):
         Label array
 
     """
+    no_classes = 2
     if normalize:
         channel = normalize_pixels(channel)
 
@@ -120,22 +122,46 @@ def process_class(channel, label=None, normalize=True):
         warn("Returning processed data only, as no corresponding label was input.")
         return data
 
-    label = np.expand_dims(np.array([label]*len(channel)), axis=1).astype('uint8')
+    label = np.expand_dims(np.array([label]*len(channel)), axis=1)
+    label = to_categorical(label, no_classes)
     return data, label
 
 
-def create_training_set(blob_data, other_data):
+def create_training_set(blob_data, other_data, normalize=True):
 	"""
 	Returns image data with corresponding label
 	"""
-	no_classes = 2
-	gb_data, gb_label = process_class(blob, label=0, normalize=True)
-	other_data, other_label = process_class(other, label=1, normalize=True)
+	#no_classes = 2
+	gb_data, gb_label = process_class(blob_data, label=0, normalize=normalize)
+	other_data, other_label = process_class(other_data, label=1, normalize=normalize)
 	training_data = np.r_[gb_data, other_data]
 	training_labels = np.r_[gb_label, other_label]
 
 	#one-hot encoding 
-	training_labels = to_categorical(training_labels, no_classes)
+	#training_labels = to_categorical(training_labels, no_classes)
 
 	return training_data, training_labels
+
+
+"""
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
+
+#scaler = MinMaxScaler()
+
+def create_transformation(data, scaler=StandardScaler()):
+    
+    reshaped_data = data.reshape(data.shape[0], data.shape[1]*data.shape[2]) 
+    transform_fit = scaler.fit(reshaped_data) 
+    
+    return transform_fit
+
+def transform_images(data, transformation):
+    
+    reshaped_data = data.reshape(data.shape[0], data.shape[1]*data.shape[2])
+    transformed_data = transformation.transform(reshaped_data)
+    
+    data = transformed_data.reshape(data.shape[0], data.shape[1], data.shape[2])
+    
+    return data 
+"""
 

@@ -83,7 +83,6 @@ def augmentation(data, batch_size, image_width=50):
         vertical_flip=vertical,
         fill_mode=fill)
 
-
     if len(data.shape) != 4:
         if len(data.shape) == 3 or len(data.shape) == 2:
             data = np.array(np.expand_dims(data, axis=-1))

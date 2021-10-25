@@ -6,7 +6,6 @@ Created on Thu Sep 16 21:43:16 2021
 @author: daniel
 """
 import numpy as np
-from warnings import warn
 from tensorflow.keras.utils import to_categorical
 
 def fixed_size_subset(array, x, y, size):
@@ -64,7 +63,7 @@ def concat_channels(R, G, B):
     return np.concatenate(RGB, axis=-1)
 
 
-def normalize_pixels(channel, minimum=650, maximum=2500):
+def normalize_pixels(channel, min_pixel=650, max_pixel=2500):
     """
     NDWFS min: 654.746
     NDWFS max for class_star < 0.8: 25560.1 | 99.9%: 7367.51 | 99%: 366.97
@@ -73,11 +72,11 @@ def normalize_pixels(channel, minimum=650, maximum=2500):
     """
 
     channel = np.array(channel).astype('float32')
-    channel = (channel - minimum)/(maximum-minimum)
+    channel = (channel - min_pixel)/(max_pixel-min_pixel)
 
     return channel
 
-def process_class(channel, label=None, normalize=True):
+def process_class(channel, label=None, normalize=True, min_pixel=650, max_pixel=2500):
     """
     Takes image data from one class, as well as corresponding
     label (0 for blob, 1 for other), and returns the reshaped
@@ -100,9 +99,11 @@ def process_class(channel, label=None, normalize=True):
         Label array
 
     """
-    no_classes = 2
+
+    channel[np.isnan(channel) == True] = min_pixel 
+
     if normalize:
-        channel = normalize_pixels(channel)
+        channel = normalize_pixels(channel, min_pixel=min_pixel, max_pixel=max_pixel)
 
     if len(channel.shape) == 3:
         img_width = channel[0].shape[0]
@@ -119,26 +120,25 @@ def process_class(channel, label=None, normalize=True):
     data = channel.reshape(axis, img_width, img_height, img_num_channels)
 
     if label is None:
-        warn("Returning processed data only, as no corresponding label was input.")
+        #warn("Returning processed data only, as no corresponding label was input.")
         return data
 
     label = np.expand_dims(np.array([label]*len(channel)), axis=1)
-    label = to_categorical(label, no_classes)
+    label = to_categorical(label, 2)
+    
     return data, label
 
 
-def create_training_set(blob_data, other_data, normalize=True):
+def create_training_set(blob_data, other_data, normalize=True, min_pixel=650, max_pixel=2500):
 	"""
 	Returns image data with corresponding label
 	"""
-	#no_classes = 2
-	gb_data, gb_label = process_class(blob_data, label=0, normalize=normalize)
-	other_data, other_label = process_class(other_data, label=1, normalize=normalize)
-	training_data = np.r_[gb_data, other_data]
-	training_labels = np.r_[gb_label, other_label]
 
-	#one-hot encoding 
-	#training_labels = to_categorical(training_labels, no_classes)
+	gb_data, gb_label = process_class(blob_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+	other_data, other_label = process_class(other_data, label=1, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+	
+    training_data = np.r_[gb_data, other_data]
+	training_labels = np.r_[gb_label, other_label]
 
 	return training_data, training_labels
 

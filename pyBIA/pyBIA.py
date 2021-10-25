@@ -7,6 +7,7 @@ Created on Thu Sep 16 22:40:39 2021
 """
 import os
 import numpy as np
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.initializers import VarianceScaling
@@ -22,7 +23,7 @@ def hyperparameters():
     Sets the hyperparemeters to be used when 
     constructing the convolutional NN.
     """
-    epochs=3
+    epochs=100
     batch_size=32
     learning_rate=0.0001
     momentum=0.9
@@ -32,7 +33,7 @@ def hyperparameters():
     return epochs, batch_size, learning_rate, momentum, decay, nesterov, loss
 
 
-def pyBIA_model(blob_data, other_data, normalize=True, validation_X=None, validation_Y=None, img_num_channels=1, pooling=True):
+def pyBIA_model(blob_data, other_data, normalize=True, min_pixel=650, max_pixel=2500, validation_X=None, validation_Y=None, img_num_channels=1, pooling=True, metrics=True, filename='file'):
     """
     The CNN model infrastructure presented by AlexNet, with
     modern modifications.
@@ -56,7 +57,7 @@ def pyBIA_model(blob_data, other_data, normalize=True, validation_X=None, valida
     else:
         raise ValueError("Data must be 3D, first dimension is number of samples, followed by width and height.")
 
-    X_train, Y_train = create_training_set(blob_data, other_data, normalize=normalize)
+    X_train, Y_train = create_training_set(blob_data, other_data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
     input_shape = (img_width, img_height, img_num_channels)
 
     epochs, batch_size, lr, momentum, decay, nesterov, loss = hyperparameters()
@@ -107,23 +108,40 @@ def pyBIA_model(blob_data, other_data, normalize=True, validation_X=None, valida
     model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
     
     if validation_X is None:
-        model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, verbose=1)
+        history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, verbose=1)
     elif validation_X is not None:
-        model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(validation_X, validation_Y), epochs=epochs, verbose=1)
+        history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(validation_X, validation_Y), epochs=epochs, verbose=1)
+
+    if metrics is True:
+        np.savetxt('model_acc'+filename, history.history['accuracy'])
+        np.savetxt('model_loss'+filename, history.history['loss'])
+        np.savetxt('model_val_acc'+filename, history.history['val_loss']  )
+        np.savetxt('model_val_loss'+filename, history.history['val_accuracy'])
 
     return model
 
 
-def predict(data, model, normalize=True):
+def predict(data, model, normalize=True, min_pixel=650, max_pixel=2500):
     """
     Returns class prediction
     0 for blob
     1 for other
     """
+    if len(data.shape) != 4 and normalize is False:
+        raise ValueError('Data must be 4 dimensional, use process_class function first.')
+
     if normalize == True:
-        data = process_class(data)
+        data = process_class(data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
 
-    pred = model.predict(data)
-    pred = np.argmax(pred)
+    predictions = model.predict(data)
 
-    return pred
+    output=[]
+    for i in range(len(predictions)):
+        if np.argmax(predictions[i]) == 0:
+            prediction = 'DIFFUSE'
+        else:
+            prediction = 'OTHER'
+
+        output.append(prediction)
+
+    return np.array(output)

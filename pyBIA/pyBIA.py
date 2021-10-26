@@ -33,7 +33,7 @@ def hyperparameters():
     return epochs, batch_size, learning_rate, momentum, decay, nesterov, loss
 
 
-def pyBIA_model(blob_data, other_data, normalize=True, min_pixel=650, max_pixel=2500, validation_X=None, validation_Y=None, img_num_channels=1, pooling=True, metrics=True, filename='file'):
+def pyBIA_model(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=7351, validation_X=None, validation_Y=None, img_num_channels=1, pooling=True, metrics=True, filename='file'):
     """
     The CNN model infrastructure presented by AlexNet, with
     modern modifications.
@@ -121,7 +121,7 @@ def pyBIA_model(blob_data, other_data, normalize=True, min_pixel=650, max_pixel=
     return model
 
 
-def predict(data, model, normalize=True, min_pixel=650, max_pixel=2500):
+def predict(data, model, normalize=True, min_pixel=638, max_pixel=7351):
     """
     Returns class prediction
     0 for blob

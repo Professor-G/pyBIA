@@ -11,9 +11,9 @@ import numpy as np
 
 def generator_parameters():
     """
-	Random image processing 
-	paremeters for data augmentation
-	"""
+    Random image processing 
+    paremeters for data augmentation
+    """
 
     rotation = 180
     width = 0.05

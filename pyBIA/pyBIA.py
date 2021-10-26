@@ -20,7 +20,7 @@ from data_processing import process_class, create_training_set
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=7351, 
     validation_X=None, validation_Y=None, epochs=100, batch_size=32, lr=0.0001, momentum=0.9, decay=0.0005,
-    nesterov=False, loss='categorical_crossentropy', padding='same', dropout=0.5, pooling=True, metrics=True, filename='file'):
+    nesterov=False, loss='categorical_crossentropy', padding='same', dropout=0.5, pooling=True, metrics=True, filename=''):
     """
     The CNN model infrastructure presented by AlexNet, with
     modern modifications.

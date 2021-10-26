@@ -63,12 +63,10 @@ def concat_channels(R, G, B):
     return np.concatenate(RGB, axis=-1)
 
 
-def normalize_pixels(channel, min_pixel=650, max_pixel=2500):
+def normalize_pixels(channel, min_pixel=638, max_pixel=7351):
     """
-    NDWFS min: 654.746
-    NDWFS max for class_star < 0.8: 25560.1 | 99.9%: 7367.51 | 99%: 366.97
-    Convert pixel data to Unsigned integer (0 to 255)
-    and float32, followed by normalization
+    NDWFS min 0.01% : 638.186
+    NDWFS max 9.99% : 7350.639
     """
 
     channel = np.array(channel).astype('float32')
@@ -76,7 +74,7 @@ def normalize_pixels(channel, min_pixel=650, max_pixel=2500):
 
     return channel
 
-def process_class(channel, label=None, normalize=True, min_pixel=650, max_pixel=2500):
+def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=7351):
     """
     Takes image data from one class, as well as corresponding
     label (0 for blob, 1 for other), and returns the reshaped
@@ -101,6 +99,8 @@ def process_class(channel, label=None, normalize=True, min_pixel=650, max_pixel=
     """
 
     channel[np.isnan(channel) == True] = min_pixel 
+    channel[channel > max_pixel] = max_pixel
+    channel[channel < min_pixel] = min_pixel
 
     if normalize:
         channel = normalize_pixels(channel, min_pixel=min_pixel, max_pixel=max_pixel)
@@ -129,18 +129,18 @@ def process_class(channel, label=None, normalize=True, min_pixel=650, max_pixel=
     return data, label
 
 
-def create_training_set(blob_data, other_data, normalize=True, min_pixel=650, max_pixel=2500):
-	"""
-	Returns image data with corresponding label
-	"""
+def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=7351):
+    """
+    Returns image data with corresponding label
+    """
 
-	gb_data, gb_label = process_class(blob_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
-	other_data, other_label = process_class(other_data, label=1, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
-	
+    gb_data, gb_label = process_class(blob_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+    other_data, other_label = process_class(other_data, label=1, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+    
     training_data = np.r_[gb_data, other_data]
-	training_labels = np.r_[gb_label, other_label]
+    training_labels = np.r_[gb_label, other_label]
 
-	return training_data, training_labels
+    return training_data, training_labels
 
 
 """

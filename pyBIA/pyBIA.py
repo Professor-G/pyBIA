@@ -18,22 +18,9 @@ from tensorflow.keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2
 
 from data_processing import process_class, create_training_set
 
-def hyperparameters():
-    """
-    Sets the hyperparemeters to be used when 
-    constructing the convolutional NN.
-    """
-    epochs=100
-    batch_size=32
-    learning_rate=0.0001
-    momentum=0.9
-    decay=0.0005
-    nesterov=False
-    loss='categorical_crossentropy'
-    return epochs, batch_size, learning_rate, momentum, decay, nesterov, loss
-
-
-def pyBIA_model(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=7351, validation_X=None, validation_Y=None, img_num_channels=1, pooling=True, metrics=True, filename='file'):
+def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=7351, 
+    validation_X=None, validation_Y=None, epochs=100, batch_size=32, lr=0.0001, momentum=0.9, decay=0.0005,
+    nesterov=False, loss='categorical_crossentropy', padding='same', dropout=0.5, pooling=True, metrics=True, filename='file'):
     """
     The CNN model infrastructure presented by AlexNet, with
     modern modifications.
@@ -59,8 +46,6 @@ def pyBIA_model(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=
 
     X_train, Y_train = create_training_set(blob_data, other_data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
     input_shape = (img_width, img_height, img_num_channels)
-
-    epochs, batch_size, lr, momentum, decay, nesterov, loss = hyperparameters()
    
     # Uniform scaling initializer
     num_classes = 2
@@ -71,34 +56,34 @@ def pyBIA_model(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=
     model = Sequential()
 
     model.add(Conv2D(96, 11, strides=4, activation='relu', input_shape=input_shape,
-                     padding='same', kernel_initializer=uniform_scaling))
+                     padding=padding, kernel_initializer=uniform_scaling))
     if pooling is True:
-        model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+        model.add(MaxPool2D(pool_size=3, strides=2, padding=padding))
     model.add(BatchNormalization())
 
-    model.add(Conv2D(256, 5, activation='relu', padding='same',
+    model.add(Conv2D(256, 5, activation='relu', padding=padding,
                      kernel_initializer=uniform_scaling))
     if pooling is True:
-        model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+        model.add(MaxPool2D(pool_size=3, strides=2, padding=padding))
     model.add(BatchNormalization())
 
-    model.add(Conv2D(384, 3, activation='relu', padding='same',
+    model.add(Conv2D(384, 3, activation='relu', padding=padding,
                      kernel_initializer=uniform_scaling))
-    model.add(Conv2D(384, 3, activation='relu', padding='same',
+    model.add(Conv2D(384, 3, activation='relu', padding=padding,
                      kernel_initializer=uniform_scaling))
-    model.add(Conv2D(256, 3, activation='relu', padding='same',
+    model.add(Conv2D(256, 3, activation='relu', padding=padding,
                      kernel_initializer=uniform_scaling))
     if pooling is True:
-        model.add(MaxPool2D(pool_size=3, strides=2, padding='same'))
+        model.add(MaxPool2D(pool_size=3, strides=2, padding=padding))
     model.add(BatchNormalization())
 
     model.add(Flatten())
     model.add(Dense(4096, activation='tanh',
                     kernel_initializer='TruncatedNormal'))
-    model.add(Dropout(0.5))
+    model.add(Dropout(dropout))
     model.add(Dense(4096, activation='tanh',
                     kernel_initializer='TruncatedNormal'))
-    model.add(Dropout(0.5))
+    model.add(Dropout(dropout))
     model.add(Dense(num_classes, activation='softmax',
                     kernel_initializer='TruncatedNormal'))
 
@@ -115,8 +100,9 @@ def pyBIA_model(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=
     if metrics is True:
         np.savetxt('model_acc'+filename, history.history['accuracy'])
         np.savetxt('model_loss'+filename, history.history['loss'])
-        np.savetxt('model_val_acc'+filename, history.history['val_loss']  )
-        np.savetxt('model_val_loss'+filename, history.history['val_accuracy'])
+        if validation_X is not None:
+            np.savetxt('model_val_loss'+filename, history.history['val_accuracy'])
+            np.savetxt('model_val_acc'+filename, history.history['val_loss']  )
 
     return model
 

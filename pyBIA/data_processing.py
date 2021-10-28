@@ -66,7 +66,7 @@ def concat_channels(R, G, B):
 def normalize_pixels(channel, min_pixel=638, max_pixel=7351):
     """
     NDWFS min 0.01% : 638.186
-    NDWFS max 9.99% : 7350.639
+    NDWFS max 99.99% : 7350.639
     """
 
     channel = np.array(channel).astype('float32')
@@ -98,11 +98,10 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
 
     """
 
-    channel[np.isnan(channel) == True] = min_pixel 
-    channel[channel > max_pixel] = max_pixel
-    channel[channel < min_pixel] = min_pixel
-
     if normalize:
+        channel[np.isnan(channel) == True] = min_pixel 
+        channel[channel > max_pixel] = max_pixel
+        channel[channel < min_pixel] = min_pixel
         channel = normalize_pixels(channel, min_pixel=min_pixel, max_pixel=max_pixel)
 
     if len(channel.shape) == 3:

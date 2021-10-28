@@ -101,8 +101,8 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_p
         np.savetxt('model_acc'+filename, history.history['accuracy'])
         np.savetxt('model_loss'+filename, history.history['loss'])
         if validation_X is not None:
-            np.savetxt('model_val_loss'+filename, history.history['val_accuracy'])
-            np.savetxt('model_val_acc'+filename, history.history['val_loss']  )
+            np.savetxt('model_val_acc'+filename, history.history['val_accuracy'])
+            np.savetxt('model_val_loss'+filename, history.history['val_loss'])
 
     return model
 

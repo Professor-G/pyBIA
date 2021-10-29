@@ -13,12 +13,11 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.losses import categorical_crossentropy
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2D, Flatten, BatchNormalization
 
 from data_processing import process_class, create_training_set
 
-def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=7351, 
+def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000, 
     validation_X=None, validation_Y=None, epochs=100, batch_size=32, lr=0.0001, momentum=0.9, decay=0.0005,
     nesterov=False, loss='categorical_crossentropy', padding='same', dropout=0.5, pooling=True, metrics=True, filename=''):
     """
@@ -107,7 +106,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_p
     return model
 
 
-def predict(data, model, normalize=True, min_pixel=638, max_pixel=7351):
+def predict(data, model, normalize=True, min_pixel=638, max_pixel=3000):
     """
     Returns class prediction
     0 for blob

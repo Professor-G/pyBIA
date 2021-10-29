@@ -6,37 +6,12 @@ Created on Thu Sep 27 08:28:20 2021
 @author: daniel
 """
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from data_processing import fixed_size_subset
+from scipy.ndimage import rotate
 import numpy as np
+
+from data_processing import fixed_size_subset
 from warnings import warn
 
-def generator_parameters():
-    """
-    Random image processing 
-    paremeters for data augmentation
-    """
-    rotation = 0
-    width = 0.0
-    height = 0.0
-    horizontal = False
-    vertical = False
-    fill = 'nearest'
-    cval = 0.0
-    zca = False
-    zca_epsilon = 1e-06
-    brightness = None
-    shear = 0.0
-    zoom = 0.0
-    rescale = None
-    sample_norm = False
-    feature_norm = False
-    std_norm = False
-    sample_std = False
-    data_format = None
-    split = 0.0
-    return rotation, width, height, horizontal, vertical, fill, cval
-    zca, zca_epsilon, brightness, shear, zoom, rescale, sample_norm,
-    feature_norm, std_norm, sample_std, data_format, split
 
 def resize(data, size=50):
     """
@@ -73,22 +48,32 @@ def resize(data, size=50):
             resized_images.append(resized_data)
 
     resized_data = np.array(resized_images)
+
     return resized_data
 
-def augmentation(data, batch=10, image_width=50, rotation=180, width=0.05, height=0.05, horizontal=True, vertical=True, fill='nearest'):
+
+def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True, vertical=True, rotation=0, fill='nearest', image_size=50):
     """
     Performs data augmentation on 
     non-normalized data and 
     resizes image to 50x50
     """
+    if isinstance(width_shift, int) == False or isinstance(height_shift, int) == False or isinstance(rotation, int) == False:
+        raise ValueError("Shift parameters must be integers indicating +- pixel range")
 
+    def image_rotation(data):
+        return rotate(data, np.random.choice(range(rotation+1), 1)[0], reshape=False, order=0, prefilter=False)
+    #   return np.rot90(image, np.random.choice([-1, 0, 1]))
+    
     datagen = ImageDataGenerator(
-        rotation_range=rotation,
-        width_shift_range=width,
-        height_shift_range=height,
+        width_shift_range=width_shift,
+        height_shift_range=height_shift,
         horizontal_flip=horizontal,
         vertical_flip=vertical,
         fill_mode=fill)
+
+    if rotation != 0:
+        datagen.preprocessing_function = image_rotation
 
     if len(data.shape) != 4:
         if len(data.shape) == 3 or len(data.shape) == 2:
@@ -104,7 +89,7 @@ def augmentation(data, batch=10, image_width=50, rotation=180, width=0.05, heigh
         	augmented_data.append(augement[0][0])
 
     augmented_data = np.array(augmented_data)
-    augmented_data = resize(augmented_data, size=image_width)
+    augmented_data = resize(augmented_data, size=image_size)
 
     return augmented_data
 

@@ -29,15 +29,12 @@ def fixed_size_subset(array, x, y, size):
     subset: array
         Subset of the input array
     """
-
     o, r = np.divmod(size, 2)
     l = (x-(o+r-1)).clip(0)
     u = (y-(o+r-1)).clip(0)
-
     array_ = array[l: x+o+1, u:y+o+1]
     out = np.full((size, size), np.nan, dtype=array.dtype)
     out[:array_.shape[0], :array_.shape[1]] = array_
-
     return out
 
 def concat_channels(R, G, B):
@@ -63,18 +60,17 @@ def concat_channels(R, G, B):
     return np.concatenate(RGB, axis=-1)
 
 
-def normalize_pixels(channel, min_pixel=638, max_pixel=7351):
+def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
     """
     NDWFS min 0.01% : 638.186
     NDWFS max 99.99% : 7350.639
     """
-
-    channel = np.array(channel).astype('float32')
-    channel = (channel - min_pixel)/(max_pixel-min_pixel)
+    norm = max_pixel - min_pixel
+    channel = (channel - min_pixel) / int(norm)
 
     return channel
 
-def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=7351):
+def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=3000):
     """
     Takes image data from one class, as well as corresponding
     label (0 for blob, 1 for other), and returns the reshaped
@@ -98,7 +94,7 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
 
     """
 
-    if normalize:
+    if normalize is True:
         channel[np.isnan(channel) == True] = min_pixel 
         channel[channel > max_pixel] = max_pixel
         channel[channel < min_pixel] = min_pixel
@@ -128,7 +124,7 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
     return data, label
 
 
-def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=7351):
+def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=3000):
     """
     Returns image data with corresponding label
     """

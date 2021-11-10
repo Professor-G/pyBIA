@@ -65,8 +65,8 @@ def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
     NDWFS min 0.01% : 638.186
     NDWFS max 99.99% : 7350.639
     """
-    norm = max_pixel - min_pixel
-    channel = (channel - min_pixel) / int(norm)
+    
+    channel = (channel - min_pixel) /  (max_pixel - min_pixel)
 
     return channel
 

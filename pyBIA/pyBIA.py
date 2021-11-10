@@ -44,6 +44,8 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_p
         raise ValueError("Data must be 3D, first dimension is number of samples, followed by width and height.")
 
     X_train, Y_train = create_training_set(blob_data, other_data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+    X_train[X_train > 1] = 1
+    X_train[X_train < 0] = 0
     input_shape = (img_width, img_height, img_num_channels)
    
     # Uniform scaling initializer

@@ -63,7 +63,6 @@ def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True,
 
     def image_rotation(data):
         return rotate(data, np.random.choice(range(rotation+1), 1)[0], reshape=False, order=0, prefilter=False)
-    #   return np.rot90(image, np.random.choice([-1, 0, 1]))
     
     datagen = ImageDataGenerator(
         width_shift_range=width_shift,

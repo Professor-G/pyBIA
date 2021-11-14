@@ -11,8 +11,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.initializers import VarianceScaling
-from tensorflow.keras.optimizers import Adam, SGD
-from tensorflow.keras.losses import categorical_crossentropy
+from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.losses import categorical_crossentropy, SquaredHinge
 from tensorflow.keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2D, Flatten, BatchNormalization
 
 from data_processing import process_class, create_training_set
@@ -88,7 +88,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_p
     model.add(Dense(num_classes, activation='softmax',
                     kernel_initializer='TruncatedNormal'))
 
-    optimizer = Adam(learning_rate=lr, momentum=momentum,
+    optimizer = SGD(learning_rate=lr, momentum=momentum,
                          decay=decay, nesterov=nesterov)
 
     model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])

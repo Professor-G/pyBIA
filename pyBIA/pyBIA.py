@@ -88,7 +88,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_p
     model.add(Dense(num_classes, activation='softmax',
                     kernel_initializer='TruncatedNormal'))
 
-    optimizer = SGD(learning_rate=lr, momentum=momentum,
+    optimizer = Adam(learning_rate=lr, momentum=momentum,
                          decay=decay, nesterov=nesterov)
 
     model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])

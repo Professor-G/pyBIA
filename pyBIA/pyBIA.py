@@ -12,10 +12,11 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import SGD
-from tensorflow.keras.losses import categorical_crossentropy, SquaredHinge
+from tensorflow.keras.losses import categorical_crossentropy
 from tensorflow.keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2D, Flatten, BatchNormalization
 
 from data_processing import process_class, create_training_set
+
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000, 
     validation_X=None, validation_Y=None, epochs=100, batch_size=32, lr=0.0001, momentum=0.9, decay=0.0005,
@@ -115,7 +116,7 @@ def predict(data, model, normalize=True, min_pixel=638, max_pixel=3000):
     1 for other
     """
     if len(data.shape) != 4 and normalize is False:
-        raise ValueError('Data must be 4 dimensional, use process_class function first.')
+        raise ValueError('Data must be 4 dimensional, set normalize=True')
 
     if normalize == True:
         data = process_class(data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)

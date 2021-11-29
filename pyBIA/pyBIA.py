@@ -7,8 +7,8 @@ Created on Thu Sep 16 22:40:39 2021
 """
 import os
 import numpy as np
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-
+from warnings import warn
+#os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import SGD
@@ -39,6 +39,9 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_p
     if validation_X is not None:
         if len(validation_X) != len(validation_Y):
             raise ValueError("Size of validation data and validation labels must be the same.")
+
+    if batch_size < 16:
+        warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger the batch size and/or smaller learning rate.")
 
     if len(blob_data.shape) == 3: #if matrix is 3D - contains multiple samples
         img_width = blob_data[0].shape[0]

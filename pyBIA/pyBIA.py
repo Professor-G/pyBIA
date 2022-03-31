@@ -8,7 +8,7 @@ Created on Thu Sep 16 22:40:39 2021
 import os
 import numpy as np
 from warnings import warn
-#os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import SGD
@@ -141,3 +141,12 @@ def predict(data, model, normalize=True, min_pixel=638, max_pixel=3000):
         output.append(prediction)
 
     return np.array(output)
+
+
+def bw_model():
+    import tensorflow as tf
+    from keras.models import load_model
+
+    return tf.keras.models.load_model('data/New_Model.h5')
+
+

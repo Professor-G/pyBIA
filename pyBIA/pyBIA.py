@@ -16,7 +16,7 @@ from tensorflow.keras.losses import categorical_crossentropy
 from tensorflow.keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2D, Flatten, BatchNormalization
 from tensorflow.keras.callbacks import ModelCheckpoint
 
-from data_processing import process_class, create_training_set
+from pyBIA.data_processing import process_class, create_training_set
 
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000, 
@@ -146,7 +146,10 @@ def predict(data, model, normalize=True, min_pixel=638, max_pixel=3000):
 def bw_model():
     import tensorflow as tf
     from keras.models import load_model
+    import pkg_resources
 
-    return tf.keras.models.load_model('data/New_Model.h5')
-
-
+    resource_package = __name__
+    resource_path = '/'.join(('data', 'New_Model.h5'))
+    model = tf.keras.models.load_model(pkg_resources.resource_filename(resource_package, resource_path))
+    
+    return model

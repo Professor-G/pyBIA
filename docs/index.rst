@@ -20,4 +20,13 @@ The current stable version can be installed via pip:
 
 Example: 
 ==================
+In this example we will load the standard pyBIA model for blue broadband images, and use this model to classify low redshift lyman-alpha blobs, known as Green Bean galaxies. 
+
+.. code-block:: python
+
+    from pyBIA import pyBIA
+
+    model = pyBIA.bw_model()
+
+This is our CNN model, which we can now use to classify any 50x50 image.
 

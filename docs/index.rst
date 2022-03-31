@@ -30,3 +30,9 @@ In this example we will load the standard pyBIA model for blue broadband images,
 
 This is our CNN model, which we can now use to classify any 50x50 image.
 
+.. code-block:: python
+
+    prediction = pyBIA.predict(data, model)
+
+The data format must be a 2-dimensional array.
+

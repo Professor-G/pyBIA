@@ -9,7 +9,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from scipy.ndimage import rotate
 import numpy as np
 
-from data_processing import fixed_size_subset
+from pyBIA.data_processing import fixed_size_subset
 from warnings import warn
 
 

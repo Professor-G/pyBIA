@@ -14,7 +14,7 @@ A machine learning classifier for detecting Lyman-alpha blobs in wide-field surv
 
 # [Documentation](https://pybia.readthedocs.io/en/latest/)
 
-For technical details and an example of how to implement MicroLIA for a microlensing search, check out our [Documentation](https://pybia.readthedocs.io/en/latest/).
+For technical details and an example of how to implement pyBIA for a lyman-alpha blob search, check out our [Documentation](https://pybia.readthedocs.io/en/latest/).
 
 
 # How to Contribute?

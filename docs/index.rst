@@ -36,6 +36,15 @@ This is our CNN model, which we can now use to classify any 50x50 image.
 
 The data format must be a 2-dimensional array.
 
+Pages
+----------------------
+.. toctree::
+   :maxdepth: 2
+
+   source/Installation
+   source/Conventions
+   source/Examples
+
 modules details
 ----------------------
 

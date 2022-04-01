@@ -19,14 +19,14 @@ sys.path.insert(0, os.path.abspath('../'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'MicroLIA'
+project = 'pyBIA'
 copyright = '2022, Daniel Godines'
 author = 'Daniel Godines'
 
 # The short X.Y version
 version = '1.0'
 # The full version, including alpha/beta/rc tags
-release = '1.6.1'
+release = '0.9.1'
 
 
 # -- General configuration ---------------------------------------------------
@@ -54,7 +54,7 @@ extensions = [
 ]
 autosummary_generate = True
 autoapi_type = 'python'
-autoapi_dirs = ['../MicroLIA', './source']
+autoapi_dirs = ['../pyBIA', './source']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -64,7 +64,7 @@ templates_path = ['_templates']
 #
 # source_suffix = ['.rst', '.md']
 source_suffix = '.rst'
-exclude_patterns = ['../MicroLIA/test/*']
+exclude_patterns = ['../pyBIA/test/*']
 # The master toctree document.
 master_doc = 'index'
 
@@ -119,7 +119,7 @@ html_static_path = ["./source/_static"]
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'MicroLIAdoc'
+htmlhelp_basename = 'pyBIAdoc'
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -146,7 +146,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'MicroLIA.tex', 'MicroLIA Documentation',
+    (master_doc, 'pyBIA.tex', 'pyBIA Documentation',
      'Daniel Godines', 'manual'),
 ]
 
@@ -156,7 +156,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'microlia', 'MicroLIA Documentation',
+    (master_doc, 'pybia', 'pyBIA Documentation',
      [author], 1)
 ]
 
@@ -167,8 +167,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'MicroLIA', 'MicroLIA Documentation',
-     author, 'MicroLIA', 'Microlensing classifier',
+    (master_doc, 'pyBIA', 'pyBIA Documentation',
+     author, 'pyBIA', 'Lyman-alpha nebulae classifier',
      'Miscellaneous'),
 ]
 

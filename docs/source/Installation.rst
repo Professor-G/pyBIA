@@ -13,7 +13,7 @@ The last stable version can be installed via pip:
 .. code-block:: bash
 
     python -m pip install -U pip
-    pip install MicroLIA
+    pip install pyBIA
 
 From Source
 -----------
@@ -22,7 +22,7 @@ You can also get the development version on GitHub:
 
 .. code-block:: bash
 
-    git clone https://github.com/Professor-G/MicroLIA.git
+    git clone https://github.com/Professor-G/pyBIA.git
     python setup.py -U install
     pip install -r requirements.txt
 

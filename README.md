@@ -9,7 +9,7 @@ A machine learning classifier for detecting Lyman-alpha blobs in wide-field surv
 # Installation
 
 ```
-    $ pip install MicroLIA
+    $ pip install pyBIA
 ```
 
 # [Documentation](https://pybia.readthedocs.io/en/latest/)

@@ -1,5 +1,5 @@
-.. _Gravitational Microlensing:
+.. _Nebulae:
 
-Gravitational Microlensing
+Lyman-alpha nebulae
 ===========
 

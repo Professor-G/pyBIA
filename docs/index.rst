@@ -8,6 +8,13 @@ Welcome to pyBIA's documentation!
 
 pyBIA is an open-source program for Lyman-alpha blob detection in wide-field surveys. This engine uses the machine learning convolutional neural network model, trained with 50x50 images.
 
+.. toctree::
+   :maxdepth: 2
+
+   source/Installation
+   source/Conventions
+   source/Examples
+   
 Installation
 ==================
 

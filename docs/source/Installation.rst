@@ -12,7 +12,7 @@ The last stable version can be installed via pip:
 
 .. code-block:: bash
 
-    python -m pip install -U pip
+    pip3 install --upgrade pip setuptools wheel
     pip install pyBIA
 
 From Source

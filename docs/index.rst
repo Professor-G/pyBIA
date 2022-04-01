@@ -36,3 +36,14 @@ This is our CNN model, which we can now use to classify any 50x50 image.
 
 The data format must be a 2-dimensional array.
 
+modules details
+----------------------
+
+Here is the (hopefully up-to-date) documentation
+for all submodules.
+
+.. toctree::
+   :maxdepth: 1
+
+   source/pyBIA
+

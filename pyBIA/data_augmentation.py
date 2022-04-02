@@ -15,9 +15,18 @@ from warnings import warn
 
 def resize(data, size=50):
     """
-    Resize image
-    size x size
+    Resizes the data by cropping out the outer 
+    boundaries outside the size x size limit.
+
+    Args:
+        data (array): 2D array
+        size (int): length/width of the output array
+
+    Returns:
+        array: The cropped out data
+
     """
+
     if len(data.shape) == 3 or len(data.shape) == 4:
         width = data[0].shape[0]
         height = data[0].shape[1]
@@ -52,12 +61,37 @@ def resize(data, size=50):
     return resized_data
 
 
-def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True, vertical=True, rotation=0, fill='nearest', image_size=50):
+def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True, 
+        vertical=True, rotation=0, fill='nearest', image_size=50):
     """
-    Performs data augmentation on 
-    non-normalized data and 
-    resizes image to 50x50
+    Performs data augmentation on non-normalized data and resizes image if
+    rotational augmentations were applied. 
+
+    Args:
+        data (array): 2D array of an image
+        batch (int): How many augmented images to create
+        width_shift (int): The max shift allowed in either horizontal direction
+        height_shift (int): The max shift allowed in either vertical direction
+        horizontal (bool): If False no horizontal flips are allowed. Defaults to True.
+        vertical (bool): If False no vertical reflections are allowed. Defaults to True.
+        rotation (int): The rotation angle in degrees. Defaults to zero for no rotation.
+        fill (str) = This is the treatment for data outside the boundaries after roration
+            and shifts. Default is set to 'nearest' which repeats the closest pixel values.
+            Can set to: {"constant", "nearest", "reflect", "wrap"}.
+        image_size (int, bool): The length/width of the cropped image. This can used to remove
+            anomalies caused by the fill. Defaults to 50, the pyBIA standard. This can also
+            be set to None in which case the image in its original size is returned.
+
+    Note:
+        The training set pyBIA uses includes augmented images. The original image size was
+        100x100 pixels, these were cropped to 50x50 to remove rotational effects at the 
+        outer boundaries. 
+
+    Returns:
+        array: 3D array containing the augmented images. 
+
     """
+
     if isinstance(width_shift, int) == False or isinstance(height_shift, int) == False or isinstance(rotation, int) == False:
         raise ValueError("Shift parameters must be integers indicating +- pixel range")
 
@@ -88,7 +122,8 @@ def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True,
         	augmented_data.append(augement[0][0])
 
     augmented_data = np.array(augmented_data)
-    augmented_data = resize(augmented_data, size=image_size)
+    if augmented_data is not None:
+        augmented_data = resize(augmented_data, size=image_size)
 
     return augmented_data
 

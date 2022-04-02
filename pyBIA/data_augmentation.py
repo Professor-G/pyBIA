@@ -62,19 +62,26 @@ def resize(data, size=50):
 
 
 def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True, 
-        vertical=True, rotation=0, fill='nearest', image_size=50):
+        vertical=True, rotation=360, fill='nearest', image_size=50):
     """
-    Performs data augmentation on non-normalized data and resizes image if
-    rotational augmentations were applied. 
+    This function takes in one image and applies data augmentation techniques.
+    Shifts and rotations occur at random, for example, if width_shit is set
+    to 10, then the image shift between -10 and 10 will be chosen from a 
+    random uniform distribution.
+
+    Rotation angle is also chosen from a random uniform distribution, between
+    zero and the rotation argument. 
 
     Args:
         data (array): 2D array of an image
-        batch (int): How many augmented images to create
-        width_shift (int): The max shift allowed in either horizontal direction
-        height_shift (int): The max shift allowed in either vertical direction
+        batch (int): How many augmented images to create and output
+        width_shift (int): The max pixel shift allowed in either horizontal direction.
+            If set to zero no horizontal shifts will be performed. Defaults to 5 pixels.
+        height_shift (int): The max pixel shift allowed in either vertical direction.
+            If set to zero no vertical shifts will be performed. Defaults to 5 pixels.
         horizontal (bool): If False no horizontal flips are allowed. Defaults to True.
         vertical (bool): If False no vertical reflections are allowed. Defaults to True.
-        rotation (int): The rotation angle in degrees. Defaults to zero for no rotation.
+        rotation (int): The rotation angle in degrees. Defaults to 360 for full rotation allowed.
         fill (str) = This is the treatment for data outside the boundaries after roration
             and shifts. Default is set to 'nearest' which repeats the closest pixel values.
             Can set to: {"constant", "nearest", "reflect", "wrap"}.

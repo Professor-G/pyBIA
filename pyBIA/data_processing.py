@@ -8,89 +8,114 @@ Created on Thu Sep 16 21:43:16 2021
 import numpy as np
 from tensorflow.keras.utils import to_categorical
 
-def fixed_size_subset(array, x, y, size):
+def fixed_size_subset(data, x, y, size):
     """
-    Gets a subset of 2D array given a set of (x,y) coordinates
-    and an output size. If the slices exceed the bounds 
-    of the input array, the non overlapping values
-    are filled with NaNs.
+    This function takes a 2D array and returns a sub-array
+    centered around x and y. 
 
-    Parameters
-    __________
-    array: array
-        2D array from which to take a subset
-    x, y: int 
-    	Coordinates of the center of the subset
-    size: int 
-    	Size of the output array
+    The sub array will be a square of length = size.
 
-    Outputs
-    _______       
-    subset: array
-        Subset of the input array
+    Note:
+        When applying data augmentation techniques 
+        it is best to crop the image afterward, to
+        avoid the rotational shear visible on the edges.
+
+    Args:
+        data (array): 2D array to crop
+        x, y (int): Central position of the sub-array, relative
+            to the entire data.
+        size (int): length/width of the output array
+
+    Returns
+        array: The cropped array
+
     """
     o, r = np.divmod(size, 2)
     l = (x-(o+r-1)).clip(0)
     u = (y-(o+r-1)).clip(0)
-    array_ = array[l: x+o+1, u:y+o+1]
-    out = np.full((size, size), np.nan, dtype=array.dtype)
-    out[:array_.shape[0], :array_.shape[1]] = array_
+    array_ = data[l: x+o+1, u:y+o+1]
+    
     return out
 
-def concat_channels(R, G, B):
+def concat_channels(channel1, channel2, channel3):
     """
-    Concatenates three 2D arrays to make a three channel matrix.
+    This function concatenates three 2D arrays to make a three channel matrix.
+    Useful for image classification when using multiple filters.
 
-    Parameters
-    __________
-    R, G, B: array
-        2D array of the channel
+    Can combine SDSS g,r,i for example, to make one 3D image. Order at which
+    they are stacked must be conistent if data is input for classification.
 
-    Outputs
-    _______   
-    RGB : array
-        3D array with each channel stacked.
+    Note:
+        pyBIA version 1 contains a trained CNN model that made use of
+        only a single band, although it is possible to also train
+        a CNN model using multiple bands if the data availability allows.
+    
+    Args:
+        Channel1 (array): 2D array of the first channel
+        Channel2 (array): 2D array of the second channel
+        Channel3 (array): 2D array of the third channel
+
+    Returns:
+        array: 3D array with each channel stacked
+
     """
 
-    if R.ndim != 2 or G.ndim != 2 or B.ndim != 2:
+    if channel1.ndim != 2 or channel2.ndim != 2 or channel3.ndim != 2:
         raise ValueError("Every input channel must be a 2-dimensional array (width + height)")
         
-    RGB = (R[..., np.newaxis], G[..., np.newaxis], B[..., np.newaxis])
+    colorized = (channel1[..., np.newaxis], channel2[..., np.newaxis], channel3[..., np.newaxis])
 
-    return np.concatenate(RGB, axis=-1)
+    return np.concatenate(colorized, axis=-1)
 
 
 def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
     """
+    This function will apply min-max normalization. 
+    Image anomalies will be removed by setting the values below/above
+    the thresholds to the min/max limits. 
+
     NDWFS min 0.01% : 638.186
     NDWFS max 99.99% : 7350.639
+    Max of expected blobs : ~3000
+
+    Args:
+    channel (array): 2D array for one image, 3D array for multiple images
+    min_pixel (int, optional): The minimum pixel count, defaults to 638. 
+        Pixels with counts below this threshold will be set to this limit.
+    max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
+        Pixels with counts above this threshold will be set to this limit.
+
+    Returns:      
+        array: Reshaped data array
+        array: Reshaped label array
+
     """
-    
+        
     channel = (channel - min_pixel) /  (max_pixel - min_pixel)
 
     return channel
 
 def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=3000):
     """
-    Takes image data from one class, as well as corresponding
-    label (0 for blob, 1 for other), and returns the reshaped
-    data and the label arrays. This reshaping is required
-    for training/testing the classifier
+    Takes image data returns the reshaped data arrays, which is required
+    for training/testing the CNN classifier
     
-    __________
-    channel : array
-        2D array 
-    label : int 
-        Class label
-    normalize : bool 
-        True will normalize the data
+    If label is set to either 0 or 1, then the reshaped data is
+    returned along with an array containing the label array, also reshaped. 
+    This is used for creating training sets of appropriate shape.
+    
+    Args:
+        channel (array): 2D array for one image, 3D array for multiple images
+        label (int, optional): Class label, 0 for blob, 1 for other. Defaults to None.
+        normalize (bool, optional): True will normalize the data using the input min and max pixels
+        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
+            Pixels with counts below this threshold will be set to this limit.
+        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
+            Pixels with counts above this threshold will be set to this limit.
 
-    Outputs
-    _______       
-    data : array
-        Reshaped data
-    label : array
-        Label array
+    Returns:      
+        array: Reshaped data array
+        array: Reshaped label array
 
     """
 
@@ -118,6 +143,7 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
         #warn("Returning processed data only, as no corresponding label was input.")
         return data
 
+    #reshape
     label = np.expand_dims(np.array([label]*len(channel)), axis=1)
     label = to_categorical(label, 2)
     
@@ -126,7 +152,22 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
 
 def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=3000):
     """
-    Returns image data with corresponding label
+    Combines image data of known class to create a training set.
+    This is used for training the machine learning models. 
+
+    Args:
+        blob_data (array): 3D array containing more than one image of diffuse objects.
+        other_data (int, optional): 3D array containing more than one image of non-diffuse objects.
+        normalize (bool, optional): True will normalize the data using the input min and max pixels
+        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
+            Pixels with counts below this threshold will be set to this limit.
+        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
+            Pixels with counts above this threshold will be set to this limit.
+
+    Returns:      
+        array: Reshaped data array
+        array: Reshaped label array
+
     """
 
     gb_data, gb_label = process_class(blob_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
@@ -137,26 +178,4 @@ def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, ma
 
     return training_data, training_labels
 
-
-"""
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
-
-#scaler = MinMaxScaler()
-
-def create_transformation(data, scaler=StandardScaler()):
-    
-    reshaped_data = data.reshape(data.shape[0], data.shape[1]*data.shape[2]) 
-    transform_fit = scaler.fit(reshaped_data) 
-    
-    return transform_fit
-
-def transform_images(data, transformation):
-    
-    reshaped_data = data.reshape(data.shape[0], data.shape[1]*data.shape[2])
-    transformed_data = transformation.transform(reshaped_data)
-    
-    data = transformed_data.reshape(data.shape[0], data.shape[1], data.shape[2])
-    
-    return data 
-"""
 

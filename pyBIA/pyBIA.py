@@ -8,16 +8,68 @@ Created on Thu Sep 16 22:40:39 2021
 import os
 import numpy as np
 from warnings import warn
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 from tensorflow.keras.models import Sequential, save_model
 from tensorflow.keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.losses import categorical_crossentropy
 from tensorflow.keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2D, Flatten, BatchNormalization
 from tensorflow.keras.callbacks import ModelCheckpoint
-
 from pyBIA.data_processing import process_class, create_training_set
 
+def bw_model():
+    """
+    Calling this will load the trained Tensorflow model, trained using NDWFS images
+    in the blue broadband.
+    
+    Note
+        Training new models with 1000 epochs can take over a week, this Bw model
+        was trained using NDWFS blue broadband images. The corresponding .h5 file is 
+        located in the data folder inside the pyBIA directory in the Python path. 
+
+    """
+    import tensorflow as tf
+    from keras.models import load_model
+    import pkg_resources
+
+    resource_package = __name__
+    resource_path = '/'.join(('data', 'New_Model.h5'))
+    model = tf.keras.models.load_model(pkg_resources.resource_filename(resource_package, resource_path))
+    
+    return model
+    
+def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
+    """
+    Returns the class prediction. The input can either be a single 2d array 
+    or a 3D array containing multiple samples.
+
+    Args
+        data: 2D array for single image, 3D array for multiple images.
+        model: The trained Tensorflow model.
+        normalize (bool, optional): True will normalize the data using the input min and max pixels
+        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
+            Pixels with counts below this threshold will be set to this limit.
+        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
+            Pixels with counts above this threshold will be set to this limit.
+
+    Returns
+        array: The class prediction(s), either 'DIFFUSE' or 'OTHER'.
+
+    """
+
+    data = process_class(data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+    predictions = model.predict(data)
+
+    output=[]
+    for i in range(len(predictions)):
+        if np.argmax(predictions[i]) == 0:
+            prediction = 'DIFFUSE'
+        else:
+            prediction = 'OTHER'
+
+        output.append(prediction)
+
+    return np.array(output)
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
     min_pixel=638, max_pixel=3000, validation_X=None, validation_Y=None, 
@@ -189,62 +241,3 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
 
     return model
 
-
-def predict(data, model, normalize=True, min_pixel=638, max_pixel=3000):
-    """
-    Returns class prediction, either 'DIFFUSE' or 'OTHER'.
-
-    Note
-        If your input data is a 2D matrix the normalize parameter must be set
-        to True, as this step will re-shape the data to be 4-dimensional. This
-        reshaping is required for CNN classification.
-
-    Args
-        data: 2D array for single image, 3D array for multiple images.
-        model: The trained Tensorflow model.
-        normalize (bool, optional): True will normalize the data using the input min and max pixels
-        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
-            Pixels with counts below this threshold will be set to this limit.
-        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
-            Pixels with counts above this threshold will be set to this limit.
-
-    Returns
-        array: The class prediction, either 'DIFFUSE' or 'OTHER'.
-
-    """
-
-    data = process_class(data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
-    predictions = model.predict(data)
-
-    output=[]
-    for i in range(len(predictions)):
-        if np.argmax(predictions[i]) == 0:
-            prediction = 'DIFFUSE'
-        else:
-            prediction = 'OTHER'
-
-        output.append(prediction)
-
-    return np.array(output)
-
-
-def bw_model():
-    """
-    Calling this will load the trained Tensorflow model, trained using NDWFS images
-    in the blue broadband.
-    
-    Note
-        Training new models with 1000 epochs can take over a week, this Bw model
-        was trained using NDWFS blue broadband images. The corresponding .h5 file is 
-        located in the data folder inside the pyBIA directory in the Python path. 
-
-    """
-    import tensorflow as tf
-    from keras.models import load_model
-    import pkg_resources
-
-    resource_package = __name__
-    resource_path = '/'.join(('data', 'New_Model.h5'))
-    model = tf.keras.models.load_model(pkg_resources.resource_filename(resource_package, resource_path))
-    
-    return model

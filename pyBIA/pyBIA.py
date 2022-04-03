@@ -46,28 +46,28 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             using tensorflow, see example in the Notes.
         epochs (int): Number of epochs used for training. 
         batch_size (int): The size of each sub-sample used during the training
-        epoch. Large batches are likely to get stuck in local minima. Defaults to 32.
+            epoch. Large batches are likely to get stuck in local minima. Defaults to 32.
         lr (float): Learning rate, the rate at which the model updates the gradient. Defaults to 0.0001
         batch_norm (bool): If False, batch normalization after each max pooling layer
-        is disabled. Defaults to True.
-        Note: If set to True it might be best also set dropout=0. See: https://arxiv.org/abs/1502.03167
+            is disabled. Defaults to True.
+            Note: If set to True it might be best also set dropout=0. See: https://arxiv.org/abs/1502.03167
         momentum (float): Momentum is a float greater than 0 that accelerates gradient descent. Defaults to 0.9.
         decay (float): The rate of learning rate decay applied after each epoch. Defaults to 0.0005.
         nesterov (bool): Whether to apply Nesterov momentum or not. Defaults to False.
         loss (str): The loss function used to calculate the gradients. Defaults to 'categorical_crossentropy'.
             Loss functions can be set by calling the Keras API losses module.
         padding (str): Either 'same' or 'valid'. When set to 'valid', the dimensions reduce as the boundary 
-        that doesn't make it within even convolutions get cuts off. Defaults to 'same', which applies
-        zero-value padding around the boundary, ensuring even convolutions.
+            that doesn't make it within even convolutions get cuts off. Defaults to 'same', which applies
+            zero-value padding around the boundary, ensuring even convolutions.
         dropout (float): Droupout rate between 0 and 1. This is the percentage of dense neurons
-        that are turned off at each epoch. This prevents inter-neuron depedency, and thus overfitting. 
-        Note: If batch_norm=True, it might be best to disable droput. See: https://arxiv.org/abs/1502.03167
+            that are turned off at each epoch. This prevents inter-neuron depedency, and thus overfitting. 
+            Note: If batch_norm=True, it might be best to disable droput. See: https://arxiv.org/abs/1502.03167
         pooling (bool): True to enable max pooling, false to disable. 
-        Note: Max pooling can result in loss of positional information, it computation allows
-        setting pooling=False may yield more robust accuracy.
+            Note: Max pooling can result in loss of positional information, it computation allows
+            setting pooling=False may yield more robust accuracy.
         metrics (bool): When False the CNN will not save the model accuracy and loss. Defaults to True.
         filename (str, optional): The name of the metrics filename. The metrics files will be saved
-        as 'model_metric'+filename.
+            as 'model_metric'+filename.
 
     Note:
         To use a validation dataset when training the model, the validation_X and validation_Y

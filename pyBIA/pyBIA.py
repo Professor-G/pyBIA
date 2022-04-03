@@ -72,7 +72,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
     Note:
         To use a validation dataset when training the model, the validation_X and validation_Y
         parameters must be input. The validation_X is a 3D matrix containing all the images, and
-        the validation_X is another matrix containing their class label (0 for DIFFUSE, 1 for OTHER).
+        the validation_Y is another matrix containing their class label (0 for DIFFUSE, 1 for OTHER).
 
         If you have validation images of both blobs and others, validation arguments can be constructed
         as follow:
@@ -85,9 +85,8 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
 
             >>> model = pyBIA_model(blob_train, other_train, validation_X=validation_X, validation_Y=validation_Y)
 
-        The class labels are also reshaped which is why it's best to use the process_class function and simply
-        set the label value, either 0 or 1. The label array is reshaped automatically, although given a label
-        value of 0, the array is constructed as follows:
+        The class labels are also reshaped which is the process_class function did for us in the above example. 
+        You can create your own label array by following the following convention:
 
             >>> label_array = numpy.expand_dims(np.array([0]*len(channel)), axis=1)
             >>> label_array = tensorflow.keras.utils.to_categorical(label, 2)

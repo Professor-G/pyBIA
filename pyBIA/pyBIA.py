@@ -22,7 +22,7 @@ def bw_model():
     Calling this will load the trained Tensorflow model, trained using NDWFS images
     in the blue broadband.
     
-    Note
+    Note:
         Training new models with 1000 epochs can take over a week, this Bw model
         was trained using NDWFS blue broadband images. The corresponding .h5 file is 
         located in the data folder inside the pyBIA directory in the Python path. 
@@ -43,7 +43,7 @@ def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
     Returns the class prediction. The input can either be a single 2d array 
     or a 3D array containing multiple samples.
 
-    Args
+    Args:
         data: 2D array for single image, 3D array for multiple images.
         model: The trained Tensorflow model.
         normalize (bool, optional): True will normalize the data using the input min and max pixels
@@ -52,7 +52,7 @@ def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
         max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
             Pixels with counts above this threshold will be set to this limit.
 
-    Returns
+    Returns:
         array: The class prediction(s), either 'DIFFUSE' or 'OTHER'.
 
     """
@@ -143,7 +143,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             >>> label_array = numpy.expand_dims(np.array([0]*len(channel)), axis=1)
             >>> label_array = tensorflow.keras.utils.to_categorical(label, 2)
 
-    Returns
+    Returns:
         model: The trained Tensorflow model.
 
     """

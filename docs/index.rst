@@ -44,7 +44,7 @@ Pages
    :maxdepth: 2
 
    source/Installation
-   source/Conventions
+   source/Science
    source/Examples
 
 Documentation

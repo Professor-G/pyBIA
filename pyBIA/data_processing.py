@@ -26,7 +26,7 @@ def fixed_size_subset(data, x, y, size):
             to the entire data.
         size (int): length/width of the output array
 
-    Returns
+    Returns:
         array: The cropped array
 
     """
@@ -71,19 +71,17 @@ def concat_channels(channel1, channel2, channel3):
 def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
     """
     This function will apply min-max normalization. 
-    Image anomalies will be removed by setting the values below/above
-    the thresholds to the min/max limits. 
 
     NDWFS min 0.01% : 638.186
     NDWFS max 99.99% : 7350.639
     Max of expected blobs : ~3000
 
     Args:
-    channel (array): 2D array for one image, 3D array for multiple images
-    min_pixel (int, optional): The minimum pixel count, defaults to 638. 
-        Pixels with counts below this threshold will be set to this limit.
-    max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
-        Pixels with counts above this threshold will be set to this limit.
+        channel (array): 2D array for one image, 3D array for multiple images
+        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
+            Pixels with counts below this threshold will be set to this limit.
+        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
+            Pixels with counts above this threshold will be set to this limit.
 
     Returns:      
         array: Reshaped data array
@@ -98,16 +96,20 @@ def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
 def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=3000):
     """
     Takes image data returns the reshaped data arrays, which is required
-    for training/testing the CNN classifier
+    for training/testing, and predicting with the CNN classifier.
     
     If label is set to either 0 or 1, then the reshaped data is
     returned along with an array containing the label array, also reshaped. 
     This is used for creating training sets of appropriate shape.
     
+    Note:
+        Image anomalies can be removed by setting normalize=True, as the 
+        values below/above the thresholds are set to the min/max limits. 
+
     Args:
         channel (array): 2D array for one image, 3D array for multiple images
         label (int, optional): Class label, 0 for blob, 1 for other. Defaults to None.
-        normalize (bool, optional): True will normalize the data using the input min and max pixels
+        normalize (bool, optional): True will apply min-max normalization.
         min_pixel (int, optional): The minimum pixel count, defaults to 638. 
             Pixels with counts below this threshold will be set to this limit.
         max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
@@ -157,7 +159,7 @@ def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, ma
 
     Args:
         blob_data (array): 3D array containing more than one image of diffuse objects.
-        other_data (int, optional): 3D array containing more than one image of non-diffuse objects.
+        other_data (array): 3D array containing more than one image of non-diffuse objects.
         normalize (bool, optional): True will normalize the data using the input min and max pixels
         min_pixel (int, optional): The minimum pixel count, defaults to 638. 
             Pixels with counts below this threshold will be set to this limit.

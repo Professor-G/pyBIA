@@ -6,7 +6,8 @@
 Welcome to pyBIA's documentation!
 ===============================
 
-pyBIA is an open-source program for Lyman-alpha blob detection in wide-field surveys. This engine uses the machine learning convolutional neural network model, trained with 50x50 images.
+pyBIA is an open-source program for Lyman-alpha blob detection in wide-field surveys. This engine uses the machine learning convolutional neural network model, trained with 50x50 images; therefore when using the standard Bw pyBIA model, the data input
+for classification must also be 50x50 pixels.
 
    
 Installation
@@ -21,7 +22,8 @@ The current stable version can be installed via pip:
 
 Importing pyBIA 
 ==================
-In this example we will load the standard pyBIA model for blue broadband images, and use this model to classify low redshift lyman-alpha blobs, known as Green Bean galaxies. 
+
+We have trained a Convolutional Neural Network using the high-level Keras API. Our model took ~8 days to train and is included in the standard pyBIA installation. This classifier is called 'bw_model' as the training data includes a subsample of diffuse objects in the NDWFS Bw band footprint (see `Moire et al. 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_. We hope to add more models for different bands in the future.
 
 .. code-block:: python
 
@@ -29,13 +31,12 @@ In this example we will load the standard pyBIA model for blue broadband images,
 
     model = pyBIA.bw_model()
 
-This is our CNN model, which we can now use to classify any 50x50 image.
+With our model loaded, we can classify any 50x50 2-dimensional matrix using the predict function.
 
 .. code-block:: python
 
     prediction = pyBIA.predict(data, model)
 
-The data format must be a 2-dimensional array.
 
 Pages
 ----------------------
@@ -46,11 +47,10 @@ Pages
    source/Conventions
    source/Examples
 
-modules details
+Documentation
 ----------------------
 
-Here is the (hopefully up-to-date) documentation
-for all submodules.
+Here is the documentation for all the modules:
 
 .. toctree::
    :maxdepth: 1

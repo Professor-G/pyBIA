@@ -17,8 +17,9 @@ from pyBIA import data_processing
 #data = hdu[0].data
 
 
-def create_catalog(data, error=None, morph_params=False, x=None, y=None, aperture=15, annulus_in=20, annulus_out=35, 
-    invert=False, path=''):
+def create_catalog(data, error=None, morph_params=False, x=None, y=None, 
+    aperture=15, annulus_in=20, annulus_out=35, invert=False, path=''):
+
     """
     Calculates the photometry of the object(s) in the
     given position(s). The parameters x and y should be
@@ -40,7 +41,7 @@ def create_catalog(data, error=None, morph_params=False, x=None, y=None, apertur
     Args:
         data (array): 2D array.
         error (array, optional): 2D array containing the rms error map.
-        morph_params (bool): If True image esegmentation is performed and
+        morph_params (bool, optional): If True image esegmentation is performed and
             morphological parameters are computed. Defaults to False. 
         x (array, optional): 1D array containing the x pixel position.
             Can contain one position or multiple samples.
@@ -51,7 +52,10 @@ def create_catalog(data, error=None, morph_params=False, x=None, y=None, apertur
             that will be used to calculate the background. Defaults to 20.
         annulus_out (int): The outer radius of the cirtular aperture
                 that will be used to calculate the background. Defaults to 35.
-        path (str): By default the text file containing the photometry will be
+        invert (bool, optional): If True, the x & y coordinates will be switched
+            when cropping out the object during the image segmentation step. For
+            more information see the morph_parameters function. Defaults to False.
+        path (str, optional): By default the text file containing the photometry will be
             saved to the local directory, unless an absolute path to a desired
             directory is entered here.
     Note:
@@ -139,9 +143,8 @@ def morph_parameters(data, x, y, invert=False):
             Can contain one position or multiple samples.
         y (array): 1D array containing the y pixel position.
             Can contain one position or multiple samples.
-        invert (bool): If True the x & y coordinates will be
-            switched when cropping out the object, see Note below.
-            Defaults to False.
+        invert (bool): If True the x & y coordinates will be switched
+            when cropping out the object, see Note below. Defaults to False.
 
     Note:
         This procedure requires x & y positions as each source 

@@ -8,7 +8,7 @@ Created on Thu Sep 16 21:43:16 2021
 import numpy as np
 from tensorflow.keras.utils import to_categorical
 
-def fixed_size_subset(data, x, y, size):
+def crop_image(data, x, y, size):
     """
     This function takes a 2D array and returns a sub-array
     centered around x and y. 

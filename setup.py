@@ -9,7 +9,7 @@ from setuptools import setup, find_packages, Extension
 
 setup(
     name="pyBIA",
-    version="0.9.5",
+    version="0.9.6",
     author="Daniel Godines",
     author_email="danielgodinez123@gmail.com",
     description="Convolutional Neural Network for Ly-alpha blob detection",
@@ -28,7 +28,7 @@ setup(
     include_package_data=True,
     test_suite="nose.collector",
     package_data={
-    '': ['New_Model.h5'],
+    '': ['Bw_CNN_Model.h5'],
 },
 
 )

@@ -80,11 +80,15 @@ def create_catalog(data, error=None, morph_params=False, x=None, y=None, apertur
             raise ValueError("The rms error map must be the same shape as the data array.")
     if aperture > annulus_in or annulus_in > annulus_out:
         raise ValueError('The radius of the inner and out annuli must be larger than the aperture radius.')
-    if x or y is not None:
+    if x is not None:
+        try: #If position array is a single number it will be converted to a list of unit length
+            len(x)
+        except TypeError:
+            x, y = [x], [y]
         if len(x) != len(y):
             raise ValueError("The two position arrays (x & y) must be the same size.")
         
-    if x or y is None:
+    if x is None:
         mean, median, std = sigma_clipped_stats(data, sigma=3.0)
         print('Performing source detection -- this will take several minutes.')
         daofind = DAOStarFinder(fwhm=3.0, threshold=2.*std)  
@@ -92,32 +96,37 @@ def create_catalog(data, error=None, morph_params=False, x=None, y=None, apertur
         for col in sources.colnames:  
             sources[col].info.format = '%.8g'  # for consistent table output        
         x, y = np.array(sources['xcentroid']), np.array(sources['ycentroid'])
-        
-    positions = np.transpose((x, y))
+
+    positions = []
+    for it in range(len(x)):
+        positions.append((x[it], y[it]))
+
     apertures = CircularAperture(positions, r=aperture)
     annulus_apertures = CircularAnnulus(positions, r_in=annulus_in, r_out=annulus_out)
     annulus_masks = annulus_apertures.to_mask(method='center')
-    annulus_data = annulus_masks.multiply(data)
-    mask = annulus_masks.data
+    annulus_data = annulus_masks[0].multiply(data)
+    mask = annulus_masks[0].data
     annulus_data_1d = annulus_data[mask > 0]
     median_bkg = np.median(annulus_data_1d)
         
     if error is None:
         phot_table = aperture_photometry(data, apertures)
         photometry = phot_table['aperture_sum'] - (median_bkg * apertures.area)
-        prop_list = morph_params(data, x, y)
-        return photometry, prop_list
+        if morph_params == True:
+            prop_list = morph_parameters(data, x, y, invert=True)
+            return photometry, prop_list
+        return photometry
        
     phot_table = aperture_photometry(data, apertures, error=error)
     photometry = phot_table['aperture_sum'] - (median_bkg * apertures.area)
     photometry_err = phot_table['aperture_sum_err']
-    prop_list = morph_params(data, x, y)
+    if morph_params == True:
+        prop_list = morph_parameters(data, x, y, invert=True)
+        return photometry, photometry_err, prop_list
+    return photometry, photometry_err
+        
 
-    return photometry, photometry_err, prop_list
-         
-    
-
-def morph_params(data, x, y):
+def morph_parameters(data, x, y, invert=False):
     """
     Applies image segmentation on each object to calculate morphological 
     parameters. These parameters can be used to train a machine learning classifier.
@@ -128,17 +137,34 @@ def morph_params(data, x, y):
             Can contain one position or multiple samples.
         y (array): 1D array containing the y pixel position.
             Can contain one position or multiple samples.
-            
+        invert (bool): If True the x & y coordinates will be
+            switched when cropping out the object, see Note below.
+            Defaults to False.
+
     Note:
         This procedure requires x & y positions as each source 
         is isolated before the segmentation is performed. If your
         image array is less than 100x100 pixels, the procedure will fail.
+
+        IMPORTANT: When loading data from a .fits file please note the pixel convention
+        is switched. The (x, y) = (0, 0) position is on the top left corner of the .fits
+        data. The standard convention is for the (x, y) = (0, 0) to be at the bottom left
+        corner of the image. We strongly recommend you double-check your data coordinate
+        convetion. We made use of .fits data with the (x, y) = (0, 0) position at the top
+        left of the image, for this reason we switched x and y when cropping out individual
+        objects. The parameter invert=True performs the coordinate switch for us. 
     
     Return:
         A catalog of morphological parameters.
         
     """
-    
+    try: #If position array is a single number it will be converted to a list of unit length
+        len(x)
+    except TypeError:
+        x, y = [x], [y]
+    if invert == True:
+        x, y = y, x
+
     prop_list=[]
     for i in range(len(x)):
         new_data = data_processing.crop_image(data, int(x[i]), int(y[i]), 100)
@@ -147,7 +173,7 @@ def morph_params(data, x, y):
         sigma = 3.0 * gaussian_fwhm_to_sigma   
         kernel = Gaussian2DKernel(sigma, x_size=3, y_size=3)
         kernel.normalize()
-        segm = detect_sources(new_data, threshold, npixels=5, filter_kernel=kernel)
+        segm = detect_sources(new_data, threshold, npixels=5, kernel=kernel)
         props = SourceCatalog(new_data, segm, kernel=kernel)
    
         sep_list=[]
@@ -163,10 +189,14 @@ def morph_params(data, x, y):
             inx = inx[0]
             props = props[int(inx)]
         prop_list.append(props)
-    
+
     return prop_list
+
+def save_catalog(photometry, photometry_err, prop_list):
+    """
+    """
+    return photometry
     
-        
 def plot(data, cmap='gray'):
     """
     Plots 2D array using a robust colorbar range to
@@ -188,5 +218,3 @@ def plot(data, cmap='gray'):
     
     plt.imshow(data, vmin=vmin, vmax=vmax, cmap=cmap)
     plt.show()
-
-

@@ -21,13 +21,13 @@ def crop_image(data, x, y, size):
         avoid the rotational shear visible on the edges.
 
     Args:
-        data (array): 2D array to crop
-        x, y (int): Central position of the sub-array, relative
-            to the entire data.
-        size (int): length/width of the output array
+        data (array): 2D array.
+        x, y (int): Central position of the sub-array to be cropped, 
+        relative to the entire data.
+        size (int): length/width of the output array.
 
     Returns:
-        array: The cropped array
+        array: The cropped array.
 
     """
     o, r = np.divmod(size, 2)
@@ -54,12 +54,12 @@ def concat_channels(channel1, channel2, channel3):
         a CNN model using multiple bands if the data availability allows.
     
     Args:
-        Channel1 (array): 2D array of the first channel
-        Channel2 (array): 2D array of the second channel
-        Channel3 (array): 2D array of the third channel
+        Channel1 (array): 2D array of the first channel.
+        Channel2 (array): 2D array of the second channel.
+        Channel3 (array): 2D array of the third channel.
 
     Returns:
-        array: 3D array with each channel stacked
+        array: 3D array with each channel stacked.
 
     """
 
@@ -76,19 +76,20 @@ def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
     This function will apply min-max normalization. 
 
     NDWFS min 0.01% : 638.186
+
     NDWFS max 99.99% : 7350.639
-    Max of expected blobs : ~3000
+
+    Max intensity of expected blobs : ~3000
 
     Args:
-        channel (array): 2D array for one image, 3D array for multiple images
+        channel (array): 2D array for one image, 3D array for multiple images.
         min_pixel (int, optional): The minimum pixel count, defaults to 638. 
             Pixels with counts below this threshold will be set to this limit.
         max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
             Pixels with counts above this threshold will be set to this limit.
 
     Returns:      
-        array: Reshaped data array
-        array: Reshaped label array
+        array: Reshaped data and label arrays.
 
     """
         
@@ -98,19 +99,20 @@ def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
 
 def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=3000):
     """
-    Takes image data returns the reshaped data arrays, which is required
-    for training/testing, and predicting with the CNN classifier.
+    Takes image data and returns the reshaped data array, which is required when 
+    entering data into the CNN classifier.
     
     If label is set to either 0 or 1, then the reshaped data is
     returned along with an array containing the label array, also reshaped. 
-    This is used for creating training sets of appropriate shape.
+    This is used for creating training or validations sets of appropriate shape.
     
     Note:
         Image anomalies can be removed by setting normalize=True, as the 
-        values below/above the thresholds are set to the min/max limits. 
+        values below/above the thresholds are set to the min/max limits. We
+        strongly recommend normalizing your data.
 
     Args:
-        channel (array): 2D array for one image, 3D array for multiple images
+        channel (array): 2D array for one image, 3D array for multiple images.
         label (int, optional): Class label, 0 for blob, 1 for other. Defaults to None.
         normalize (bool, optional): True will apply min-max normalization.
         min_pixel (int, optional): The minimum pixel count, defaults to 638. 
@@ -119,8 +121,7 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
             Pixels with counts above this threshold will be set to this limit.
 
     Returns:      
-        array: Reshaped data array
-        array: Reshaped label array
+        array: Reshaped data and label arrays
 
     """
 
@@ -170,8 +171,7 @@ def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, ma
             Pixels with counts above this threshold will be set to this limit.
 
     Returns:      
-        array: Reshaped data array
-        array: Reshaped label array
+        array: Reshaped data and label arrays.
 
     """
 

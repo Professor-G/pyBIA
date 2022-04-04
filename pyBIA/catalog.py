@@ -17,7 +17,8 @@ from pyBIA import data_processing
 #data = hdu[0].data
 
 
-def create_catalog(data, error=None, morph_params=False, x=None, y=None, aperture=15, annulus_in=20, annulus_out=35, path=''):
+def create_catalog(data, error=None, morph_params=False, x=None, y=None, aperture=15, annulus_in=20, annulus_out=35, 
+    invert=False, path=''):
     """
     Calculates the photometry of the object(s) in the
     given position(s). The parameters x and y should be
@@ -30,6 +31,7 @@ def create_catalog(data, error=None, morph_params=False, x=None, y=None, apertur
     Example:
         We can use the world coordinate system astropy
         provides to convert our ra and dec to x and y pixels:
+
         >>> hdu = astropy.io.fits.open(name)
         >>> wcsobj= astropy.wcs.WCS(header = hdu[0].header)
         >>> x_pix, y_pix = wcsobj.all_world2pix(ra, dec, 0) 
@@ -148,11 +150,13 @@ def morph_parameters(data, x, y, invert=False):
 
         IMPORTANT: When loading data from a .fits file please note the pixel convention
         is switched. The (x, y) = (0, 0) position is on the top left corner of the .fits
-        data. The standard convention is for the (x, y) = (0, 0) to be at the bottom left
-        corner of the image. We strongly recommend you double-check your data coordinate
-        convetion. We made use of .fits data with the (x, y) = (0, 0) position at the top
+        image. The standard convention is for the (x, y) = (0, 0) to be at the bottom left
+        corner of the data. We strongly recommend you double-check your data coordinate
+        convention. We made use of .fits data with the (x, y) = (0, 0) position at the top
         left of the image, for this reason we switched x and y when cropping out individual
-        objects. The parameter invert=True performs the coordinate switch for us. 
+        objects. The parameter invert=True performs the coordinate switch for us. This is only
+        required when running this function as the image must be cropped before segmentation.
+
     
     Return:
         A catalog of morphological parameters.
@@ -196,7 +200,7 @@ def save_catalog(photometry, photometry_err, prop_list):
     """
     """
     return photometry
-    
+
 def plot(data, cmap='gray'):
     """
     Plots 2D array using a robust colorbar range to

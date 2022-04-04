@@ -33,15 +33,15 @@ def bw_model():
     import pkg_resources
 
     resource_package = __name__
-    resource_path = '/'.join(('data', 'New_Model.h5'))
+    resource_path = '/'.join(('data', 'Bw_CNN_Model.h5'))
     model = tf.keras.models.load_model(pkg_resources.resource_filename(resource_package, resource_path))
     
     return model
     
 def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
     """
-    Returns the class prediction. The input can either be a single 2d array 
-    or a 3D array containing multiple samples.
+    Returns the class prediction. The input can either be a single 2D array 
+    or a 3D array if there are multiple samples.
 
     Args:
         data: 2D array for single image, 3D array for multiple images.
@@ -126,8 +126,8 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
         parameters must be input. The validation_X is a 3D matrix containing all the images, and
         the validation_Y is another matrix containing their class label (0 for DIFFUSE, 1 for OTHER).
 
-        If you have validation images of both blobs and others, validation arguments can be constructed
-        as follow:
+        If you have validation images of blobs and others, we can use the pyBIA data_processing module to
+        properly process our data and costruct validation arguments of appropriate shape. 
 
             >>> val_other, val_other_labels = pyBIA.data_processing.process_class(other_test, label=1, normalize=False)
             >>> val_blob, val_blob_labels = pyBIA.data_processing.process_class(blob_test, label=0, normalize=False)
@@ -137,8 +137,13 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
 
             >>> model = pyBIA_model(blob_train, other_train, validation_X=validation_X, validation_Y=validation_Y)
 
-        The class labels are also reshaped which is the process_class function did for us in the above example. 
-        You can create your own label array by following the following convention:
+        The process_class function will reshape our data and label array. The data must be a 4D matrix, constructed as follow:
+
+            >>> data = channel.reshape(axis, img_width, img_height, img_num_channels)
+
+        You can do this manually by converting your 1D label arrays into a binary matrix representation.
+        For example, if you have a channel with 100 DIFFUSE samples (label=0), you can create a corresponding label array
+        with the following, although we recommened you use the process_class function.
 
             >>> label_array = numpy.expand_dims(np.array([0]*len(channel)), axis=1)
             >>> label_array = tensorflow.keras.utils.to_categorical(label, 2)

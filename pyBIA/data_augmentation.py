@@ -9,7 +9,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from scipy.ndimage import rotate
 import numpy as np
 
-from pyBIA.data_processing import fixed_size_subset
+from pyBIA.data_processing import crop_image
 from warnings import warn
 
 
@@ -45,15 +45,15 @@ def resize(data, size=50):
         return data
 
     if len(data.shape) == 2:
-        resized_data = fixed_size_subset(np.array(np.expand_dims(data, axis=-1))[:, :, 0], int(width/2.), int(height/2.), size)
+        resized_data = crop_image(np.array(np.expand_dims(data, axis=-1))[:, :, 0], int(width/2.), int(height/2.), size)
         return resized_data
     else:
         resized_images = []    
         for i in np.arange(0, len(data)):
             if len(data[i].shape) == 2:
-                resized_data = fixed_size_subset(np.array(np.expand_dims(data[i], axis=-1))[:, :, 0], int(width/2.), int(height/2.), size)
+                resized_data = crop_image(np.array(np.expand_dims(data[i], axis=-1))[:, :, 0], int(width/2.), int(height/2.), size)
             else:
-                resized_data = fixed_size_subset(data[i][:, :, 0], int(width/2.), int(height/2.), size)
+                resized_data = crop_image(data[i][:, :, 0], int(width/2.), int(height/2.), size)
             resized_images.append(resized_data)
 
     resized_data = np.array(resized_images)

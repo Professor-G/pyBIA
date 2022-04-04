@@ -33,8 +33,11 @@ def crop_image(data, x, y, size):
     o, r = np.divmod(size, 2)
     l = (x-(o+r-1)).clip(0)
     u = (y-(o+r-1)).clip(0)
-    array_ = data[l: x+o+1, u:y+o+1]
+    array = data[l: x+o+1, u:y+o+1]
     
+    out = np.full((size, size), np.nan, dtype=data.dtype)
+    out[:array.shape[0], :array.shape[1]] = array
+
     return out
 
 def concat_channels(channel1, channel2, channel3):

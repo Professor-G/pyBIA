@@ -43,9 +43,9 @@ def create_catalog(data, error=None, morph_params=False, x=None, y=None,
         error (array, optional): 2D array containing the rms error map.
         morph_params (bool, optional): If True image esegmentation is performed and
             morphological parameters are computed. Defaults to False. 
-        x (array, optional): 1D array containing the x pixel position.
+        x (array, optional): 1D array or list containing the x pixel position.
             Can contain one position or multiple samples.
-        y (array, optional): 1D array containing the y pixel position.
+        y (array, optional): 1D array or list containing the y pixel position.
             Can contain one position or multiple samples.
         aperture (int): The radius of the photometric aperture. Defaults to 15.
         annulus_in (int): The inner radius of the cirtular aperture
@@ -119,7 +119,7 @@ def create_catalog(data, error=None, morph_params=False, x=None, y=None,
         phot_table = aperture_photometry(data, apertures)
         photometry = phot_table['aperture_sum'] - (median_bkg * apertures.area)
         if morph_params == True:
-            prop_list = morph_parameters(data, x, y, invert=True)
+            prop_list = morph_parameters(data, x, y, invert=invert)
             return photometry, prop_list
         return photometry
        
@@ -127,7 +127,7 @@ def create_catalog(data, error=None, morph_params=False, x=None, y=None,
     photometry = phot_table['aperture_sum'] - (median_bkg * apertures.area)
     photometry_err = phot_table['aperture_sum_err']
     if morph_params == True:
-        prop_list = morph_parameters(data, x, y, invert=True)
+        prop_list = morph_parameters(data, x, y, invert=invert)
         return photometry, photometry_err, prop_list
     return photometry, photometry_err
         
@@ -139,9 +139,9 @@ def morph_parameters(data, x, y, invert=False):
     
     Args:
         data (array): 2D array.
-        x (array): 1D array containing the x pixel position.
+        x (array): 1D array or list containing the x pixel position.
             Can contain one position or multiple samples.
-        y (array): 1D array containing the y pixel position.
+        y (array): 1D array or list containing the y pixel position.
             Can contain one position or multiple samples.
         invert (bool): If True the x & y coordinates will be switched
             when cropping out the object, see Note below. Defaults to False.
@@ -162,7 +162,9 @@ def morph_parameters(data, x, y, invert=False):
 
     
     Return:
-        A catalog of morphological parameters.
+        A catalog of morphological parameters. If multiple positions are input, then the
+        output will be a list containing multiple individual morphological catalogs, one for
+        each position.
         
     """
     try: #If position array is a single number it will be converted to a list of unit length

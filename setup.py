@@ -23,7 +23,7 @@ setup(
 		'Programming Language :: Python :: 3',	   
 ],
     packages=find_packages('.'),
-    install_requires = ['numpy','tensorflow','scipy','photutils', 'matplotlib'],
+    install_requires = ['numpy','tensorflow','scipy','photutils', 'matplotlib', 'pandas'],
     python_requires='>=3.7,<4',
     include_package_data=True,
     test_suite="nose.collector",

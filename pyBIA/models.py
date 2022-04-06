@@ -189,16 +189,16 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
 
     model.add(Conv2D(96, 11, strides=4, activation='relu', input_shape=input_shape,
                      padding=padding, kernel_initializer=uniform_scaling))
-    if pooling is True:
+    if pooling:
         model.add(MaxPool2D(pool_size=3, strides=2, padding=padding))
-    if batch_norm is True:
+    if batch_norm:
         model.add(BatchNormalization())
 
     model.add(Conv2D(256, 5, activation='relu', padding=padding,
                      kernel_initializer=uniform_scaling))
-    if pooling is True:
+    if pooling:
         model.add(MaxPool2D(pool_size=3, strides=2, padding=padding))
-    if batch_norm is True:
+    if batch_norm:
         model.add(BatchNormalization())
 
     model.add(Conv2D(384, 3, activation='relu', padding=padding,
@@ -207,9 +207,9 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
                      kernel_initializer=uniform_scaling))
     model.add(Conv2D(256, 3, activation='relu', padding=padding,
                      kernel_initializer=uniform_scaling))
-    if pooling is True:
+    if pooling:
         model.add(MaxPool2D(pool_size=3, strides=2, padding=padding))
-    if batch_norm is True:
+    if batch_norm:
         model.add(BatchNormalization())
 
     model.add(Flatten())
@@ -235,7 +235,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
     elif validation_X is not None:
         history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(validation_X, validation_Y), epochs=epochs, callbacks=callbacks_list, verbose=1)
 
-    if metrics is True:
+    if metrics:
         np.savetxt('model_acc'+filename, history.history['accuracy'])
         np.savetxt('model_loss'+filename, history.history['loss'])
         if validation_X is not None:

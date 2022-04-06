@@ -134,4 +134,27 @@ def resize(data, size=50):
 
     return resized_data
 
+def plot(data, cmap='gray', title=''):
+    """
+    Plots 2D array using a robust colorbar range to
+    ensure proper visibility.
+    
+    Args:
+        data (array): 2D array for single image, or 3D array with stacked channels.
+        cmap (str): Colormap to use when generating the image.
+        title (str, optional): Title displayed above the image. 
+
+    Returns:
+        Image
+        
+    """
+    
+    index = np.where(np.isfinite(data))
+    std = np.median(np.abs(data[index]-np.median(data[index])))
+    vmin = np.median(data[index]) - 3*std
+    vmax = np.median(data[index]) + 10*std
+    
+    plt.imshow(data, vmin=vmin, vmax=vmax, cmap=cmap)
+    plt.title(title)
+    plt.show()
 

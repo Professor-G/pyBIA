@@ -31,9 +31,9 @@ def crop_image(data, x, y, size):
 
     """
     o, r = np.divmod(size, 2)
-    l = (x-(o+r-1)).clip(0)
-    u = (y-(o+r-1)).clip(0)
-    array = data[l: x+o+1, u:y+o+1]
+    l = (int(x)-(o+r-1)).clip(0)
+    u = (int(y)-(o+r-1)).clip(0)
+    array = data[l: int(x)+o+1, u:int(y)+o+1]
     
     out = np.full((size, size), np.nan, dtype=data.dtype)
     out[:array.shape[0], :array.shape[1]] = array

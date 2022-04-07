@@ -137,17 +137,21 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
 
             >>> model = pyBIA_model(blob_train, other_train, validation_X=validation_X, validation_Y=validation_Y)
 
-        The process_class function will reshape our data and label array. The data must be a 4D matrix, constructed as follow:
+        The process_class function will reshape our data and label array. This is done because the data must be a 4D matrix in
+        order to input into a CNN model. The data array is thus constructed as follow:
 
             >>> data = channel.reshape(axis, img_width, img_height, img_num_channels)
 
-        You can do this manually by converting your 1D label arrays into a binary matrix representation.
-        For example, if you have a channel with 100 DIFFUSE samples (label=0), you can create a corresponding label array
-        with the following, although we recommened you use the process_class function.
+        The label array is also a special binary form: you can set this up manually by converting your 1D label arrays 
+        into a binary matrix representation. For example, if you have a channel with 100 DIFFUSE samples (label=0), 
+        you can create a corresponding label array with the following:
 
             >>> label_array = numpy.expand_dims(np.array([0]*len(channel)), axis=1)
             >>> label_array = tensorflow.keras.utils.to_categorical(label, 2)
-
+        
+        The process_class function does all the above for us, so it's best to call that directly to
+        properly reshape our data and labels. 
+        
     Returns:
         model: The trained Tensorflow model.
 

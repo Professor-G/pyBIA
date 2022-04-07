@@ -51,7 +51,11 @@ extensions = [
     'sphinx.ext.githubpages',
     'sphinx.ext.napoleon',
     'autoapi.extension'
+   # 'sphinx.ext.autosectionlabel'
 ]
+
+#autosectionlabel_prefix_document = True
+
 autosummary_generate = True
 autoapi_type = 'python'
 autoapi_dirs = ['../pyBIA', './source']

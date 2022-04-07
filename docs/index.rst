@@ -28,7 +28,7 @@ data of newly discovered Lyman-alpha nebulae to our existing models!
 Importing pyBIA 
 ==================
 
-We have trained a Convolutional Neural Network using the high-level Keras API. Our model took ~8 days to train and is included in the standard pyBIA installation. This classifier is called 'bw_model' as the DIFFUSE training data sample includes diffuse objects in the NDWFS Bw band footprint (see `Moire et al. 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_). We hope to add more models for different bands in the future.
+We have trained a Convolutional Neural Network using the high-level Keras API. Our model took ~8 days to train and is included in the standard pyBIA installation. This classifier is called 'bw_model' as the DIFFUSE training data sample includes diffuse objects in the NDWFS Bw band footprint (see `Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_). We hope to add more models for different bands in the future.
 
 .. code-block:: python
 
@@ -49,7 +49,7 @@ case it would contain multiple 50x50 matrices.
 Documentation
 ==================
 
-Here is the documentation for all the modules, see : `Engineering_pyBIA`_. for the details
+Here is the documentation for all the modules, see for the details
 
 .. toctree::
    :maxdepth: 1

@@ -1,6 +1,6 @@
 .. _Engineering_pyBIA:
 
-Lyman-alpha Nebulae
+Engineering pyBIA
 ===========
 To train pyBIA v1.0 we made use of blue broadband survey data from the 9.3 square degree `Boötes field <https://legacy.noirlab.edu/noao/noaodeep/>`_. There are 27 subfields, a fits file for each of these fields can be downloaded `here <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/matchedFITS/>`_.
 
@@ -13,7 +13,7 @@ To create pyBIA we did the following:
 -  Used the DIFFUSE and OTHER image data to train a Convolutional Neural Network, modeled after the award-winning `AlexNet <https://proceedings.neurips.cc/paper/2012/file/c399862d3b9d6b76c8436e924a68c45b-Paper.pdf>`_ architecture.
 
 1) Constructing the Master Catalog
-===========
+-----------
 We first downloaded the data for all subfields within the `Boötes survey <https://legacy.noirlab.edu/noao/noaodeep/>`_ -- with these 27 fits files we can use pyBIA to automatically detect sources and create a photometric and morphological catalog, although the NDWFS team included `merged catalogs <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/matchedFITS/>`_ with their data release. We extracted four items from their merged catalogs, the ra & dec positions of each object, as well as the name of the corresponding subfield and the its NDWFS catalog name. This was saved as a Pandas dataframe.
 
 To create a catalog of morphological parameters using pyBIA, we need to use the catalog module, which takes as inputs the x and y pixel positions of each object; for this reason we load astropy and use their `World Coordinate System implementation <https://docs.astropy.org/en/stable/wcs/index.html>`_ to convert our ra/dec equatorial coordinates to image pixel coordinates.
@@ -53,21 +53,20 @@ Since there are 27 different subfields, we load each one at a time and then crea
 
 When creating a catalog using pyBIA there are numerous parameters you can control, `see the API reference for the catalog class <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_.
 
-2) Identifying Lyman-alpha Blob Candidates
-===========
+2) DIFFUSE Training Class
+-----------
 `Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_ conducted a systematic search of Lyman-alpha Nebulae in the Boötes field, from which 866 total candidates were selected. We start by 
 
 
 
 3) Data Augmentation
-===========
+-----------
 
 
+4) OTHER Training Class
+-----------
 
-4) Data Augmentation
-===========
 
-
-5) Creating and Training the CNN
-===========
+5) Creating and Training pyBIA
+-----------
 

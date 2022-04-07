@@ -27,6 +27,9 @@ def bw_model():
         was trained using NDWFS blue broadband images. The corresponding .h5 file is 
         located in the data folder inside the pyBIA directory in the Python path. 
 
+    Returns:
+        The pyBIA CNN model used for classifying images in blue broadband surveys.
+
     """
     import tensorflow as tf
     from keras.models import load_model
@@ -53,9 +56,12 @@ def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
             Pixels with counts above this threshold will be set to this limit.
 
     Returns:
-        array: The class prediction(s), either 'DIFFUSE' or 'OTHER'.
+        The class prediction(s), either 'DIFFUSE' or 'OTHER'.
 
     """
+    if data.shape[-1] != 50:
+        raise ValueError('Data size is invalid. Each image must be a 50x50 2D array, resize the array \
+            using the crop_image function in the data_processing module.')
 
     data = process_class(data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
     predictions = model.predict(data)
@@ -153,7 +159,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
         properly reshape our data and labels. 
         
     Returns:
-        model: The trained Tensorflow model.
+        The trained Tensorflow model.
 
     """
     if len(blob_data.shape) != len(other_data.shape):

@@ -8,12 +8,10 @@ Created on Thu Sep 16 21:43:16 2021
 import numpy as np
 from tensorflow.keras.utils import to_categorical
 
-def crop_image(data, x, y, size):
+def crop_image(data, x, y, size=50):
     """
     This function takes a 2D array and returns a sub-array
-    centered around x and y. 
-
-    The sub array will be a square of length = size.
+    centered around x and y. The sub array will be a square of length = size.
 
     Note:
         When applying data augmentation techniques 
@@ -23,11 +21,21 @@ def crop_image(data, x, y, size):
     Args:
         data (array): 2D array.
         x, y (int): Central position of the sub-array to be cropped, 
-        relative to the entire data.
-        size (int): length/width of the output array.
+            relative to the entire data.
+        size (int): length/width of the output array. Defaults to 50.
 
     Returns:
-        array: The cropped array.
+        The cropped array.
+
+    Example:
+        If we have a 100x100 image, we can crop this by setting x,y = (50,50), which
+        would be the center of of the image. Since pyBIA standard is 50x50, we will 
+        set the size of the reshaped array to 50.
+
+        >>> from pyBIA import data_processing
+        >>> resize = data_processing.crop_image(data, x=50, y=50, size=50)
+
+        If your image is 200x200, then x, y = (100,100), and so on.
 
     """
     o, r = np.divmod(size, 2)
@@ -59,7 +67,7 @@ def concat_channels(channel1, channel2, channel3):
         Channel3 (array): 2D array of the third channel.
 
     Returns:
-        array: 3D array with each channel stacked.
+        3D array with each channel stacked.
 
     """
 
@@ -89,7 +97,7 @@ def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
             Pixels with counts above this threshold will be set to this limit.
 
     Returns:      
-        array: Reshaped data and label arrays.
+        Reshaped data and label arrays.
 
     """
         
@@ -121,7 +129,7 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
             Pixels with counts above this threshold will be set to this limit.
 
     Returns:      
-        array: Reshaped data and label arrays
+        Reshaped data and label arrays.
 
     """
 
@@ -171,7 +179,7 @@ def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, ma
             Pixels with counts above this threshold will be set to this limit.
     
     Returns:      
-        array: Reshaped data and label arrays.
+        Reshaped data and label arrays.
 
     """
 

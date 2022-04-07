@@ -22,7 +22,7 @@ from pyBIA import data_processing
 
 def create(data, error=None, morph_params=False, x=None, y=None, name=None,
     aperture=15, annulus_in=20, annulus_out=35, invert=False, nsig=2, 
-    path=''):
+    save_file=True, path=''):
     """
     Creates a photometric and morphological catalog containing the object(s) in 
     the given position(s) at the given order. The parameters x and y should be 1D 
@@ -69,6 +69,9 @@ def create(data, error=None, morph_params=False, x=None, y=None, name=None,
         nsig (int): Objects in the image are detected if their peak intensity is
             higher than at least nsig times the standard deviation derived from
             sigma-clipped statistics. Default is 2.
+        save_file (bool): If set to False then the catalog will not be saved to the machine. 
+            You can always save manually, for example, if df = catalog(), then you can save 
+            with: df.to_csv('filename'). Defaults to True.
         path (str, optional): By default the text file containing the photometry will be
             saved to the local directory, unless an absolute path to a desired
             directory is entered here.
@@ -133,10 +136,10 @@ def create(data, error=None, morph_params=False, x=None, y=None, name=None,
         if morph_params == True:
             prop_list = morph_parameters(data, x, y, invert=invert)
             tbl = make_table(prop_list)
-            df = make_dataframe(table=tbl, x=x, y=y, name=name, flux=flux, save=True, path=path)
+            df = make_dataframe(table=tbl, x=x, y=y, name=name, flux=flux, save=save_file, path=path)
             return df
 
-        df = make_dataframe(table=None, x=x, y=y, name=name, flux=flux, save=True, path=path)
+        df = make_dataframe(table=None, x=x, y=y, name=name, flux=flux, save=save_file, path=path)
         return df
        
     phot_table = aperture_photometry(data, apertures, error=error)
@@ -145,10 +148,10 @@ def create(data, error=None, morph_params=False, x=None, y=None, name=None,
     if morph_params == True:
         prop_list = morph_parameters(data, x, y, invert=invert)
         tbl = make_table(prop_list)
-        df = make_dataframe(table=tbl, x=x, y=y, name=name, flux=flux, flux_err=flux_err, save=True, path=path)
+        df = make_dataframe(table=tbl, x=x, y=y, name=name, flux=flux, flux_err=flux_err, save=save_file, path=path)
         return df
 
-    df = make_dataframe(table=None, x=x, y=y, name=name, flux=flux, flux_err=flux_err, save=True, path=path)
+    df = make_dataframe(table=None, x=x, y=y, name=name, flux=flux, flux_err=flux_err, save=save_file, path=path)
     return df
 
 
@@ -289,7 +292,7 @@ def make_table(props):
     return np.array(table)
 
 def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
-    save=True, path=None):
+    save=True, path=None, save_image=False):
     """
     This function takes as input the catalog of morphological features
     which is output by the make_cat_tbl function -- this catalog is converted
@@ -349,6 +352,8 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
         data_dict['flux'] = flux
     if flux_err is not None:
         data_dict['flux_err'] = flux_err
+    if save_image:
+        data_dict['image_data'] = 
 
     if table is None:
         df = pd.DataFrame(data_dict)
@@ -374,4 +379,5 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
             return df
         df.to_csv('pyBIA_catalog')  
         return df
+    return df
 

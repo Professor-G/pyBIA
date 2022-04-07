@@ -42,11 +42,9 @@ Since there are 27 different subfields, we load each one at a time and then crea
     	hdu = astropy.io.fits.open(path+field_name)					#load .fits field for this subfield only
 
 		wcsobj = astropy.wcs.WCS(header = hdu[0].header)			#create wcs object for coord conversion
-
 		xpix, ypix = wcsobj.all_world2pix(NDWFS_bootes['ra'], NDWFS_bootes['dec'], 0) #convert ra/dec to xpix/ypix
-		
-		dataframe = catalog.create(hdu[0].data, x=xpix, y=ypix, name=NDWFS_bootes['NDWFS_objname'], morph_params=True, invert=True, save_file=False)
 
+		dataframe = catalog.create(data=hdu[0].data, x=xpix, y=ypix, name=NDWFS_bootes['NDWFS_objname'], morph_params=True, invert=True, save_file=False)
 		frame.append(dataframe)
 
     pd.concat(frames)						#merge all 27 catalogs into one dataframe

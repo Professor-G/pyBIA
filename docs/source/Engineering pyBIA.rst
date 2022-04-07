@@ -2,14 +2,14 @@
 
 Lyman-alpha Nebulae
 ===========
-To train pyBIA v1.0 we made use of blue broadband survey data of the 9.3 square degree `Boötes field <https://legacy.noirlab.edu/noao/noaodeep/>`_. There are 27 subfields, a fits file for each of these fields can be downloaded `here <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/matchedFITS/>`_.
+To train pyBIA v1.0 we made use of blue broadband survey data from the 9.3 square degree `Boötes field <https://legacy.noirlab.edu/noao/noaodeep/>`_. There are 27 subfields, a fits file for each of these fields can be downloaded `here <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/matchedFITS/>`_.
 
 To create pyBIA we did the following:
 
 -  Constructed a master catalog of all objects in the Boötes field.
 -  Identified Lyman-alpha blob candidates in the catalog using the results from `Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_ and extracted blue broadband images for all blob candidates.
--  Applied data augmentation techniques to artificially increase the number of samples in our DIFFUSE training class.
--  Extracted blue broadband images for random objects in all fields, this composed our OTHER training class.
+-  Applied data augmentation techniques to artificially increase the number of blob samples, which composed our DIFFUSE training class.
+-  Extracted blue broadband images for random objects in all field, this made up our OTHER training class.
 -  Used the DIFFUSE and OTHER image data to train a Convolutional Neural Network, modeled after the award-winning `AlexNet <https://proceedings.neurips.cc/paper/2012/file/c399862d3b9d6b76c8436e924a68c45b-Paper.pdf>`_ architecture.
 
 1) Constructing the Master Catalog

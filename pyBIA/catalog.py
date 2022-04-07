@@ -85,8 +85,9 @@ def create(data, error=None, morph_params=False, x=None, y=None, name=None,
         where surrounding sources may skew the median background.
                 
     Returns:
-        A catalog of all objects input (or automatically detected if there were no position arguments), containing
-        both photometric and morphological information. 
+        A catalog of all objects input (or automatically detected if there were no position arguments), 
+        containing both photometric and morphological information. A CSV file titled "pybia_catalog" 
+        will also be saved to the local directory, unless an absolute path argument is specified.
           
     """
     

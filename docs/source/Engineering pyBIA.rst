@@ -33,23 +33,24 @@ We start by importing our modules and loading our Pandas dataframe containing th
 Since there are 27 different subfields, we load each one at a time and then create a catalog of only the objects that exist within the subfield. For this reason we append each of the 27 catalogs to an empty frame, after which we can concantenate our frame list and save it as a master catalog.
 
 .. code-block:: python
-
-	frame = []		#empty list which will store the catalog of every subfield
+	
+    frame = []		#empty list which will store the catalog of every subfield
 
     for field_name in np.unique(NDWFS_bootes['field_name']):
 
     	index = np.argwhere(NDWFS_bootes['field_name'] == field_name) 	#identify objects in this subfield
     	hdu = astropy.io.fits.open(path+field_name)					#load .fits field for this subfield only
+
 		wcsobj = astropy.wcs.WCS(header = hdu[0].header)			#create wcs object for coord conversion
 
 		xpix, ypix = wcsobj.all_world2pix(NDWFS_bootes['ra'], NDWFS_bootes['dec'], 0) #convert ra/dec to xpix/ypix
-
+		
 		dataframe = catalog.create(hdu[0].data, x=xpix, y=ypix, name=NDWFS_bootes['NDWFS_objname'], morph_params=True, invert=True, save_file=False)
 
 		frame.append(dataframe)
 
-	pd.concat(frames)						#merge all 27 catalogs into one dataframe
-	frames.to_csv('NDWFS_master_catalog') 	#save dataframe
+    pd.concat(frames)						#merge all 27 catalogs into one dataframe
+    frames.to_csv('NDWFS_master_catalog') 	#save dataframe
 
 When creating a catalog using pyBIA there are numerous parameters you can control, `see the API reference for the catalog class <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_.
 

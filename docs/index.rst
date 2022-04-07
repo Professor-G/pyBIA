@@ -49,7 +49,7 @@ case it would contain multiple 50x50 matrices.
 Documentation
 ==================
 
-Here is the documentation for all the modules, see :any:`_Engineering_pyBIA` for the details
+Here is the documentation for all the modules, see :any:`source/_Engineering_pyBIA` for the details
 
 .. toctree::
    :maxdepth: 1

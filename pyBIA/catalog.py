@@ -103,7 +103,8 @@ def create(data, error=None, morph_params=False, x=None, y=None, name=None,
         if len(x) != len(y):
             raise ValueError("The two position arrays (x & y) must be the same size.")
     if invert == False:
-        warn('WARNING: Is your data from a .fits file? If so you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.')
+        warn('WARNING: Is your data from a .fits file? If so you may need to set invert=True if (x,y) = (0,0) \
+            is at the top left corner of the image instead of the bottom left corner.')
     if x is None: #Apply DAOFIND (Stetson 1987) to detect sources in the image
         mean, median, std = sigma_clipped_stats(data, sigma=3.0)
         print('Performing source detection -- this will take several minutes...')
@@ -211,7 +212,8 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
         try:
             props = SourceCatalog(new_data, segm, kernel=kernel)
         except:
-            warn('Skipping at least one object which could not be detected in segmentation... perhaps too faint or coordinate error.')
+            warn('At least one object which could not be detected in segmentation... perhaps too object is too faint \
+                or there is a coordinate error.')
             continue
 
         sep_list=[]

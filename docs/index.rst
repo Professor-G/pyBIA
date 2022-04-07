@@ -46,6 +46,15 @@ The output will either be 'DIFFUSE' or 'OTHER'. The data can be 3-dimensional as
 case it would contain multiple 50x50 matrices.
 
 
+Pages
+==================
+.. toctree::
+   :maxdepth: 1
+
+   source/Installation
+   source/Engineering pyBIA
+   source/Examples
+
 Documentation
 ==================
 
@@ -55,13 +64,3 @@ Here is the documentation for all the modules, see for the details
    :maxdepth: 1
 
    source/pyBIA
-
-
-Pages
-==================
-.. toctree::
-   :maxdepth: 2
-
-   source/Installation
-   source/Engineering pyBIA
-   source/Examples

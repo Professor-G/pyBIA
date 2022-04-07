@@ -352,9 +352,7 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
         data_dict['flux'] = flux
     if flux_err is not None:
         data_dict['flux_err'] = flux_err
-    if save_image:
-        data_dict['image_data'] = 
-
+    
     if table is None:
         df = pd.DataFrame(data_dict)
         if save == True:

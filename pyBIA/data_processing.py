@@ -169,7 +169,7 @@ def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, ma
             Pixels with counts below this threshold will be set to this limit.
         max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
             Pixels with counts above this threshold will be set to this limit.
-
+    
     Returns:      
         array: Reshaped data and label arrays.
 

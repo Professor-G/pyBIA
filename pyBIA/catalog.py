@@ -16,10 +16,6 @@ from photutils.segmentation import SourceCatalog
 
 from pyBIA import data_processing
 
-#hdu = fits.open('/Users/daniel/Desktop/NDWFS_Tiles/Bw_FITS/NDWFSJ1426p3236_Bw_03_fix.fits')
-#data = hdu[0].data
-
-
 def create(data, error=None, morph_params=False, x=None, y=None, name=None,
     aperture=15, annulus_in=20, annulus_out=35, invert=False, nsig=2, 
     save_file=True, path=''):
@@ -246,7 +242,7 @@ def make_table(props):
         Props (source catalog): A source catalog containing morphological parameters.
         
     Returns:
-        ndarray: Array containing the morphological features. 
+        Array containing the morphological features. 
 
     """
 
@@ -300,7 +296,7 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
 
 
     Args:
-        tbl: Table containing the object features. Can make with make_table() function.
+        table: Table containing the object features. Can make with make_table() function.
         x (array, optional): 1D array containing the x-pixel position.
             If input it must be an array of x positions for all objects in the table. 
             This x position will be appended to the dataframe for cataloging purposes. Defaults to None.
@@ -328,9 +324,9 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
         >>> dataframe = make_dataframe(table, x=xpix, y=ypix)
 
     Returns:
-        dataframe: Pandas dataframe containing the parameters and features of all objects
-            in the input data table
-        csv: CSV file titled "pybia_catalog" if save=True.
+        Pandas dataframe containing the parameters and features of all objects
+        in the input data table. If save=True, a CSV file titled 'pybia_catalog'
+        will be saved to the local directory, unless a path is specified.
 
     """
 

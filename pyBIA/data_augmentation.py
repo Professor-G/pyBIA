@@ -15,7 +15,7 @@ from warnings import warn
 
 
 def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True, 
-        vertical=True, rotation=360, fill='nearest', image_size=50):
+    vertical=True, rotation=360, fill='nearest', image_size=50):
     """
     This function takes in one image and applies data augmentation techniques.
     Shifts and rotations occur at random, for example, if width_shift is set
@@ -48,7 +48,7 @@ def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True,
         procedure so as to remove rotational effects at the outer boundaries of the image.
 
     Returns:
-        array: 3D array containing the augmented images. 
+        3D array containing the augmented images. 
 
     """
 
@@ -89,8 +89,8 @@ def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True,
 
 def resize(data, size=50):
     """
-    Resizes the data by cropping out the outer 
-    boundaries outside the size x size limit.
+    Resizes the data by cropping out the outer boundaries outside the size x size limit.
+    Can be either 2D for one sample, or 3D for multiple samples.
 
     Args:
         data (array): 2D array
@@ -98,7 +98,7 @@ def resize(data, size=50):
             50 pixels which is the pyBIA convention.
 
     Returns:
-        array: The cropped out data
+        The cropped out array
 
     """
 
@@ -146,7 +146,7 @@ def plot(data, cmap='gray', title=''):
         title (str, optional): Title displayed above the image. 
 
     Returns:
-        Image
+        AxesImage.
         
     """
     

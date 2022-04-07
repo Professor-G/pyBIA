@@ -1,4 +1,4 @@
-.. LIA documentation master file, created by
+.. MicroLIA documentation master file, created by
    sphinx-quickstart on Thu Mar 24 11:15:14 2022.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
@@ -47,9 +47,9 @@ case it would contain multiple 50x50 matrices.
 
 
 Documentation
-----------------------
+==================
 
-Here is the documentation for all the modules:
+Here is the documentation for all the modules, see :here:`_Engineering_pyBIA` for the details
 
 .. toctree::
    :maxdepth: 1
@@ -58,7 +58,7 @@ Here is the documentation for all the modules:
 
 
 Pages
-----------------------
+==================
 .. toctree::
    :maxdepth: 2
 

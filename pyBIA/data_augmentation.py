@@ -7,6 +7,7 @@ Created on Thu Sep 27 08:28:20 2021
 """
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from scipy.ndimage import rotate
+import matplotlib.pyplot as plt
 import numpy as np
 
 from pyBIA.data_processing import crop_image

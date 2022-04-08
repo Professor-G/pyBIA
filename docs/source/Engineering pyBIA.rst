@@ -88,11 +88,11 @@ Finally, we will extract 2D arrays of size 100x100, centered around the position
 
 .. code-block:: python
 	
-	from pyBIA import data_processing
+    from pyBIA import data_processing
 
-	diffuse_images = []
+    diffuse_images = []
 
-	for field_name in np.unique(diffuse_catalog['field_name']):
+    for field_name in np.unique(diffuse_catalog['field_name']):
 
     	index = np.argwhere(diffuse_catalog['field_name'] == field_name)  #identify objects in this subfield
     	hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
@@ -136,11 +136,11 @@ It is important to avoid class imbalance when training machine learning algorith
 
 .. code-block:: python
 
-	index = random.sample(range(len(other_catalog)), 86600) #random index
+    index = random.sample(range(len(other_catalog)), 86600) #random index
 
-	other_images = []
+    other_images = []
 
-	for field_name in np.unique(other_catalog['field_name']):
+    for field_name in np.unique(other_catalog['field_name']):
 
     	index = np.argwhere(other_catalog['field_name'] == field_name)  #identify objects in this subfield
     	hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only

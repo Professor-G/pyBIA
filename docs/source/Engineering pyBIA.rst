@@ -121,8 +121,7 @@ To perform data augmentation, we can use pyBIA's data_augmentation model, we jus
 
 	from pyBIA import data_augmentation
 
-	diffuse_training = augmentation(diffuse_images, batch=100, width_shift=5, height_shift=5, horizontal=True, 
-    vertical=True, rotation=360)
+	diffuse_training = augmentation(diffuse_images, batch=100, width_shift=5, height_shift=5, horizontal=True, vertical=True, rotation=360)
 
 By default the augmentation function will resize the image to 50x50 after performing the data augmentation, but this resizing can be controlled with the image_size argument. 
 
@@ -135,10 +134,56 @@ It is important to avoid class imbalance when training machine learning algorith
 .. code-block:: python
 
 	index = random.sample(range(len(other_catalog)), 86600) #random index
-	other_training = other_catalog[index]
 
+	other_images = []
 
+	for field_name in np.unique(other_catalog['field_name']):
 
-5) Creating and Training pyBIA
+    	index = np.argwhere(other_catalog['field_name'] == field_name)  #identify objects in this subfield
+    	hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
+    	data = hdu[0].data
+
+    	for i in range(len(index)):
+    		image = crop_image(data, x=other_catalog['xpix'], y=other_catalog['ypix'], size=100, invert=True)
+    		other_images.append(image)
+
+    other_training = np.array(other_images)
+
+ With these two 3D arrays containing 86600 samples eah (diffuse_training & other_training), we can create a binary classifier.
+
+5) Training pyBIA
 -----------
+To properly evaluate classification performance, it is imperative that we create a validation dataset that will evaluated at the end of every training epoch. We will separate 10% of the data for validation by shuffling the two training arrays and then selecting the first 10 percent of the array as our validation data.
+
+.. code-block:: python
+
+	import random
+
+	random.shuffle(diffuse_training)
+	random.shuffle(other_training)
+
+Since we have 86600 samples in each array, we will index the first 8660 to be the validation data, which we can construct using the data_processing.process_class() function. This function takes as input a 3D array containing images of a single class, all categorized with the same label. In our case the label 0 corresponds to DIFFUSE, and 1 to OTHER; therefore we need to create two validation sets, one for DIFFUSE and one for OTHER, after which we'll combine to form one validation set
+
+.. code-block:: python
+
+	val_X1, val_Y1 = process_class(diffuse_training[:8660], label=0, min_pixel=638, max_pixel=1500)
+	val_X2, val_Y2 = process_class(other_training[:8660], label=1, max_pixel=1500)
+
+	val_X = np.r_[val_X1, val_X2]
+	val_Y = np.r_[val_Y1, val_Y2]
+
+The process_class function will output two arrays, the reshaped image data and the appropriately shaped labels. Both of these arrays are reshaped in preparation for the training. 
+
+IMPORTANT: When doing image classification it is imperative that we normalize our images so as to avoid exploding gradients. We applied min-max normalization, where min_pixel is the average background count of the data (or entire survey); in our case we set the min to be 638, the 0.01 quantile of the Boötes field. The max_pixel value is set to 1500, we set this value because Lyman-alpha nebulae are diffuse sources and thus we can ignore anything brighter than 1500,  which will result in more robust classification performance.
+
+Since we used the first 10% of the data for validation, the remaining 90% will be used to train the CNN, we will create the CNN model using pyBIA.models.pyBIA_model():
+
+.. code-block:: python
+
+	model = pyBIA_model(blob_train[8660:], other_train[8660:], validation_X=val_X, validation_Y=val_Y, min_pixel= 638, max_pixel=1500, filename='Bw_Model_866')
+
+When the pyBIA model is trained it will save metric files and an .h5 file containing the Tensorflow model. We did not set any of the parameters in the above example as the default ones are set already, but please note that by default the CNN will train for 1000 epochs, which would take several days to complete. Because of the computation time needed to train the model, a checkpoint file will be output so that we can resume training should the process be interrupted.
+
+
+
 

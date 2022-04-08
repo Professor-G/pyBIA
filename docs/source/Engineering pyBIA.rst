@@ -180,10 +180,17 @@ Since we used the first 10% of the data for validation, the remaining 90% will b
 
 .. code-block:: python
 
-	model = pyBIA_model(blob_train[8660:], other_train[8660:], validation_X=val_X, validation_Y=val_Y, min_pixel= 638, max_pixel=1500, filename='Bw_Model_866')
+	model = pyBIA_model(blob_train[8660:], other_train[8660:], validation_X=val_X, validation_Y=val_Y, min_pixel= 638, max_pixel=1500, filename='Bw_CNN')
 
-When the pyBIA model is trained it will save metric files and an .h5 file containing the Tensorflow model. We did not set any of the parameters in the above example as the default ones are set already, but please note that by default the CNN will train for 1000 epochs, which would take several days to complete. Because of the computation time needed to train the model, a checkpoint file will be output so that we can resume training should the process be interrupted.
+When the pyBIA model is trained it will save metric files and an .h5 file containing the Tensorflow model. We did not set any of the parameters in the above example as the default ones are the ones we used, but please note that by default the CNN will train for 1000 epochs, which would take several days to complete. Because of the computation time needed to train the model, a checkpoint file will automatically be saved everytime the performance improves, that way we can resume training should the process be interrupted.
 
+With our model saved we can now classify any object by entering the 50x50 2D arrays, either individually or as a 3D array:
+
+.. code-block::python
+	
+	prediction = models.predict(data, model, normalize=True, min_pixel=638, max_pixel=1500)
+
+In practice we don't need to create models from scratch, as trained models are included in the pyBIA installation and can be loaded directly. For more information see the Example.
 
 
 

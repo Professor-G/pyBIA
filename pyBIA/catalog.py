@@ -16,9 +16,8 @@ from photutils.segmentation import SourceCatalog
 
 from pyBIA import data_processing
 
-def create(data, error=None, morph_params=False, x=None, y=None, name=None,
-    aperture=15, annulus_in=20, annulus_out=35, invert=False, nsig=2, 
-    save_file=True, path=''):
+def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, field_name=None, flag=None, 
+    aperture=15, annulus_in=20, annulus_out=35, invert=False, nsig=2, save_file=True, path='', filename=None):
     """
     Creates a photometric and morphological catalog containing the object(s) in 
     the given position(s) at the given order. The parameters x and y should be 1D 
@@ -43,17 +42,22 @@ def create(data, error=None, morph_params=False, x=None, y=None, name=None,
         >>> catalog.create(data, x_pix, y_pix)
 
     Args:
-        data (array): 2D array.
-        error (array, optional): 2D array containing the rms error map.
+        data (ndarray): 2D array.
+        error (ndarray, optional): 2D array containing the rms error map.
         morph_params (bool, optional): If True, image segmentation is performed and
-            morphological parameters are computed. Defaults to False. 
-        x (array, optional): 1D array or list containing the x-pixel position.
+            morphological parameters are computed. Defaults to True. 
+        x (ndarray, optional): 1D array or list containing the x-pixel position.
             Can contain one position or multiple samples.
-        y (array, optional): 1D array or list containing the y-pixel position.
+        y (ndarray, optional): 1D array or list containing the y-pixel position.
             Can contain one position or multiple samples.
-        name (array, optional): A 1D array containing the names of each object
+        obj_name (ndarray, str, optional): 1D array containing the name of each object
+            corresponding to the x & y position. This will be appended to the first
+            column of the output catalog. Defaults to None.
+        field_name (ndarray, str, optional): 1D array containing the field name of each object
             corresponding to the x & y positions. This will be appended to the first
             column of the output catalog. Defaults to None.
+        flag (ndarray, optional): 1D array containing a flag value for each object corresponding
+            to the x & y positions. Defaults to None. 
         aperture (int): The radius of the photometric aperture. Defaults to 15.
         annulus_in (int): The inner radius of the circular aperture
             that will be used to calculate the background. Defaults to 20.
@@ -69,8 +73,8 @@ def create(data, error=None, morph_params=False, x=None, y=None, name=None,
             You can always save manually, for example, if df = catalog(), then you can save 
             with: df.to_csv('filename'). Defaults to True.
         path (str, optional): By default the text file containing the photometry will be
-            saved to the local directory, unless an absolute path to a desired
-            directory is entered here.
+            saved to the local directory, unless an absolute path to a directory is entered here.
+        
     Note:
         As Lyman-alpha nebulae are diffuse sources with
         extended emission features, the default radius of
@@ -85,7 +89,7 @@ def create(data, error=None, morph_params=False, x=None, y=None, name=None,
                 
     Returns:
         A catalog of all objects input (or automatically detected if there were no position arguments), 
-        containing both photometric and morphological information. A CSV file titled "pybia_catalog" 
+        containing both photometric and morphological information. A CSV file titled "pyBIA_catalog" 
         will also be saved to the local directory, unless an absolute path argument is specified.
           
     """
@@ -132,10 +136,12 @@ def create(data, error=None, morph_params=False, x=None, y=None, name=None,
         if morph_params == True:
             prop_list = morph_parameters(data, x, y, invert=invert)
             tbl = make_table(prop_list)
-            df = make_dataframe(table=tbl, x=x, y=y, name=name, flux=flux, save=save_file, path=path)
+            df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag,
+                flux=flux, save=save_file, path=path)
             return df
 
-        df = make_dataframe(table=None, x=x, y=y, name=name, flux=flux, save=save_file, path=path)
+        df = make_dataframe(table=None, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
+            flux=flux, save=save_file, path=path)
         return df
        
     phot_table = aperture_photometry(data, apertures, error=error)
@@ -144,10 +150,12 @@ def create(data, error=None, morph_params=False, x=None, y=None, name=None,
     if morph_params == True:
         prop_list = morph_parameters(data, x, y, invert=invert)
         tbl = make_table(prop_list)
-        df = make_dataframe(table=tbl, x=x, y=y, name=name, flux=flux, flux_err=flux_err, save=save_file, path=path)
+        df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
+            flux=flux, flux_err=flux_err, save=save_file, path=path)
         return df
 
-    df = make_dataframe(table=None, x=x, y=y, name=name, flux=flux, flux_err=flux_err, save=save_file, path=path)
+    df = make_dataframe(table=None, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, flux=flux, 
+        flux_err=flux_err, save=save_file, path=path)
     return df
 
 
@@ -157,10 +165,10 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
     parameters. These parameters can be used to train a machine learning classifier.
     
     Args:
-        data (array): 2D array.
-        x (array): 1D array or list containing the x-pixel position.
+        data (ndarray): 2D array.
+        x (ndarray): 1D array or list containing the x-pixel position.
             Can contain one position or multiple samples.
-        y (array): 1D array or list containing the y-pixel position.
+        y (ndarray): 1D array or list containing the y-pixel position.
             Can contain one position or multiple samples.
         invert (bool): If True the x & y coordinates will be switched
             when cropping out the object, see Note below. Defaults to False.
@@ -197,12 +205,10 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
         len(x)
     except TypeError:
         x, y = [x], [y]
-    if invert == True:
-        x, y = y, x
 
     prop_list=[]
     for i in range(len(x)):
-        new_data = data_processing.crop_image(data, int(x[i]), int(y[i]), 100)
+        new_data = data_processing.crop_image(data, int(x[i]), int(y[i]), 100, invert=invert)
         threshold = detect_threshold(new_data, nsigma=nsig)
 
         sigma = 3.0 * gaussian_fwhm_to_sigma   
@@ -212,8 +218,9 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
         try:
             props = SourceCatalog(new_data, segm, kernel=kernel)
         except:
-            warn('At least one object which could not be detected in segmentation... perhaps too object is too faint \
+            warn('At least one object could not be detected in segmentation... perhaps too object is too faint \
                 or there is a coordinate error.')
+            props_list.append([0])
             continue
 
         sep_list=[]
@@ -234,12 +241,12 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
 
 def make_table(props):
     """
-    Returns the morphological parameters calculated from the sementation image
+    Returns the morphological parameters calculated from the sementation image.
     A list of the parameters and their function is available in the Photutils
     Source Catalog documentation: https://photutils.readthedocs.io/en/stable/api/photutils.segmentation.SourceCatalog.html
     
     Args:
-        Props (source catalog): A source catalog containing morphological parameters.
+        Props (source catalog): A source catalog containing the 30 segmentation parameters.
         
     Returns:
         Array containing the morphological features. 
@@ -249,6 +256,14 @@ def make_table(props):
     table = []
     for i in range(len(props)):
         prop_list = []
+        try:
+            props[i].area
+        except:
+            for xx in range(30):
+                prop_list.append([0])
+            table.append(prop_list)
+            continue
+
         prop_list.append(float(props[i].area / u.pix**2))
         prop_list.append(props[i].bbox_xmax)
         prop_list.append(props[i].bbox_xmin)
@@ -287,8 +302,8 @@ def make_table(props):
 
     return np.array(table)
 
-def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
-    save=True, path=None, save_image=False):
+def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, obj_name=None,
+    field_name=None, flag=None, save=True, path=None):
     """
     This function takes as input the catalog of morphological features
     which is output by the make_cat_tbl function -- this catalog is converted
@@ -297,18 +312,20 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
 
     Args:
         table: Table containing the object features. Can make with make_table() function.
-        x (array, optional): 1D array containing the x-pixel position.
+        x (ndarray, optional): 1D array containing the x-pixel position.
             If input it must be an array of x positions for all objects in the table. 
             This x position will be appended to the dataframe for cataloging purposes. Defaults to None.
-        y (array, optional): 1D array containing the y-pixel position.
+        y (ndarray, optional): 1D array containing the y-pixel position.
             If input it must be an array of y positions for all objects in the table. 
             This y position will be appended to the dataframe for cataloging purposes. Defaults to None.
-        flux (array, optional): 1D array containing the calculated flux
+        flux (ndarray, optional): 1D array containing the calculated flux
             of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
-        flux_err (array, optional): 1D array containing the calculated flux error
+        flux_err (ndarray, optional): 1D array containing the calculated flux error
             of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
-        name (array, str, optional): A corresponding array or list of object name(s). This will be appended to 
+        name (ndarray, str, optional): A corresponding array or list of object name(s). This will be appended to 
             the dataframe for cataloging purposes. Defaults to None.
+        flag (ndarray, optional): 1D array containing a flag value for each object corresponding
+            to the x & y positions. Defaults to None. 
         save (bool, optional): If False the dataframe CSV file will not be saved to the local
             directory. Defaults to True. 
         path (str, optional): Absolute path where CSV file should be saved, if save=True. If 
@@ -320,7 +337,7 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
     Example:
 
         >>> props = morph_parameters(data, x=xpix, y=ypix)
-        >>> table = make_cat_tbl(props)
+        >>> table = make_table(props)
         >>> dataframe = make_dataframe(table, x=xpix, y=ypix)
 
     Returns:
@@ -338,8 +355,12 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
 
     data_dict = {}
 
-    if name is not None:
-        data_dict['name'] = name
+    if obj_name is not None:
+        data_dict['obj_name'] = obj_name
+    if field_name is not None:
+        data_dict['field_name'] = field_name
+    if flag is not None:
+        data_dict['flag'] = flag
     if x is not None:
         data_dict['xpix'] = x
     if y is not None:
@@ -353,9 +374,9 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, name=None,
         df = pd.DataFrame(data_dict)
         if save == True:
             if path is not None:
-                df.to_csv(path+'pyBIA_catalog') 
+                df.to_csv(filename) 
                 return df
-            df.to_csv('pyBIA_catalog')  
+            df.to_csv(filename)  
         return df
 
     try:

@@ -40,8 +40,9 @@ With our model loaded, we can classify any 50x50 2-dimensional matrix using the 
 
 .. code-block:: python
 
-    prediction = models.predict(data, model)
+    prediction = models.predict(data, model, normalize=True, min_pixel=1000, max_pixel=1600)
 
+normalize=False, min_pixel=638, max_pixel=3000)
 The output will either be 'DIFFUSE' or 'OTHER'. The data can be 3-dimensional as well, in which
 case it would contain multiple 50x50 matrices.
 

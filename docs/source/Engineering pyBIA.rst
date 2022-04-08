@@ -14,7 +14,7 @@ To create pyBIA we did the following:
 
 1) Constructing the Catalog
 -----------
-We first downloaded the data for all subfields within the `Boötes survey <https://legacy.noirlab.edu/noao/noaodeep/>`_ -- with these 27 fits files we can use pyBIA to automatically detect sources and create a photometric and morphological catalog, although the NDWFS team included `merged catalogs <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/matchedFITS/>`_ with their data release. We extracted four items from their merged catalogs, the ra & dec positions of each detected object, as well as the name of the corresponding subfield and the its NDWFS object name. This was saved as a Pandas dataframe.
+We first downloaded the data for all subfields within the `Boötes survey <https://legacy.noirlab.edu/noao/noaodeep/>`_ -- with these 27 fits files we can use pyBIA to automatically detect sources and create a photometric and morphological catalog, although the NDWFS team included `merged catalogs <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/matchedFITS/>`_ with their data release. We extracted four items from their merged catalogs: the ra & dec positions of each detected source, the name of the corresponding subfield, as well as its NDWFS object name. This was saved as a Pandas dataframe.
 
 To create a catalog we can use the pyBIA.catalog module, which takes as optional inputs the x and y pixel positions of each object (if no positions are entered then DAOFINDER is applied to detect sources). Since we need pixel positions we need to load astropy and use their `World Coordinate System implementation <https://docs.astropy.org/en/stable/wcs/index.html>`_ to convert our ra/dec equatorial coordinates to image pixel coordinates.
 
@@ -28,7 +28,7 @@ We start by importing our modules and loading our Pandas dataframe containing th
 
     from pyBIA import catalog
 
-    NDWFS_bootes = pandas.read_csv('ndwfs_bootes') 
+    ndwfs_bootes = pandas.read_csv('ndwfs_bootes') 
 
 Since there are 27 different subfields, we load each one at a time and then create a catalog of only the objects that exist within the subfield. For this reason we create 27 different catalogs and append each to an empty frame, after which we can concantenate our frame list and save it as a master catalog.
 
@@ -36,34 +36,107 @@ Since there are 27 different subfields, we load each one at a time and then crea
 	
     frame = []		#empty list which will store the catalog of every subfield
 
-    for field_name in np.unique(NDWFS_bootes['field_name']):
+    for field_name in np.unique(ndwfs_bootes['field_name']):
 
-    	index = np.argwhere(NDWFS_bootes['field_name'] == field_name)  #identify objects in this subfield
+    	index = np.argwhere(ndwfs_bootes['field_name'] == field_name)  #identify objects in this subfield
     	hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
 
 		wcsobj = astropy.wcs.WCS(header = hdu[0].header)  #create wcs object for coord conversion
-		xpix, ypix = wcsobj.all_world2pix(NDWFS_bootes['ra'], NDWFS_bootes['dec'], 0) #convert ra/dec to xpix/ypix
+		xpix, ypix = wcsobj.all_world2pix(ndwfs_bootes['ra'][index], ndwfs_bootes['dec'][index], 0) #convert ra/dec to xpix/ypix
 
-		cat = catalog.create(data=hdu[0].data, x=xpix, y=ypix, name=NDWFS_bootes['NDWFS_objname'], morph_params=True, invert=True, save_file=False)
+		cat = catalog.create(data=hdu[0].data, x=xpix, y=ypix, name=ndwfs_bootes['NDWFS_objname'][index], field_name=ndwfs_bootes['field_name'][index], flag=np.ones(len(index)), invert=True, save_file=False)
 		frame.append(cat)
 
     pd.concat(frames) #merge all 27 catalogs into one dataframe
     frames.to_csv('NDWFS_master_catalog') 	#save dataframe as 'NDWFS_master_catalog'
 
-When creating a catalog using pyBIA there are numerous parameters you can control, `see the API reference for the catalog class <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_.
+When creating a catalog using pyBIA there are numerous parameters you can control, `see the API reference for the catalog class <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_. These features can be used to train a machine learning model, which is why we've included a flag parameter, in which we can input an array containing labels or flags for each object. In the above example, we flagged every object with a value of one, which is what we label any astrophysical object that is not a Lyman-alpha blob. This flag input can also contain an array of strings, which could correspond to actual class labels, e.g. 'GALAXY', 'STAR'
 
 2) DIFFUSE Training Class
 -----------
-`Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_ conducted a systematic search for Lyman-alpha Nebulae in the Boötes field, from which 866 total candidates were selected. 
+`Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_ conducted a systematic search for Lyman-alpha Nebulae in the Boötes field, from which 866 total candidates were selected after visual inspection. From this sample, 85 had a larger (B-R), which could indicate stronger Lyman-alpha emission at z > 2. Only about a third of these 85 candidates have been followed up, and to-date only 5 of these sources have been sprectoscopically confirmed as true Lyman-alpha nebulae. 
 
+The entire sample of 866 objects display morphologies and features which are characteristic of diffuse emission, as such we can begin by extracting these 866 sources from our master catalog. These objects will serve as our initial training sample of diffuse nebulae. We will begin by loading the NDWFS object names of these 866 candidates which we have saved as a file titled 'obj_names_866'. Each object in the survey has a unique name, therefore this can be used to index the master catalog.
 
+.. code-block:: python
+
+	master_catalog = pandas.read_csv('NDWFS_master_catalog')
+	obj_names_866 = np.loadtxt('obj_names_866', dtype=str)
+
+	866_index = []
+
+	for i in range(len(obj_names_866)):
+		index = np.argwhere(master_catalog['name'] == obj_names_866[i])
+		866_index.append(int(index))
+
+	866_index = np.array(866_index)
+
+When we initially created the catalog, we set the 'flag' to 1 for all objects, but now that we have the indices of the 866 blob candidates, we can set the 'flag' column to 0 for these entries, which we will interpret to mean DIFFUSE. For simplicity, we will break up our master catalog into a diffuse_catalog containing only these 866 candidates, and an other_catalog with everything else.
+
+.. code-block:: python
+
+	diffuse_catalog = master_catalog[866_index]
+	diffuse_catalog['flag'] = 0
+
+	other_index = np.argwhere(master_catalog['flag'] == 1)
+	other_catalog = master_catalog[other_index]
+
+Finally, we will extract 2D arrays of size 100x100, centered around the positions of each of the 866 diffuse objects. We need these images to train the CNN. As was done when creating the catalog, we will loop over all 27 subfields, find the objects in each one, crop out the subarray, and append the images to a list. We can crop out the image of each object using the crop_image function in pyBIA.data_processing:
+
+.. code-block:: python
+	
+	from pyBIA import data_processing
+
+	diffuse_images = []
+
+	for field_name in np.unique(diffuse_catalog['field_name']):
+
+    	index = np.argwhere(diffuse_catalog['field_name'] == field_name)  #identify objects in this subfield
+    	hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
+    	data = hdu[0].data
+
+    	for i in range(len(index)):
+    		image = crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
+    		diffuse_images.append(image)
+
+    diffuse_images = np.array(diffuse_images)
+
+The diffuse_images array now contains data for our 'DIFFUSE' training class (flag=0), but 866 samples is very small. AlexNet, the convolutional neural network pyBIA is modeled after, used ~1.3 million images for training. Since Lyman-alpha nebulae are rare we don't have a large sample of these phenomena, as such, we must perform data augmentation techniques to inflate our 'DIFFUSE' training bag, after which we can randomly select a similar number of other objects to compose our 'OTHER' training class. 
 
 3) Data Augmentation
 -----------
+We want to apply modification techniques to our images of DIFFUSE objects in ways that will not alter the integrity of the morphological features, so data augmentation methods that include image zoom and cropping, as well as pixel alterations, should not be applied in this context. We adopted the following combination of data augmentation techniques:
 
+-  Horizontal Shift
+-  Vertical Shift 
+-  Horizontal Flip
+-  Vertical Flip
+-  Rotation
+
+Each time an augmented image is created, the shifts, flips, and rotation parameters are chosen at random as per the specified bounds. It's important to note that image shifts and rotations do end up altering the original image, as the shifted and distorted areas require filling either by extrapolation or by setting the pixels to a constant value -- it is for this reason that we extracted the images of our 866 DIFFUSE objects as 100x100 pixels. We will first perform data augmentation, after which we will resize the image to 50x50. This ensures that any filling that occurs because of shifts or rotations exist on the outer boundaries of the image which end up being cropped away.
+
+To perform data augmentation, we can use pyBIA's data_augmentation model, we just need to input how many augmented images per original image we will create, and the specified bounds of the augmentations. For help please see the `augmentation documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/data_augmentation/index.html>`_. We decided to create 100 augmented images per original sample, enable horizontal/vertical flips and full rotation, and allow for horizontal and vertical shifts of 5 pixels in either direction. Each augmented image will be created by randomly sampling from the distributions.
+
+.. code-block:: python
+
+	from pyBIA import data_augmentation
+
+	diffuse_training = augmentation(diffuse_images, batch=100, width_shift=5, height_shift=5, horizontal=True, 
+    vertical=True, rotation=360)
+
+By default the augmentation function will resize the image to 50x50 after performing the data augmentation, but this resizing can be controlled with the image_size argument. 
+
+The diffuse_training variable is a 3D array containing 866*100=86600 augmented images -- this array will be our 'DIFFUSE' training bag. We can now extract a similar number of other objects to compose our 'OTHER' training bag. 
 
 4) OTHER Training Class
 -----------
+It is important to avoid class imbalance when training machine learning algorithms. The sizes of each class should be relatively the same so as to avoid fitting issues; therefore we're going to extract 50x50 images of 86600 random sources, chosen from the other_catalog:
+
+.. code-block:: python
+
+	index = random.sample(range(len(other_catalog)), 86600) #random index
+	other_training = other_catalog[index]
+
 
 
 5) Creating and Training pyBIA

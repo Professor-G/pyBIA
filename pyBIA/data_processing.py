@@ -8,22 +8,35 @@ Created on Thu Sep 16 21:43:16 2021
 import numpy as np
 from tensorflow.keras.utils import to_categorical
 
-def crop_image(data, x, y, size=50):
+def crop_image(data, x, y, size=50, invert=False):
     """
     This function takes a 2D array and returns a sub-array
     centered around x and y. The sub array will be a square of length = size.
 
     Note:
-        When applying data augmentation techniques 
-        it is best to crop the image afterward, to
-        avoid the rotational shear visible on the edges.
+        When applying data augmentation techniques it is best to start with a larger
+        image and then crop it to the appropriate size afterward, so as to avoid the 
+        rotational shear visible on the edges.
+
+        IMPORTANT: When loading data from a .fits file the pixel convention
+        is switched. The (x, y) = (0, 0) position is on the top left corner of the .fits
+        image. The standard convention is for the (x, y) = (0, 0) to be at the bottom left
+        corner of the data. We strongly recommend you double-check your data coordinate
+        convention. We made use of .fits data with the (x, y) = (0, 0) position at the top
+        left of the image, for this reason we switched x and y when cropping out individual
+        objects. The parameter invert=True performs the coordinate switch for us. This is only
+        required because pyBIA's cropping function assumes standard convention.
+
 
     Args:
         data (array): 2D array.
-        x, y (int): Central position of the sub-array to be cropped, 
-            relative to the entire data.
+        x (int): Central x-position of the sub-array to be cropped out, relative
+            to the entire data.
+        y (int): Central y-position of the sub-array to be cropped out, relative
+            to the entire data.
         size (int): length/width of the output array. Defaults to 50.
-
+        invert (bool): If True the x & y coordinates will be switched
+            when cropping out the object, see Note above. Defaults to False.
     Returns:
         The cropped array.
 
@@ -38,6 +51,9 @@ def crop_image(data, x, y, size=50):
         If your image is 200x200, then x, y = (100,100), and so on.
 
     """
+    if invert == True:
+        x, y = y, x
+
     o, r = np.divmod(size, 2)
     l = (int(x)-(o+r-1)).clip(0)
     u = (int(y)-(o+r-1)).clip(0)

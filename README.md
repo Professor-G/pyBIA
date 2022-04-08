@@ -1,7 +1,6 @@
 [![Documentation Status](https://readthedocs.org/projects/pybia/badge/?version=latest)](https://pybia.readthedocs.io/en/latest/?badge=latest)
-[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.6-orange.svg)](https://tensorflow.org)
 [![GPLv3 License](https://img.shields.io/badge/License-GPL%20v3-yellow.svg)](https://opensource.org/licenses/LGPL-3.0)
-
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.6-orange.svg)](https://tensorflow.org)
 
 # pyBIA
 

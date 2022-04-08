@@ -12,6 +12,9 @@ To create pyBIA we did the following:
 -  Extracted blue broadband images for random objects in all field, this made up our OTHER training class.
 -  Used the DIFFUSE and OTHER image data to train a Convolutional Neural Network, modeled after the award-winning `AlexNet <https://proceedings.neurips.cc/paper/2012/file/c399862d3b9d6b76c8436e924a68c45b-Paper.pdf>`_ architecture.
 
+We outline below how we created pyBIA, and the associated model which has been saved and included in the installation.
+
+
 1) Constructing the Catalog
 -----------
 We first downloaded the data for all subfields within the `Boötes survey <https://legacy.noirlab.edu/noao/noaodeep/>`_ -- with these 27 fits files we can use pyBIA to automatically detect sources and create a photometric and morphological catalog, although the NDWFS team included `merged catalogs <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/matchedFITS/>`_ with their data release. We extracted four items from their merged catalogs: the ra & dec positions of each detected source, the name of the corresponding subfield, as well as its NDWFS object name. This was saved as a Pandas dataframe.
@@ -190,7 +193,7 @@ With our model saved we can now classify any object by entering the 50x50 2D arr
 	
 	prediction = models.predict(data, model, normalize=True, min_pixel=638, max_pixel=1500)
 
-In practice we don't need to create models from scratch, as trained models are included in the pyBIA installation and can be loaded directly. For more information see the Example.
+In practice we don't need to create models from scratch, as trained models are included in the pyBIA installation and can be loaded directly. For more information see the Example page. 
 
 
 

@@ -115,6 +115,12 @@ def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
     Returns:      
         Reshaped data and label arrays.
 
+    Note:
+        In the context of diffuse nebulae detection, the max_pixel value should 
+        be slightly above the maximum expected count for the nebula, as anything 
+        brighter (such as stars) will be set to the same limit of max_pixel, which
+        will result in more robust classification performance.
+        
     """
         
     channel = (channel - min_pixel) /  (max_pixel - min_pixel)

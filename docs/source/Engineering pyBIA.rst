@@ -88,21 +88,21 @@ Finally, we will extract 2D arrays of size 100x100, centered around the position
 
 .. code-block:: python
 	
-    from pyBIA import data_processing
+	from pyBIA import data_processing
 
-    diffuse_images = []
+	diffuse_images = []
 
-    for field_name in np.unique(diffuse_catalog['field_name']):
+	for field_name in np.unique(diffuse_catalog['field_name']):
 
-    	index = np.argwhere(diffuse_catalog['field_name'] == field_name)  #identify objects in this subfield
-    	hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
-    	data = hdu[0].data
+		index = np.argwhere(diffuse_catalog['field_name'] == field_name)  #identify objects in this subfield
+		hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
+		data = hdu[0].data
 
-    	for i in range(len(index)):
-    		image = crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
-    		diffuse_images.append(image)
+		for i in range(len(index)):
+			image = crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
+			diffuse_images.append(image)
 
-    diffuse_images = np.array(diffuse_images)
+	diffuse_images = np.array(diffuse_images)
 
 The diffuse_images array now contains data for our 'DIFFUSE' training class (flag=0), but 866 samples is very small. AlexNet, the convolutional neural network pyBIA is modeled after, used ~1.3 million images for training. Since Lyman-alpha nebulae are rare we don't have a large sample of these phenomena, as such, we must perform data augmentation techniques to inflate our 'DIFFUSE' training bag, after which we can randomly select a similar number of other objects to compose our 'OTHER' training class. 
 
@@ -136,23 +136,23 @@ It is important to avoid class imbalance when training machine learning algorith
 
 .. code-block:: python
 
-    index = random.sample(range(len(other_catalog)), 86600) #random index
+	index = random.sample(range(len(other_catalog)), 86600) #random index
 
-    other_images = []
+	other_images = []
 
-    for field_name in np.unique(other_catalog['field_name']):
+	for field_name in np.unique(other_catalog['field_name']):
 
-    	index = np.argwhere(other_catalog['field_name'] == field_name)  #identify objects in this subfield
-    	hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
-    	data = hdu[0].data
+		index = np.argwhere(other_catalog['field_name'] == field_name)  #identify objects in this subfield
+		hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
+		data = hdu[0].data
 
-    	for i in range(len(index)):
-    		image = crop_image(data, x=other_catalog['xpix'], y=other_catalog['ypix'], size=100, invert=True)
-    		other_images.append(image)
+		for i in range(len(index)):
+			image = crop_image(data, x=other_catalog['xpix'], y=other_catalog['ypix'], size=100, invert=True)
+			other_images.append(image)
 
-    other_training = np.array(other_images)
+	other_training = np.array(other_images)
 
- With these two 3D arrays containing 86600 samples eah (diffuse_training & other_training), we can create a binary classifier.
+With these two 3D arrays containing 86600 samples eah (diffuse_training & other_training), we can create a binary classifier.
 
 5) Training pyBIA
 -----------

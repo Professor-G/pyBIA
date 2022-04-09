@@ -17,7 +17,7 @@ from photutils.segmentation import SourceCatalog
 from pyBIA import data_processing
 
 def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, field_name=None, flag=None, 
-    aperture=15, annulus_in=20, annulus_out=35, invert=False, nsig=2, save_file=True, path='', filename=None):
+    aperture=15, annulus_in=20, annulus_out=35, invert=False, nsig=2, save_file=True, path=''):
     """
     Creates a photometric and morphological catalog containing the object(s) in 
     the given position(s) at the given order. The parameters x and y should be 1D 
@@ -107,8 +107,7 @@ def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, f
         if len(x) != len(y):
             raise ValueError("The two position arrays (x & y) must be the same size.")
     if invert == False:
-        warn('WARNING: Is your data from a .fits file? If so you may need to set invert=True if (x,y) = (0,0) \
-            is at the top left corner of the image instead of the bottom left corner.')
+        warn('WARNING: Is your data from a .fits file? If so you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.')
     if x is None: #Apply DAOFIND (Stetson 1987) to detect sources in the image
         mean, median, std = sigma_clipped_stats(data, sigma=3.0)
         print('Performing source detection -- this will take several minutes...')
@@ -207,6 +206,7 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
         x, y = [x], [y]
 
     prop_list=[]
+    print('Applying image segmentation, this could take a while...')
     for i in range(len(x)):
         new_data = data_processing.crop_image(data, int(x[i]), int(y[i]), 100, invert=invert)
         threshold = detect_threshold(new_data, nsigma=nsig)
@@ -218,9 +218,8 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
         try:
             props = SourceCatalog(new_data, segm, kernel=kernel)
         except:
-            warn('At least one object could not be detected in segmentation... perhaps too object is too faint \
-                or there is a coordinate error.')
-            props_list.append([0])
+            warn('At least one object could not be detected in segmentation... perhaps the object is too faint or there is a coordinate error. NOTE: This object is still in the catalog, the morphologcail features have been set to zero.')
+            prop_list.append([0])
             continue
 
         sep_list=[]
@@ -235,9 +234,9 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
         if len(inx) > 1:
             inx = inx[0]
 
-        prop_list.append(props[int(inx)])
+        prop_list.append(props[inx])
 
-    return prop_list
+    return np.array(prop_list)
 
 def make_table(props):
     """
@@ -302,7 +301,7 @@ def make_table(props):
 
     return np.array(table)
 
-def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, obj_name=None,
+def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_name=None,
     field_name=None, flag=None, save=True, path=None):
     """
     This function takes as input the catalog of morphological features
@@ -311,7 +310,8 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, obj_name=Non
 
 
     Args:
-        table: Table containing the object features. Can make with make_table() function.
+        table (optional): Table containing the object features. Can make with make_table() function.
+            If None then a Pandas dataframe containing only the input columns will be generated. Defaults to None.
         x (ndarray, optional): 1D array containing the x-pixel position.
             If input it must be an array of x positions for all objects in the table. 
             This x position will be appended to the dataframe for cataloging purposes. Defaults to None.
@@ -372,11 +372,12 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, obj_name=Non
     
     if table is None:
         df = pd.DataFrame(data_dict)
+        df = df.drop(df.filter(regex="Unname"),axis=1, inplace=True)
         if save == True:
             if path is not None:
-                df.to_csv(filename) 
+                df.to_csv(path+'pyBIA_catalog') 
                 return df
-            df.to_csv(filename)  
+            df.to_csv('pyBIA_catalog')  
         return df
 
     try:
@@ -388,6 +389,7 @@ def make_dataframe(table, x=None, y=None, flux=None, flux_err=None, obj_name=Non
         data_dict[prop_list[i]] = table[:,i]
 
     df = pd.DataFrame(data_dict, index=np.arange(0, len(table[:,0])))
+    df = df.drop(df.filter(regex="Unname"), axis=1, inplace=True)
     if save == True:
         if path is not None:
             df.to_csv(path+'pyBIA_catalog') 

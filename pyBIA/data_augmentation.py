@@ -26,7 +26,8 @@ def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True,
     zero and the rotation argument. 
 
     Args:
-        data (array): 2D array of an image
+        data (array): 2D array of containing a single image, or a 3D array containing
+            multiple images.
         batch (int): How many augmented images to create and save.
         width_shift (int): The max pixel shift allowed in either horizontal direction.
             If set to zero no horizontal shifts will be performed. Defaults to 5 pixels.

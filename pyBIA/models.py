@@ -184,7 +184,14 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
     else:
         raise ValueError("Data must be 3D, first dimension is number of samples, followed by width and height.")
 
+    ix = np.random.permutation(len(blob_data))
+    blob_data = blob_data[ix]
+
+    ix = np.random.permutation(len(other_data))
+    other_data = other_data[ix]
+
     X_train, Y_train = create_training_set(blob_data, other_data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+
     X_train[X_train > 1] = 1
     X_train[X_train < 0] = 0
     input_shape = (img_width, img_height, img_num_channels)
@@ -243,6 +250,8 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
     if validation_X is None:
         history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=1)
     elif validation_X is not None:
+        ix = np.random.permutation(len(validation_X))
+        validation_X, validation_Y = validation_X[ix], validation_Y[ix]
         history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(validation_X, validation_Y), epochs=epochs, callbacks=callbacks_list, verbose=1)
 
     if metrics:

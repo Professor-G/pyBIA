@@ -47,7 +47,7 @@ Since there are 27 different subfields, we load each one at a time and then crea
 		wcsobj = astropy.wcs.WCS(header = hdu[0].header)  #create wcs object for coord conversion
 		xpix, ypix = wcsobj.all_world2pix(ndwfs_bootes['ra'][index], ndwfs_bootes['dec'][index], 0) #convert ra/dec to xpix/ypix
 
-		cat = catalog.create(data=hdu[0].data, x=xpix, y=ypix, name=ndwfs_bootes['NDWFS_objname'][index], field_name=ndwfs_bootes['field_name'][index], flag=np.ones(len(index)), invert=True, save_file=False)
+		cat = catalog.create(data=hdu[0].data, x=xpix, y=ypix, obj_name=ndwfs_bootes['NDWFS_objname'][index], field_name=ndwfs_bootes['field_name'][index], flag=np.ones(len(index)), invert=True, save_file=False)
 		frame.append(cat)
 
     pd.concat(frames) #merge all 27 catalogs into one dataframe
@@ -66,19 +66,19 @@ The entire sample of 866 objects display morphologies and features which are cha
 	master_catalog = pandas.read_csv('NDWFS_master_catalog')
 	obj_names_866 = np.loadtxt('obj_names_866', dtype=str)
 
-	866_index = []
+	index_866 = []
 
 	for i in range(len(obj_names_866)):
 		index = np.argwhere(master_catalog['name'] == obj_names_866[i])
-		866_index.append(int(index))
+		index_866.append(int(index))
 
-	866_index = np.array(866_index)
+	index_866 = np.array(index_866)
 
 When we initially created the catalog, we set the 'flag' to 1 for all objects, but now that we have the indices of the 866 blob candidates, we can set the 'flag' column to 0 for these entries, which we will interpret to mean DIFFUSE. For simplicity, we will break up our master catalog into a diffuse_catalog containing only these 866 candidates, and an other_catalog with everything else.
 
 .. code-block:: python
 
-	diffuse_catalog = master_catalog[866_index]
+	diffuse_catalog = master_catalog[index_866]
 	diffuse_catalog['flag'] = 0
 
 	other_index = np.argwhere(master_catalog['flag'] == 1)
@@ -170,7 +170,7 @@ Since we have 86600 samples in each array, we will index the first 8660 to be th
 .. code-block:: python
 
 	val_X1, val_Y1 = process_class(diffuse_training[:8660], label=0, min_pixel=638, max_pixel=1500)
-	val_X2, val_Y2 = process_class(other_training[:8660], label=1, max_pixel=1500)
+	val_X2, val_Y2 = process_class(other_training[:8660], label=1, min_pixel=638, max_pixel=1500)
 
 	val_X = np.r_[val_X1, val_X2]
 	val_Y = np.r_[val_Y1, val_Y2]

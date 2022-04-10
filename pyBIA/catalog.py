@@ -17,7 +17,7 @@ from photutils.segmentation import SourceCatalog
 from pyBIA import data_processing
 
 def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, field_name=None, flag=None, 
-    aperture=15, annulus_in=20, annulus_out=35, invert=False, nsig=2, save_file=True, path=''):
+    aperture=15, annulus_in=20, annulus_out=35, invert=False, nsig=2, save_file=True, path='', filename=None):
     """
     Creates a photometric and morphological catalog containing the object(s) in 
     the given position(s) at the given order. The parameters x and y should be 1D 
@@ -74,7 +74,8 @@ def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, f
             with: df.to_csv('filename'). Defaults to True.
         path (str, optional): By default the text file containing the photometry will be
             saved to the local directory, unless an absolute path to a directory is entered here.
-        
+        filename(str, optional): Name of the output catalog. Default name is 'pyBIA_catalog'.
+
     Note:
         As Lyman-alpha nebulae are diffuse sources with
         extended emission features, the default radius of
@@ -118,8 +119,8 @@ def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, f
         x, y = np.array(sources['xcentroid']), np.array(sources['ycentroid'])
 
     positions = []
-    for it in range(len(x)):
-        positions.append((x[it], y[it]))
+    for j in range(len(x)):
+        positions.append((x[j], y[j]))
 
     apertures = CircularAperture(positions, r=aperture)
     annulus_apertures = CircularAnnulus(positions, r_in=annulus_in, r_out=annulus_out)
@@ -219,7 +220,7 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
             props = SourceCatalog(new_data, segm, kernel=kernel)
         except:
             warn('At least one object could not be detected in segmentation... perhaps the object is too faint or there is a coordinate error. NOTE: This object is still in the catalog, the morphologcail features have been set to zero.')
-            prop_list.append([0])
+            prop_list.append(0)
             continue
 
         sep_list=[]
@@ -256,44 +257,44 @@ def make_table(props):
     for i in range(len(props)):
         prop_list = []
         try:
-            props[i].area
+            props[i][0].area
         except:
-            for xx in range(30):
-                prop_list.append([0])
+            for j in range(30): #number of morphological params
+                prop_list.append(0)
             table.append(prop_list)
             continue
 
-        prop_list.append(float(props[i].area / u.pix**2))
-        prop_list.append(props[i].bbox_xmax)
-        prop_list.append(props[i].bbox_xmin)
-        prop_list.append(props[i].bbox_ymax)
-        prop_list.append(props[i].bbox_ymin)
-        prop_list.append(props[i].bbox.shape[0] * props[i].bbox.shape[1])
-        prop_list.append(float(props[i].covar_sigx2 / u.pix**2))
-        prop_list.append(float(props[i].covar_sigxy / u.pix**2))
-        prop_list.append(float(props[i].covar_sigy2 / u.pix**2))
-        prop_list.append(float(props[i].covariance_eigvals[0] / u.pix**2))
-        prop_list.append(float(props[i].covariance_eigvals[1] / u.pix**2))
-        prop_list.append(float(props[i].cxx * u.pix**2))
-        prop_list.append(float(props[i].cxy * u.pix**2))
-        prop_list.append(float(props[i].cyy * u.pix**2))
-        prop_list.append(float(props[i].eccentricity))
-        prop_list.append(float(props[i].ellipticity))
-        prop_list.append(float(props[i].elongation))
-        prop_list.append(float(props[i].equivalent_radius / u.pix))
-        prop_list.append(float(props[i].fwhm / u.pix))
-        prop_list.append(props[i].gini)
-        prop_list.append(props[i].kron_flux)
-        prop_list.append(float(props[i].kron_radius / u.pix))
-        prop_list.append(props[i].max_value)
-        prop_list.append(props[i].min_value)
-        prop_list.append(float(props[i].orientation / u.degree))
-        prop_list.append(float(props[i].perimeter / u.pix))
-        prop_list.append(props[i].segment_flux)
-        prop_list.append(float(props[i].semimajor_sigma / u.pix))
-        prop_list.append(float(props[i].semiminor_sigma / u.pix))
+        prop_list.append(float(props[i][0].area / u.pix**2))
+        prop_list.append(props[i][0].bbox_xmax)
+        prop_list.append(props[i][0].bbox_xmin)
+        prop_list.append(props[i][0].bbox_ymax)
+        prop_list.append(props[i][0].bbox_ymin)
+        prop_list.append(props[i][0].bbox.shape[0] * props[i][0].bbox.shape[1])
+        prop_list.append(float(props[i][0].covar_sigx2 / u.pix**2))
+        prop_list.append(float(props[i][0].covar_sigxy / u.pix**2))
+        prop_list.append(float(props[i][0].covar_sigy2 / u.pix**2))
+        prop_list.append(float(props[i][0].covariance_eigvals[0] / u.pix**2))
+        prop_list.append(float(props[i][0].covariance_eigvals[1] / u.pix**2))
+        prop_list.append(float(props[i][0].cxx * u.pix**2))
+        prop_list.append(float(props[i][0].cxy * u.pix**2))
+        prop_list.append(float(props[i][0].cyy * u.pix**2))
+        prop_list.append(float(props[i][0].eccentricity))
+        prop_list.append(float(props[i][0].ellipticity))
+        prop_list.append(float(props[i][0].elongation))
+        prop_list.append(float(props[i][0].equivalent_radius / u.pix))
+        prop_list.append(float(props[i][0].fwhm / u.pix))
+        prop_list.append(props[i][0].gini)
+        prop_list.append(props[i][0].kron_flux)
+        prop_list.append(float(props[i][0].kron_radius / u.pix))
+        prop_list.append(props[i][0].max_value)
+        prop_list.append(props[i][0].min_value)
+        prop_list.append(float(props[i][0].orientation / u.degree))
+        prop_list.append(float(props[i][0].perimeter / u.pix))
+        prop_list.append(props[i][0].segment_flux)
+        prop_list.append(float(props[i][0].semimajor_sigma / u.pix))
+        prop_list.append(float(props[i][0].semiminor_sigma / u.pix))
 
-        if props[i].isscalar == True: #Checks whether it's a single source
+        if props[i][0].isscalar == True: #Checks whether it's a single source
             prop_list.append(1)
         else:
             prop_list.append(0)
@@ -302,7 +303,7 @@ def make_table(props):
     return np.array(table)
 
 def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_name=None,
-    field_name=None, flag=None, save=True, path=None):
+    field_name=None, flag=None, save=True, path=None, filename=None):
     """
     This function takes as input the catalog of morphological features
     which is output by the make_cat_tbl function -- this catalog is converted
@@ -330,6 +331,8 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_nam
             directory. Defaults to True. 
         path (str, optional): Absolute path where CSV file should be saved, if save=True. If 
             path is not set, the file will be saved to the local directory.
+        filename(str, optional): Name of the output catalog. Default name is 'pyBIA_catalog'.
+
 
     Note:
         These features can be used to create a machine learning model. 
@@ -346,6 +349,8 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_nam
         will be saved to the local directory, unless a path is specified.
 
     """
+    if filename is None:
+        filename = 'pyBIA_catalog'
 
     prop_list = ['area', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'bbox',
         'covar_sigx2', 'covar_sigxy', 'covar_sigy2', 'covariance_eigvals1', 'covariance_eigvals2',
@@ -372,12 +377,11 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_nam
     
     if table is None:
         df = pd.DataFrame(data_dict)
-        df = df.drop(df.filter(regex="Unname"),axis=1, inplace=True)
         if save == True:
             if path is not None:
-                df.to_csv(path+'pyBIA_catalog') 
+                df.to_csv(path+filename) 
                 return df
-            df.to_csv('pyBIA_catalog')  
+            df.to_csv(filename)  
         return df
 
     try:
@@ -388,13 +392,12 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_nam
     for i in range(len(table[0])):
         data_dict[prop_list[i]] = table[:,i]
 
-    df = pd.DataFrame(data_dict, index=np.arange(0, len(table[:,0])))
-    df = df.drop(df.filter(regex="Unname"), axis=1, inplace=True)
+    df = pd.DataFrame(data_dict)
     if save == True:
         if path is not None:
-            df.to_csv(path+'pyBIA_catalog') 
+            df.to_csv(path+filename) 
             return df
-        df.to_csv('pyBIA_catalog')  
+        df.to_csv(filename)  
         return df
     return df
 

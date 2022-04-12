@@ -37,22 +37,22 @@ Since there are 27 different subfields, we load each one at a time and then crea
 
 .. code-block:: python
 	
-    frames = []		#empty list which will store the catalog of every subfield
+    frame = []		#empty frame which will store the catalog of every subfield
 
     for field_name in np.unique(ndwfs_bootes['field_name']):
 
-    	index = np.argwhere(ndwfs_bootes['field_name'] == field_name)  #identify objects in this subfield
-    	hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
+    	index = np.where(ndwfs_bootes['field_name'] == field_name)[0]  #identify objects in this subfield
+    	hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
 
 		wcsobj = astropy.wcs.WCS(header = hdu[0].header)  #create wcs object for coord conversion
 		xpix, ypix = wcsobj.all_world2pix(ndwfs_bootes['ra'][index], ndwfs_bootes['dec'][index], 0) #convert ra/dec to xpix/ypix
 
 		cat = catalog.create(data=hdu[0].data, x=xpix, y=ypix, obj_name=ndwfs_bootes['NDWFS_objname'][index], field_name=ndwfs_bootes['field_name'][index], flag=np.ones(len(index)), invert=True, save_file=False)
 
-		frames.append(cat)
+		frame.append(cat)
 
-    pandas.concat(frame, axis=0, join='inner') #merge all 27 catalogs into one dataframe
-    frames.to_csv('NDWFS_master_catalog') 	#save dataframe as 'NDWFS_master_catalog'
+    frame = pandas.concat(frame, axis=0, join='inner') #merge all 27 frames into one
+    frame.to_csv('NDWFS_master_catalog') 	#save as 'NDWFS_master_catalog'
 
 When creating a catalog using pyBIA there are numerous parameters you can control, `see the API reference for the catalog class <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_. These features can be used to train a machine learning model, which is why we've included a flag parameter, in which we can input an array containing labels or flags for each object. In the above example, we flagged every object with a value of one, which is what we label any astrophysical object that is not a Lyman-alpha blob. This flag input can also contain an array of strings, which could correspond to actual class labels, e.g. 'GALAXY' or 'STAR'
 
@@ -70,8 +70,8 @@ The entire sample of 866 objects display morphologies and features which are cha
 	index_866 = []
 
 	for i in range(len(obj_names_866)):
-		index = np.argwhere(master_catalog['name'] == obj_names_866[i])
-		index_866.append(int(index))
+		index = np.where(master_catalog['name'] == obj_names_866[i])[0]
+		index_866.append(index)
 
 	index_866 = np.array(index_866)
 
@@ -82,7 +82,7 @@ When we initially created the catalog, we set the 'flag' to 1 for all objects, b
 	diffuse_catalog = master_catalog[index_866]
 	diffuse_catalog['flag'] = 0
 
-	other_index = np.argwhere(master_catalog['flag'] == 1)
+	other_index = np.where(master_catalog['flag'] == 1)[0]
 	other_catalog = master_catalog[other_index]
 
 Finally, we will extract 2D arrays of size 100x100, centered around the positions of each of the 866 diffuse objects. We need these images to train the CNN. As was done when creating the catalog, we will loop over all 27 subfields, find the objects in each one, crop out the subarray, and append the images to a list. We can crop out the image of each object using the crop_image function in pyBIA.data_processing:
@@ -95,8 +95,8 @@ Finally, we will extract 2D arrays of size 100x100, centered around the position
 
 	for field_name in np.unique(diffuse_catalog['field_name']):
 
-		index = np.argwhere(diffuse_catalog['field_name'] == field_name)  #identify objects in this subfield
-		hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
+		index = np.where(diffuse_catalog['field_name'] == field_name)[0]  #identify objects in this subfield
+		hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
 		data = hdu[0].data
 
 		for i in range(len(index)):
@@ -144,7 +144,7 @@ It is important to avoid class imbalance when training machine learning algorith
 	for field_name in np.unique(other_catalog['field_name']):
 
 		index = np.argwhere(other_catalog['field_name'] == field_name)  #identify objects in this subfield
-		hdu = astropy.io.fits.open(path+field_name)	 #load .fits field for this subfield only
+		hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
 		data = hdu[0].data
 
 		for i in range(len(index)):
@@ -190,7 +190,7 @@ When the pyBIA model is trained it will save metric files and an .h5 file contai
 
 With our model saved we can now classify any object by entering the 50x50 2D arrays, either individually or as a 3D array:
 
-.. code-block::python
+.. code-block:: python
 	
 	prediction = models.predict(data, model, normalize=True, min_pixel=638, max_pixel=1500)
 

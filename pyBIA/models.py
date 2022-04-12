@@ -78,7 +78,7 @@ def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
     return np.array(output)
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
-    min_pixel=638, max_pixel=3000, validation_X=None, validation_Y=None, 
+    min_pixel=638, max_pixel=3000, val_X=None, val_Y=None, 
     epochs=100, batch_size=32, lr=0.0001, batch_norm=True, momentum=0.9, decay=0.0005, 
     nesterov=False, loss='categorical_crossentropy', padding='same', 
     dropout=0.5, pooling=True, metrics=True, filename=''):
@@ -97,9 +97,9 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             Pixels with counts below this threshold will be set to this limit.
         max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
             Pixels with counts above this threshold will be set to this limit.
-        validation_X (array, optional): 3D matrix containing the 2D arrays (images)
+        val_X (array, optional): 3D matrix containing the 2D arrays (images)
             to be used for validation.
-        validation_Y (array, optional): A binary class matrix containing the labels of the
+        val_Y (array, optional): A binary class matrix containing the labels of the
             corresponding validation data. This binary matrix representation can be created
             using tensorflow, see example in the Notes.
         epochs (int): Number of epochs used for training. 
@@ -128,9 +128,9 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             as 'model_metric'+filename.
 
     Note:
-        To use a validation dataset when training the model, the validation_X and validation_Y
-        parameters must be input. The validation_X is a 3D matrix containing all the images, and
-        the validation_Y is another matrix containing their class label (0 for DIFFUSE, 1 for OTHER).
+        To use a validation dataset when training the model, the val_X and val_Y
+        parameters must be input. The val_X is a 3D matrix containing all the images, and
+        the val_Y is another matrix containing their class label (0 for DIFFUSE, 1 for OTHER).
 
         If you have validation images of blobs and others, we can use the pyBIA data_processing module to
         properly process our data and costruct validation arguments of appropriate shape. 
@@ -138,10 +138,10 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             >>> val_other, val_other_labels = pyBIA.data_processing.process_class(other_test, label=1, normalize=False)
             >>> val_blob, val_blob_labels = pyBIA.data_processing.process_class(blob_test, label=0, normalize=False)
     
-            >>> validation_X = np.r_[val_X1, val_X2]
-            >>> validation_Y = np.r_[val_Y1, val_Y2]
+            >>> val_X = np.r_[val_X1, val_X2]
+            >>> val_Y = np.r_[val_Y1, val_Y2]
 
-            >>> model = pyBIA_model(blob_train, other_train, validation_X=validation_X, validation_Y=validation_Y)
+            >>> model = pyBIA_model(blob_train, other_train, val_X=val_X, val_Y=val_Y)
 
         The process_class function will reshape our data and label array. This is done because the data must be a 4D matrix in
         order to input into a CNN model. The data array is thus constructed as follow:
@@ -162,17 +162,18 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
         The trained Tensorflow model.
 
     """
+    
     if len(blob_data.shape) != len(other_data.shape):
         raise ValueError("Shape of blob and other data must be the same.")
 
-    if validation_X is not None:
-        if validation_Y is None:
-            raise ValueError("Need to input validation data labels (validation_Y).")
-    if validation_Y is not None:
-        if validation_X is None:
-            raise ValueError("Need to input validation data (validation_X).")
-    if validation_X is not None:
-        if len(validation_X) != len(validation_Y):
+    if val_X is not None:
+        if val_Y is None:
+            raise ValueError("Need to input validation data labels (val_Y).")
+    if val_Y is not None:
+        if val_X is None:
+            raise ValueError("Need to input validation data (val_X).")
+    if val_X is not None:
+        if len(val_X) != len(val_Y):
             raise ValueError("Size of validation data and validation labels must be the same.")
 
     if batch_size < 16:
@@ -247,17 +248,17 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
     model_checkpoint = ModelCheckpoint("checkpoint.hdf5", monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
     callbacks_list = [model_checkpoint]
 
-    if validation_X is None:
+    if val_X is None:
         history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=1)
-    elif validation_X is not None:
-        ix = np.random.permutation(len(validation_X))
-        validation_X, validation_Y = validation_X[ix], validation_Y[ix]
-        history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(validation_X, validation_Y), epochs=epochs, callbacks=callbacks_list, verbose=1)
+    elif val_X is not None:
+        ix = np.random.permutation(len(val_X))
+        val_X, val_Y = val_X[ix], val_Y[ix]
+        history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=1)
 
     if metrics:
         np.savetxt('model_acc'+filename, history.history['accuracy'])
         np.savetxt('model_loss'+filename, history.history['loss'])
-        if validation_X is not None:
+        if val_X is not None:
             np.savetxt('model_val_acc'+filename, history.history['val_accuracy'])
             np.savetxt('model_val_loss'+filename, history.history['val_loss'])
 

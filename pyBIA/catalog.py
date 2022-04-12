@@ -1,5 +1,4 @@
 from warnings import warn
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -264,6 +263,7 @@ def make_table(props):
             table.append(prop_list)
             continue
 
+        #Need to make params unitless 
         prop_list.append(float(props[i][0].area / u.pix**2))
         prop_list.append(props[i][0].bbox_xmax)
         prop_list.append(props[i][0].bbox_xmin)
@@ -349,6 +349,7 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_nam
         will be saved to the local directory, unless a path is specified.
 
     """
+
     if filename is None:
         filename = 'pyBIA_catalog'
 

@@ -33,6 +33,7 @@ How did we build pyBIA?
 ==================
 Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%20pyBIA.html>`_ to learn more about the training data, as well as the machine learning architecture and latest performance. 
 
+
 Importing pyBIA 
 ==================
 
@@ -44,13 +45,13 @@ We have trained a Convolutional Neural Network using the high-level Keras API. O
 
     model = models.bw_model()
 
-With our model loaded, we can classify any 50x50 2-dimensional matrix using the predict function.
+With our model loaded, we can classify any 50x50 image using the predict function.
 
 .. code-block:: python
 
     prediction = models.predict(data, model, normalize=True, min_pixel=1000, max_pixel=1600)
 
-The output will either be 'DIFFUSE' or 'OTHER'. The data can be 3-dimensional as well, allowing you to output classifications for multiple samples at once. 
+The output will either be 'DIFFUSE' or 'OTHER'. The input data can also be a 3-dimensional array containing multiple images.
 
 
 Pages

@@ -38,7 +38,8 @@ def bw_model():
     resource_package = __name__
     resource_path = '/'.join(('data', 'Bw_CNN_Model.h5'))
     model = tf.keras.models.load_model(pkg_resources.resource_filename(resource_package, resource_path))
-    
+    print('Bw model successfully loaded')
+    print('Note: Input data must be 50x50.')
     return model
     
 def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):

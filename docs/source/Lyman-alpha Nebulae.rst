@@ -1,6 +1,6 @@
 .. _Lyalpha_blobs:
 
 
-Diffuse emission
+Lyman-alpha Nebulae
 ============
 

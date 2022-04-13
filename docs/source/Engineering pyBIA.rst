@@ -99,8 +99,8 @@ Finally, we will extract 2D arrays of size 100x100, centered around the position
     	data = hdu[0].data
 
     	for i in range(len(index)):
-    		image = data_processing.crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
-    		diffuse_images.append(image)
+    	image = data_processing.crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
+    	diffuse_images.append(image)
 
 	diffuse_images = np.array(diffuse_images)
 
@@ -141,14 +141,13 @@ It is important to avoid class imbalance when training machine learning algorith
 	other_images = []
 
 	for field_name in np.unique(other_catalog['field_name']):
+		index = np.argwhere(other_catalog['field_name'] == field_name)  #identify objects in this subfield
+		hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
+		data = hdu[0].data
 
-    	index = np.argwhere(other_catalog['field_name'] == field_name)  #identify objects in this subfield
-    	hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
-    	data = hdu[0].data
-
-    	for i in range(len(index)):
-    		image = crop_image(data, x=other_catalog['xpix'], y=other_catalog['ypix'], size=100, invert=True)
-    		other_images.append(image)
+		for i in range(len(index)):
+			image = crop_image(data, x=other_catalog['xpix'], y=other_catalog['ypix'], size=100, invert=True)
+			other_images.append(image)
 
 	other_training = np.array(other_images)
 

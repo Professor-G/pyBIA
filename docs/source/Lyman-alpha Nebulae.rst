@@ -1,4 +1,4 @@
-.. _Lyman_alpha_blobs:
+.. _Lyalpha_blobs:
 
 
 Diffuse emission

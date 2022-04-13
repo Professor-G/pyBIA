@@ -44,12 +44,11 @@ Since there are 27 different subfields, we load each one at a time and then crea
     	index = np.where(ndwfs_bootes['field_name'] == field_name)[0]  #identify objects in this subfield
     	hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
 
-		wcsobj = astropy.wcs.WCS(header = hdu[0].header)  #create wcs object for coord conversion
-		xpix, ypix = wcsobj.all_world2pix(ndwfs_bootes['ra'][index], ndwfs_bootes['dec'][index], 0) #convert ra/dec to xpix/ypix
+    	wcsobj = astropy.wcs.WCS(header = hdu[0].header)  #create wcs object for coord conversion
+    	xpix, ypix = wcsobj.all_world2pix(ndwfs_bootes['ra'][index], ndwfs_bootes['dec'][index], 0) #convert ra/dec to xpix/ypix
 
-		cat = catalog.create(data=hdu[0].data, x=xpix, y=ypix, obj_name=ndwfs_bootes['NDWFS_objname'][index], field_name=ndwfs_bootes['field_name'][index], flag=np.ones(len(index)), invert=True, save_file=False)
-
-		frame.append(cat)
+    	cat = catalog.create(data=hdu[0].data, x=xpix, y=ypix, obj_name=ndwfs_bootes['NDWFS_objname'][index], field_name=ndwfs_bootes['field_name'][index], flag=np.ones(len(index)), invert=True, save_file=False)
+    	frame.append(cat)
 
     frame = pandas.concat(frame, axis=0, join='inner') #merge all 27 frames into one
     frame.to_csv('NDWFS_master_catalog') 	#save as 'NDWFS_master_catalog'
@@ -58,7 +57,7 @@ When creating a catalog using pyBIA there are numerous parameters you can contro
 
 2) DIFFUSE Training Class
 -----------
-`Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_ conducted a systematic search for Lyman-alpha Nebulae in the Boötes field, from which 866 total candidates were selected after visual inspection. From this sample, 85 had a larger (B-R), which could indicate stronger Lyman-alpha emission at z > 2. Only about a third of these 85 candidates have been followed up, and to-date only 5 of these sources have been sprectoscopically confirmed as true Lyman-alpha nebulae. 
+`Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_ conducted a systematic search for Lyman-alpha Nebulae in the Boötes field, from which 866 total candidates were selected after visual inspection. From this sample, 85 had a larger (B-R) value, which could indicate stronger Lyman-alpha emission at z > 2 as the Lyman-alpha wavelength (~1210 Angstroms) from such distance would be redshifted to blue as observed on Earth. Only about a third of these 85 candidates have been followed up, and to-date only 5 of these sources have been sprectoscopically confirmed as true Lyman-alpha nebulae. 
 
 The entire sample of 866 objects display morphologies and features which are characteristic of diffuse emission, as such we can begin by extracting these 866 sources from our master catalog. These objects will serve as our initial training sample of diffuse nebulae. We will begin by loading the NDWFS object names of these 866 candidates which we have saved as a file titled 'obj_names_866'. Each object in the survey has a unique name, therefore this can be used to index the master catalog.
 
@@ -69,13 +68,13 @@ The entire sample of 866 objects display morphologies and features which are cha
 
 	index_866 = []
 
-	for i in range(len(obj_names_866)):
-		index = np.where(master_catalog['name'] == obj_names_866[i])[0]
-		index_866.append(index)
+	for obj_name in obj_names_866:
+    	index = np.where(master_catalog['obj_name'] == obj_name)[0]
+    	index_866.append(index)
 
 	index_866 = np.array(index_866)
 
-When we initially created the catalog, we set the 'flag' to 1 for all objects, but now that we have the indices of the 866 blob candidates, we can set the 'flag' column to 0 for these entries, which we will interpret to mean DIFFUSE. For simplicity, we will break up our master catalog into a diffuse_catalog containing only these 866 candidates, and an other_catalog with everything else.
+When we initially created the catalog, we set the 'flag' column to 1 for all objects, but now that we have the indices of the 866 blob candidates, we can set the 'flag' column to 0 for these entries, which we will interpret to mean DIFFUSE. For simplicity, we will break up our master catalog into a diffuse_catalog containing only these 866 candidates, and an other_catalog with everything else.
 
 .. code-block:: python
 
@@ -95,21 +94,21 @@ Finally, we will extract 2D arrays of size 100x100, centered around the position
 
 	for field_name in np.unique(diffuse_catalog['field_name']):
 
-		index = np.where(diffuse_catalog['field_name'] == field_name)[0]  #identify objects in this subfield
-		hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
-		data = hdu[0].data
+    	index = np.where(diffuse_catalog['field_name'] == field_name)[0]  #identify objects in this subfield
+    	hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
+    	data = hdu[0].data
 
-		for i in range(len(index)):
-			image = crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
-			diffuse_images.append(image)
+    	for i in range(len(index)):
+    		image = data_processing.crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
+    		diffuse_images.append(image)
 
 	diffuse_images = np.array(diffuse_images)
 
-The diffuse_images array now contains data for our 'DIFFUSE' training class (flag=0), but 866 samples is very small. AlexNet, the convolutional neural network pyBIA is modeled after, used ~1.3 million images for training. Since Lyman-alpha nebulae are rare we don't have a large sample of these phenomena, as such, we must perform data augmentation techniques to inflate our 'DIFFUSE' training bag, after which we can randomly select a similar number of other objects to compose our 'OTHER' training class. 
+The diffuse_images array now contains image data for our 'DIFFUSE' training class (flag=0), but a training class of 866 objects is very small. AlexNet, the convolutional neural network pyBIA is modeled after, used ~1.3 million images for training. Since Lyman-alpha nebulae are rare we don't have a large sample of these objects, as such, we must perform data augmentation techniques to inflate our 'DIFFUSE' training bag, after which we can randomly select a similar number of other objects to compose our 'OTHER' training class. 
 
 3) Data Augmentation
 -----------
-We want to apply modification techniques to our images of DIFFUSE objects in ways that will not alter the integrity of the morphological features, so data augmentation methods that include image zoom and cropping, as well as pixel alterations, should not be applied in this context. We adopted the following combination of data augmentation techniques:
+We want to apply modification techniques to our images of DIFFUSE objects in ways that will not alter the integrity of the morphological characteristics, so data augmentation methods that include image zoom and cropping, as well as pixel alterations, should not be applied in this context. We adopted the following combination of data augmentation techniques:
 
 -  Horizontal Shift
 -  Vertical Shift 
@@ -117,9 +116,9 @@ We want to apply modification techniques to our images of DIFFUSE objects in way
 -  Vertical Flip
 -  Rotation
 
-Each time an augmented image is created, the shifts, flips, and rotation parameters are chosen at random as per the specified bounds. It's important to note that image shifts and rotations do end up altering the original image, as the shifted and distorted areas require filling either by extrapolation or by setting the pixels to a constant value -- it is for this reason that we extracted the images of our 866 DIFFUSE objects as 100x100 pixels. We will first perform data augmentation, after which we will resize the image to 50x50. This ensures that any filling that occurs because of shifts or rotations exist on the outer boundaries of the image which end up being cropped away.
+Each time an augmented image is created, the shifts, flips, and rotation parameters are chosen at random as per the specified bounds. It's important to note that image shifts and rotations do end up altering the original image, as the shifted and distorted areas require filling either by extrapolation or by setting the pixels to a constant value -- it is for this reason that we extracted the images of our 866 DIFFUSE objects as 100x100 pixels. We will first perform data augmentation, after which we will resize the image to 50x50. This ensures that any filling that occurs on the outer boundaries because of shifts or rotations end up being cropped away.
 
-To perform data augmentation, we can use pyBIA's data_augmentation model, we just need to input how many augmented images per original image we will create, and the specified bounds of the augmentations. For help please see the `augmentation documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/data_augmentation/index.html>`_. We decided to create 100 augmented images per original sample, enable horizontal/vertical flips and full rotation, and allow for horizontal and vertical shifts of 5 pixels in either direction. Each augmented image will be created by randomly sampling from the distributions.
+To perform data augmentation, we can use pyBIA's data_augmentation module, we just need to input how many augmented images per original sample we will create, and the specified bounds of the augmentations. For help please see the `data augmentation documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/data_augmentation/index.html>`_. We decided to create 100 augmented images per object, enable horizontal/vertical flips and full rotation, and allow for horizontal and vertical shifts of 5 pixels in either direction. Each augmented image will be created by randomly sampling from random uniform distributions.
 
 .. code-block:: python
 
@@ -129,7 +128,7 @@ To perform data augmentation, we can use pyBIA's data_augmentation model, we jus
 
 By default the augmentation function will resize the image to 50x50 after performing the data augmentation, but this resizing can be controlled with the image_size argument. 
 
-The diffuse_training variable is a 3D array containing 866*100=86600 augmented images -- this array will be our 'DIFFUSE' training bag. We can now extract a similar number of other objects to compose our 'OTHER' training bag. 
+The diffuse_training variable is a 3D array containing 866*100=86600 augmented images -- this array will be our 'DIFFUSE' training bag. We can now extract a similar number of other objects to compose our 'OTHER' training bag. This is one power of data augmentation: by inflaating the size of the data-deprived class, you can include more data of the other classes for which there are more samples.
 
 4) OTHER Training Class
 -----------

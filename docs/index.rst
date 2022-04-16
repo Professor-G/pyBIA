@@ -8,7 +8,7 @@ Welcome to pyBIA's documentation!
 
 Lyman-alpha nebulae are extremely rare, to aid in the search for these objects we have created pyBIA, a deep learning classifier for detecting Lyman-alpha blobs using single band imaging. The latest assesment output a false-positive rate of ~4%.
 
-The program tools have been coded for general application, check out this example to learn how you can use pyBIA modules to create your own machine learning image classifier. 
+The program tools have been coded for general application, check out this `example <https://pybia.readthedocs.io/en/latest/source/Examples.html>`_ to learn how you can use pyBIA modules to create your own machine learning image classifier. 
 
    
 Installation

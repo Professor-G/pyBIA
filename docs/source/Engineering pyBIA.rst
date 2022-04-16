@@ -64,15 +64,15 @@ The entire sample of 866 objects display morphologies and features which are cha
 .. code-block:: python
 	
     master_catalog = pandas.read_csv('NDWFS_master_catalog')
-	obj_names_866 = np.loadtxt('obj_names_866', dtype=str)
+    obj_names_866 = np.loadtxt('obj_names_866', dtype=str)
 
-	index_866 = []
+    index_866 = []
 
-	for obj_name in obj_names_866:
-		index = np.where(master_catalog['obj_name'] == obj_name)[0]
-		index_866.append(index)
+    for obj_name in obj_names_866:
+    	index = np.where(master_catalog['obj_name'] == obj_name)[0]
+    	index_866.append(index)
 
-	index_866 = np.array(index_866)
+    index_866 = np.array(index_866)
 
 When we initially created the catalog, we set the 'flag' column to 1 for all objects, but now that we have the indices of the 866 blob candidates, we can set the 'flag' column to 0 for these entries, which we will interpret to mean DIFFUSE. For simplicity, we will break up our master catalog into a diffuse_catalog containing only these 866 candidates, and an other_catalog with everything else.
 

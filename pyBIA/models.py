@@ -38,8 +38,8 @@ def bw_model():
     resource_package = __name__
     resource_path = '/'.join(('data', 'Bw_CNN_Model.h5'))
     model = tf.keras.models.load_model(pkg_resources.resource_filename(resource_package, resource_path))
-    print('Bw model successfully loaded')
-    print('Note: Input data must be 50x50.')
+    print('Bw model successfully loaded.')
+    print('Note: Input data when using this model must be 50x50.')
     return model
     
 def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
@@ -117,7 +117,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             Loss functions can be set by calling the Keras API losses module.
         padding (str): Either 'same' or 'valid'. When set to 'valid', the dimensions reduce as the boundary 
             that doesn't make it within even convolutions get cuts off. Defaults to 'same', which applies
-            zero-value padding around the boundary, ensuring even convolutions.
+            zero-value padding around the boundary, ensuring even convolutional steps across each dimension.
         dropout (float): Droupout rate between 0 and 1. This is the percentage of dense neurons
             that are turned off at each epoch. This prevents inter-neuron depedency, and thus overfitting. 
             Note: If batch_norm=True, it might be best to disable droput. See: https://arxiv.org/abs/1502.03167
@@ -144,29 +144,28 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
 
             >>> model = pyBIA_model(blob_train, other_train, val_X=val_X, val_Y=val_Y)
 
-        The process_class function will reshape our data and label array. This is done because the data must be a 4D matrix in
-        order to input into a CNN model. The data array is thus constructed as follow:
+        The process_class function will reshape our data and label array, as the CNN input data. This reshaped data array
+        can be constructed as follows:
 
             >>> data = channel.reshape(axis, img_width, img_height, img_num_channels)
 
         The label array is also a special binary form: you can set this up manually by converting your 1D label arrays 
         into a binary matrix representation. For example, if you have a channel with 100 DIFFUSE samples (label=0), 
-        you can create a corresponding label array with the following:
+        you can create a corresponding label array using numpy and keras:
 
             >>> label_array = numpy.expand_dims(np.array([0]*len(channel)), axis=1)
             >>> label_array = tensorflow.keras.utils.to_categorical(label, 2)
         
-        The process_class function does all the above for us, so it's best to call that directly to
-        properly reshape our data and labels. 
+        The process_class function does will reshape both the image data and labels for us, so it's best to call 
+        pyBIA.data_processing.process_class() directly to properly reshape our data and labels; see example doc page.
         
     Returns:
-        The trained Tensorflow model.
+        The trained CNN model.
 
     """
     
     if len(blob_data.shape) != len(other_data.shape):
         raise ValueError("Shape of blob and other data must be the same.")
-
     if val_X is not None:
         if val_Y is None:
             raise ValueError("Need to input validation data labels (val_Y).")
@@ -176,10 +175,8 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
     if val_X is not None:
         if len(val_X) != len(val_Y):
             raise ValueError("Size of validation data and validation labels must be the same.")
-
     if batch_size < 16:
         warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.")
-
     if len(blob_data.shape) == 3: #if matrix is 3D - contains multiple samples
         img_width = blob_data[0].shape[0]
         img_height = blob_data[0].shape[1]
@@ -251,7 +248,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
 
     if val_X is None:
         history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=1)
-    elif val_X is not None:
+    else:
         ix = np.random.permutation(len(val_X))
         val_X, val_Y = val_X[ix], val_Y[ix]
         history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=1)

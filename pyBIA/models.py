@@ -42,7 +42,7 @@ def bw_model():
     print('Note: Input data when using this model must be 50x50.')
     return model
     
-def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
+def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000, target='DIFFUSE'):
     """
     Returns the class prediction. The input can either be a single 2D array 
     or a 3D array if there are multiple samples.
@@ -55,7 +55,8 @@ def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
             Pixels with counts below this threshold will be set to this limit.
         max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
             Pixels with counts above this threshold will be set to this limit.
-
+        target (str): The name of the target class, assuming binary classification in 
+            which there is an 'OTHER' class. Defaults to 'DIFFUSE'. 
     Returns:
         The class prediction(s), either 'DIFFUSE' or 'OTHER'.
 
@@ -70,7 +71,7 @@ def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
     output=[]
     for i in range(len(predictions)):
         if np.argmax(predictions[i]) == 0:
-            prediction = 'DIFFUSE'
+            prediction = target
         else:
             prediction = 'OTHER'
 
@@ -78,7 +79,7 @@ def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000):
 
     return np.array(output)
 
-def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
+def create(blob_data, other_data, img_num_channels=1, normalize=True, 
     min_pixel=638, max_pixel=3000, val_X=None, val_Y=None, 
     epochs=100, batch_size=32, lr=0.0001, batch_norm=True, momentum=0.9, decay=0.0005, 
     nesterov=False, loss='categorical_crossentropy', padding='same', 
@@ -142,7 +143,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             >>> val_X = np.r_[val_X1, val_X2]
             >>> val_Y = np.r_[val_Y1, val_Y2]
 
-            >>> model = pyBIA_model(blob_train, other_train, val_X=val_X, val_Y=val_Y)
+            >>> model = create(blob_train, other_train, val_X=val_X, val_Y=val_Y)
 
         The process_class function will reshape our data and label array, as the CNN input data. This reshaped data array
         can be constructed as follows:

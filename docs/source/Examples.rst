@@ -47,7 +47,7 @@ With our machine learning model saved, we can now classify any 100x100 image of 
 This prediction will either be 'WATER_DEER' or 'OTHER'. Note that we had to set a target argument to 'WATER_DEER', as by default if the prediction comes out positive the output is 'DIFFUSE' as per our goal of detecting diffuse Lyman-alpha emission.
 
 
-Example 2:
+Example 2: Green Bean Galaxies
 -----------
 
 

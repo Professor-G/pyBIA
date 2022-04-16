@@ -2,7 +2,7 @@
 
 Examples
 ========
-While we configured pyBIA for astrophysical image filtering, the program modules can be called directly to create any type image classifier. 
+While we configured pyBIA for astrophysical image filtering, the program modules can be called directly to create any type of image classifier. 
 
 Example 1: Ecological Application
 -----------
@@ -44,10 +44,10 @@ With our machine learning model saved, we can now classify any 100x100 image of 
 
 	prediction = models.predict(new_data, model, target='WATER_DEER')
 
-This prediction will either be 'WATER_DEER' or 'OTHER'. Note that we had to set a target argument to 'WATER_DEER', as by default if the prediction comes out positive the output is 'DIFFUSE' as per our goal of detecting diffuse Lyman-alpha emission.
+This prediction will either be 'WATER_DEER' or 'OTHER'. Note that we had to set  target='WATER_DEER', as by default if the prediction comes out positive, the output is 'DIFFUSE' as the original goal of detecting diffuse Lyman-alpha emission.
 
 
-Example 2:
+Example 2: Green Bean Galaxies (3 filters)
 -----------
 
 

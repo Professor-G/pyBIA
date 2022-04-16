@@ -102,7 +102,7 @@ Finally, we will extract 2D arrays of size 100x100, centered around the position
     	for i in range(len(index)): #Crop 100x100 images for each object
     		image = data_processing.crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
     		diffuse_images.append(image)
-
+    		
     diffuse_images = np.array(diffuse_images)
 
 The diffuse_images array now contains image data for our 'DIFFUSE' training class (flag=0), but a training class of 866 objects is very small. AlexNet, the convolutional neural network pyBIA is modeled after, used ~1.3 million images for training. Since Lyman-alpha nebulae are rare we don't have a large sample of these objects, as such, we must perform data augmentation techniques to inflate our 'DIFFUSE' training bag, after which we can randomly select a similar number of other objects to compose our 'OTHER' training class. 
@@ -150,7 +150,7 @@ It is important to avoid class imbalance when training machine learning algorith
 
     	for i in range(len(index)):
     		image = crop_image(data, x=other_catalog['xpix'], y=other_catalog['ypix'], size=100, invert=True)
-			other_images.append(image)
+    		other_images.append(image)
 
     other_training = np.array(other_images)
 

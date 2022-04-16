@@ -181,11 +181,13 @@ The process_class function will output two arrays, the reshaped image data and t
 
 IMPORTANT: When doing image classification it is imperative that we normalize our images so as to avoid exploding gradients. We applied min-max normalization, where min_pixel is the average background count of the data (or entire survey); in our case we set the min to be 638, the 0.01 quantile of the Boötes field. The max_pixel value is set to 1500, we set this value because Lyman-alpha nebulae are diffuse sources and thus we can ignore anything brighter than 1500,  which will result in more robust classification performance.
 
-Since we used the first 10% of the data for validation, the remaining 90% will be used to train the CNN, we will create the CNN model using pyBIA.models.pyBIA_model():
+Since we used the first 10% of the data for validation, the remaining 90% will be used to train the CNN, we will create the CNN model using pyBIA.models.create():
 
 .. code-block:: python
 
-	model = pyBIA_model(blob_train[8660:], other_train[8660:], validation_X=val_X, validation_Y=val_Y, min_pixel= 638, max_pixel=1500, filename='Bw_CNN')
+	from pyBIA import models
+
+	model = models.create(blob_train[8660:], other_train[8660:], validation_X=val_X, validation_Y=val_Y, min_pixel= 638, max_pixel=1500, filename='Bw_CNN')
 
 When the pyBIA model is trained it will save metric files and an .h5 file containing the Tensorflow model. We did not set any of the parameters in the above example as the default ones are the ones we used, but please note that by default the CNN will train for 1000 epochs, which would take several days to complete. Because of the computation time needed to train the model, a checkpoint file will automatically be saved everytime the performance improves, that way we can resume training should the process be interrupted.
 

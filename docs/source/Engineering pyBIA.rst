@@ -99,7 +99,7 @@ Finally, we will extract 2D arrays of size 100x100, centered around the position
     	hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
     	data = hdu[0].data
 
-    	for i in range(len(index)): #Crop 100x100 images for each object
+    	for i in range(len(index)): #Crop out object
     		image = data_processing.crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
     		diffuse_images.append(image)
     		

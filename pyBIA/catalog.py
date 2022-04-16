@@ -25,7 +25,8 @@ def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, f
 
     If no positions are input then a catalog is automatically 
     generated using the DAOFIND algorithm. Sources with local density
-    maxima greater than nsig standard deviations from the background. 
+    maxima greater than nsig (defaul is 2) standard deviations from the background
+    will be cataloged.
     
     Example:
         We can use the world coordinate system in astropy

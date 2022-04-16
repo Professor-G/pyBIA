@@ -62,14 +62,13 @@ When creating a catalog using pyBIA there are numerous parameters you can contro
 The entire sample of 866 objects display morphologies and features which are characteristic of diffuse emission, as such we can begin by extracting these 866 sources from our master catalog. These objects will serve as our initial training sample of diffuse nebulae. We will begin by loading the NDWFS object names of these 866 candidates which we have saved as a file titled 'obj_names_866'. Each object in the survey has a unique name, therefore this can be used to index the master catalog.
 
 .. code-block:: python
-
-	master_catalog = pandas.read_csv('NDWFS_master_catalog')
+	
+    master_catalog = pandas.read_csv('NDWFS_master_catalog')
 	obj_names_866 = np.loadtxt('obj_names_866', dtype=str)
 
 	index_866 = []
 
 	for obj_name in obj_names_866:
-
 		index = np.where(master_catalog['obj_name'] == obj_name)[0]
 		index_866.append(index)
 
@@ -100,7 +99,6 @@ Finally, we will extract 2D arrays of size 100x100, centered around the position
 		data = hdu[0].data
 
 		for i in range(len(index)): #Crop 100x100 images for each object
-
 			image = data_processing.crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
 			diffuse_images.append(image)
 
@@ -149,7 +147,6 @@ It is important to avoid class imbalance when training machine learning algorith
 		data = hdu[0].data
 
 		for i in range(len(index)):
-
 			image = crop_image(data, x=other_catalog['xpix'], y=other_catalog['ypix'], size=100, invert=True)
 			other_images.append(image)
 

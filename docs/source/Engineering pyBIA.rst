@@ -2,7 +2,7 @@
 
 Engineering pyBIA
 ===========
-To train pyBIA v1.0 we made use of blue broadband survey data from the 9.3 square degree `Boötes field <https://legacy.noirlab.edu/noao/noaodeep/>`_. There are 27 subfields, a fits file for each of these fields can be downloaded `here <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/matchedFITS/>`_.
+To train pyBIA v1.0 we made use of blue broadband survey data from the 9.3 square degree `Boötes field <https://legacy.noirlab.edu/noao/noaodeep/>`_. There are 27 subfields, a fits file for each of these fields can be downloaded `here <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/singleFITS/>`_.
 
 To create pyBIA we did the following:
 
@@ -69,8 +69,9 @@ The entire sample of 866 objects display morphologies and features which are cha
 	index_866 = []
 
 	for obj_name in obj_names_866:
-    	index = np.where(master_catalog['obj_name'] == obj_name)[0]
-    	index_866.append(index)
+
+		index = np.where(master_catalog['obj_name'] == obj_name)[0]
+		index_866.append(index)
 
 	index_866 = np.array(index_866)
 
@@ -93,13 +94,15 @@ Finally, we will extract 2D arrays of size 100x100, centered around the position
 	diffuse_images = []
 
 	for field_name in np.unique(diffuse_catalog['field_name']):
-    	index = np.where(diffuse_catalog['field_name'] == field_name)[0]  #identify objects in this subfield
-    	hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
-    	data = hdu[0].data
 
-    	for i in range(len(index)): #Crop 100x100 images for each object
-    		image = data_processing.crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
-    		diffuse_images.append(image)
+		index = np.where(diffuse_catalog['field_name'] == field_name)[0]  #identify objects in this subfield
+		hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
+		data = hdu[0].data
+
+		for i in range(len(index)): #Crop 100x100 images for each object
+
+			image = data_processing.crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
+			diffuse_images.append(image)
 
 	diffuse_images = np.array(diffuse_images)
 
@@ -140,13 +143,15 @@ It is important to avoid class imbalance when training machine learning algorith
 	other_images = []
 
 	for field_name in np.unique(other_catalog['field_name']):
-    	index = np.argwhere(other_catalog['field_name'] == field_name)  #identify objects in this subfield
-    	hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
-    	data = hdu[0].data
 
-    	for i in range(len(index)):
-    		image = crop_image(data, x=other_catalog['xpix'], y=other_catalog['ypix'], size=100, invert=True)
-    		other_images.append(image)
+		index = np.argwhere(other_catalog['field_name'] == field_name)  #identify objects in this subfield
+		hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
+		data = hdu[0].data
+
+		for i in range(len(index)):
+
+			image = crop_image(data, x=other_catalog['xpix'], y=other_catalog['ypix'], size=100, invert=True)
+			other_images.append(image)
 
 	other_training = np.array(other_images)
 

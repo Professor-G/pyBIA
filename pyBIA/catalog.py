@@ -1,12 +1,12 @@
-from warnings import warn
+from warnings import warn, filterwarnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import astropy.units as u
-from astropy.stats import sigma_clipped_stats
+from astropy.stats import sigma_clipped_stats, SigmaClip
 
 from photutils.detection import DAOStarFinder
-from photutils.aperture import aperture_photometry, CircularAperture, CircularAnnulus
+from photutils.aperture import CircularAperture, CircularAnnulus, ApertureStats
 from photutils import detect_threshold
 from astropy.convolution import Gaussian2DKernel
 from astropy.stats import gaussian_fwhm_to_sigma
@@ -18,8 +18,8 @@ from pyBIA import data_processing
 def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, field_name=None, flag=None, 
     aperture=15, annulus_in=20, annulus_out=35, invert=False, nsig=2, save_file=True, path='', filename=None):
     """
-    Creates a photometric and morphological catalog containing the object(s) in 
-    the given position(s) at the given order. The parameters x and y should be 1D 
+    Creates a photometric and morphological catalog containing the astrophysical object(s) 
+    in the input position(s), at the given order. The parameters x and y should be 1D 
     arrays containing the pixel location of each source. The input can be for a 
     single object or multiple objects.
 
@@ -108,15 +108,17 @@ def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, f
         if len(x) != len(y):
             raise ValueError("The two position arrays (x & y) must be the same size.")
     if invert == False:
-        warn('WARNING: Is your data from a .fits file? If so you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.')
+        warn('WARNING: Is your data from a .fits file? If so you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.', stacklevel=2)
     if x is None: #Apply DAOFIND (Stetson 1987) to detect sources in the image
         mean, median, std = sigma_clipped_stats(data, sigma=3.0)
-        print('Performing source detection -- this will take several minutes...')
+        print('No coordinates input, performing source detection -- this will take several minutes...')
         daofind = DAOStarFinder(fwhm=3.0, threshold=2.*std)  
         sources = daofind(data - median)  
         for col in sources.colnames:  
             sources[col].info.format = '%.8g'      
         x, y = np.array(sources['xcentroid']), np.array(sources['ycentroid'])
+        print("Source detection complete, "+str(len(x))+" objects found.")
+    filterwarnings("ignore")
 
     positions = []
     for j in range(len(x)):
@@ -124,40 +126,36 @@ def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, f
 
     apertures = CircularAperture(positions, r=aperture)
     annulus_apertures = CircularAnnulus(positions, r_in=annulus_in, r_out=annulus_out)
-    annulus_masks = annulus_apertures.to_mask(method='center')
-    annulus_data = annulus_masks[0].multiply(data)
-    mask = annulus_masks[0].data
-    annulus_data_1d = annulus_data[mask > 0]
-    median_bkg = np.median(annulus_data_1d)
-        
-    if error is None:
-        phot_table = aperture_photometry(data, apertures)
-        flux = phot_table['aperture_sum'] - (median_bkg * apertures.area)
+    bkg_stats = ApertureStats(data, annulus_apertures, sigma_clip=SigmaClip(sigma=3.0, maxiters=10))
+
+    if error is not None:
+        aper_stats = ApertureStats(data, apertures, error=error, sigma_clip=None)
+    elif error is None:
+        aper_stats = ApertureStats(data, apertures, sigma_clip=None)
+        flux = aper_stats.sum - (bkg_stats.median * aper_stats.sum_aper_area.value)
         if morph_params == True:
             prop_list = morph_parameters(data, x, y, invert=invert)
             tbl = make_table(prop_list)
             df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag,
-                flux=flux, save=save_file, path=path)
+                flux=flux, bkg=bkg_stats.median, save=save_file, path=path)
             return df
 
         df = make_dataframe(table=None, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
-            flux=flux, save=save_file, path=path)
+            flux=flux, bkg=bkg_stats.median, save=save_file, path=path)
         return df
        
-    phot_table = aperture_photometry(data, apertures, error=error)
-    flux = phot_table['aperture_sum'] - (median_bkg * apertures.area)
-    flux_err = phot_table['aperture_sum_err']
+    flux = aper_stats.sum - (bkg_stats.median * aper_stats.sum_aper_area.value)
+    flux_err = aper_stats.sum_error
     if morph_params == True:
         prop_list = morph_parameters(data, x, y, invert=invert)
         tbl = make_table(prop_list)
         df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
-            flux=flux, flux_err=flux_err, save=save_file, path=path)
+            flux=flux, flux_err=flux_err, bkg=bkg_stats.median, save=save_file, path=path)
         return df
 
     df = make_dataframe(table=None, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, flux=flux, 
-        flux_err=flux_err, save=save_file, path=path)
+        flux_err=flux_err, bkg=bkg_stats.median, save=save_file, path=path)
     return df
-
 
 def morph_parameters(data, x, y, invert=False, nsig=2):
     """
@@ -219,7 +217,7 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
         try:
             props = SourceCatalog(new_data, segm, kernel=kernel)
         except:
-            warn('At least one object could not be detected in segmentation... perhaps the object is too faint or there is a coordinate error. NOTE: This object is still in the catalog, the morphologcail features have been set to zero.')
+            warn('At least one object could not be detected in segmentation... perhaps the object is too faint or there is a coordinate error. NOTE: This object is still in the catalog, the morphologcail features have been set to zero.', stacklevel=2)
             prop_list.append(0)
             continue
 
@@ -303,13 +301,12 @@ def make_table(props):
 
     return np.array(table)
 
-def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_name=None,
+def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, bkg=None, obj_name=None,
     field_name=None, flag=None, save=True, path=None, filename=None):
     """
     This function takes as input the catalog of morphological features
     which is output by the make_cat_tbl function -- this catalog is converted
     into a Pandas dataframe. 
-
 
     Args:
         table (optional): Table containing the object features. Can make with make_table() function.
@@ -324,6 +321,8 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_nam
             of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
         flux_err (ndarray, optional): 1D array containing the calculated flux error
             of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
+        bkg (ndarray, optional): 1D array containing the median flux of the background annulus created for
+            each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
         name (ndarray, str, optional): A corresponding array or list of object name(s). This will be appended to 
             the dataframe for cataloging purposes. Defaults to None.
         flag (ndarray, optional): 1D array containing a flag value for each object corresponding
@@ -333,7 +332,6 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_nam
         path (str, optional): Absolute path where CSV file should be saved, if save=True. If 
             path is not set, the file will be saved to the local directory.
         filename(str, optional): Name of the output catalog. Default name is 'pyBIA_catalog'.
-
 
     Note:
         These features can be used to create a machine learning model. 
@@ -376,6 +374,8 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, obj_nam
         data_dict['flux'] = flux
     if flux_err is not None:
         data_dict['flux_err'] = flux_err
+    if bkg is not None:
+        data_dict['background'] = bkg
     
     if table is None:
         df = pd.DataFrame(data_dict)

@@ -7,6 +7,7 @@ Created on Thu Sep 16 22:40:39 2021
 """
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 from warnings import warn
 #os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 from tensorflow.keras.models import Sequential, save_model
@@ -177,7 +178,7 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
         if len(val_X) != len(val_Y):
             raise ValueError("Size of validation data and validation labels must be the same.")
     if batch_size < 16:
-        warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.")
+        warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.", stacklevel=2)
     if len(blob_data.shape) == 3: #if matrix is 3D - contains multiple samples
         img_width = blob_data[0].shape[0]
         img_height = blob_data[0].shape[1]
@@ -261,7 +262,15 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
             np.savetxt('model_val_acc'+filename, history.history['val_accuracy'])
             np.savetxt('model_val_loss'+filename, history.history['val_loss'])
 
+    print("Saving CNN model as: "+filename)
     save_model(model, filename+'_Model.h5')
+
+    print("Plotting learning evolution...")
+    #need subplot to also include loss vs epoch
+    plt.plot(range(len(history.history['accuracy'])), history.history['accuracy'])
+    plt.xlabel('Epochs')
+    plt.ylabel('Training Accuracy')
+    plt.title('Model Accuracy')
 
     return model
 

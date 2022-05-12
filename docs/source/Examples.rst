@@ -44,13 +44,13 @@ With our machine learning model saved, we can now classify any 100x100 image of 
 
 	prediction = models.predict(new_data, model, target='WATER_DEER')
 
-This prediction will either be 'WATER_DEER' or 'OTHER'. Note that we had to set  target='WATER_DEER', as by default if the prediction comes out positive, the output is 'DIFFUSE' as the original goal of detecting diffuse Lyman-alpha emission.
+This prediction will either be 'WATER_DEER' or 'OTHER'. Note that we had to set  target='WATER_DEER', as by default if the prediction comes out positive, the output is 'DIFFUSE' as per the original goal of detecting diffuse Lyman-alpha emission.
 
 
 Example 2: Green Bean Galaxies (3 filters)
 -----------
 
-In this example we will adapt pyBIA for Green Bean Galaxy detection in the SDSS footprint. As SDSS images in 3 bands, we will stack all three channels to create one colorized image. As we will train our model with 3 band images, our input data when making predictions must also have all 3 channels.
+In this example we will adapt pyBIA for Green Bean Galaxy detection in the SDSS footprint. As SDSS images in 3 bands, we will stack all three channels to create one colorized image; therefore our input data when making predictions must also contain all 3 channels. 
 
 
 

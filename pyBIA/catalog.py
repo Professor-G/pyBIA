@@ -1,32 +1,40 @@
-from warnings import warn, filterwarnings
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Nov 17 28 10:10:11 2021
+
+@author: danielgodinez
+"""
+from astropy.utils.exceptions import AstropyWarning
+from warnings import warn, filterwarnings, simplefilter
+filterwarnings("ignore", category=AstropyWarning) #Ignore NaN & inf warnings
+from astropy.io import fits 
+from astropy.wcs import WCS
+import matplotlib.pyplot as plt
+import matplotlib.ticker as tck 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import astropy.units as u
-from astropy.stats import sigma_clipped_stats, SigmaClip
 
 from photutils.detection import DAOStarFinder
-from photutils.aperture import CircularAperture, CircularAnnulus, ApertureStats
-from photutils import detect_threshold
-from astropy.convolution import Gaussian2DKernel
-from astropy.stats import gaussian_fwhm_to_sigma
-from photutils import detect_sources
-from photutils.segmentation import SourceCatalog
+from photutils import detect_threshold, detect_sources, segmentation
+from photutils.aperture import ApertureStats, CircularAperture, CircularAnnulus
+from astropy.stats import sigma_clipped_stats, SigmaClip, gaussian_fwhm_to_sigma
+from astropy.convolution import Gaussian2DKernel, convolve
 
 from pyBIA import data_processing
 
-def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, field_name=None, flag=None, 
-    aperture=15, annulus_in=20, annulus_out=35, invert=False, nsig=2, save_file=True, path='', filename=None):
+
+def create(data, error=None, morph_params=True, deblend=False, x=None, y=None, obj_name=None, field_name=None, 
+    flag=None, aperture=15, annulus_in=20, annulus_out=35, invert=False, fwhm=14, save_file=True, path=None, 
+    filename=None):
     """
-    Creates a photometric and morphological catalog containing the astrophysical object(s) 
-    in the input position(s), at the given order. The parameters x and y should be 1D 
+    Creates a photometric and morphological catalog containing the object(s) in 
+    the given position(s) at the given order. The parameters x and y should be 1D 
     arrays containing the pixel location of each source. The input can be for a 
     single object or multiple objects.
 
     If no positions are input then a catalog is automatically 
     generated using the DAOFIND algorithm. Sources with local density
-    maxima greater than nsig (defaul is 2) standard deviations from the background
-    will be cataloged.
+    maxima greater than 3 standard deviations from the background. 
     
     Example:
         We can use the world coordinate system in astropy
@@ -46,6 +54,9 @@ def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, f
         error (ndarray, optional): 2D array containing the rms error map.
         morph_params (bool, optional): If True, image segmentation is performed and
             morphological parameters are computed. Defaults to True. 
+        deblend (bool, optional): If True, the objects are deblended during the segmentation
+            procedure, thus deblending the objects before the morphological features
+            are computed. Defaults to False so as to keep blobs as one segmentation object.
         x (ndarray, optional): 1D array or list containing the x-pixel position.
             Can contain one position or multiple samples.
         y (ndarray, optional): 1D array or list containing the y-pixel position.
@@ -66,9 +77,8 @@ def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, f
         invert (bool, optional): If True, the x & y coordinates will be switched
             when cropping out the object during the image segmentation step. For
             more information see the morph_parameters function. Defaults to False.
-        nsig (int): Objects in the image are detected if their peak intensity is
-            higher than at least nsig times the standard deviation derived from
-            sigma-clipped statistics. Default is 2.
+        fwhm (int): The circularized full width at half maximum (FWHM). 
+            Default is 2.
         save_file (bool): If set to False then the catalog will not be saved to the machine. 
             You can always save manually, for example, if df = catalog(), then you can save 
             with: df.to_csv('filename'). Defaults to True.
@@ -108,17 +118,20 @@ def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, f
         if len(x) != len(y):
             raise ValueError("The two position arrays (x & y) must be the same size.")
     if invert == False:
-        warn('WARNING: Is your data from a .fits file? If so you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.', stacklevel=2)
+        warn('If data is from .fits file you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.')
     if x is None: #Apply DAOFIND (Stetson 1987) to detect sources in the image
-        mean, median, std = sigma_clipped_stats(data, sigma=3.0)
-        print('No coordinates input, performing source detection -- this will take several minutes...')
-        daofind = DAOStarFinder(fwhm=3.0, threshold=2.*std)  
-        sources = daofind(data - median)  
-        for col in sources.colnames:  
-            sources[col].info.format = '%.8g'      
+        median, std = sigma_clipped_stats(data)[1:]
+        print('Performing source detection...')
+        daofind = DAOStarFinder(threshold=4.*std, fwhm=fwhm)  #Found this threshold and fwhm as ideal through trial and error using blobs for validation
+        sources = daofind(data - median)
+        try:
+            index = np.where((sources['ycentroid']<0) | (sources['xcentroid']<0))[0]
+        except:
+            print('No objects found! Perhaps the fwhm is too low, default is fwhm=9.')
+            return None
+        sources = np.delete(sources, index)
         x, y = np.array(sources['xcentroid']), np.array(sources['ycentroid'])
-        print("Source detection complete, "+str(len(x))+" objects found.")
-    filterwarnings("ignore")
+        #print('{} objects found!'.format(len(x)))
 
     positions = []
     for j in range(len(x)):
@@ -126,41 +139,42 @@ def create(data, error=None, morph_params=True, x=None, y=None, obj_name=None, f
 
     apertures = CircularAperture(positions, r=aperture)
     annulus_apertures = CircularAnnulus(positions, r_in=annulus_in, r_out=annulus_out)
-    bkg_stats = ApertureStats(data, annulus_apertures, sigma_clip=SigmaClip(sigma=3.0, maxiters=10))
+    aper_stats = ApertureStats(data, apertures, error=error)
+    bkg_stats = ApertureStats(data, annulus_apertures, error=error, sigma_clip=SigmaClip())
+    
+    background = bkg_stats.median  
+    flux = aper_stats.sum - (background * apertures.area)
 
-    if error is not None:
-        aper_stats = ApertureStats(data, apertures, error=error, sigma_clip=None)
-    elif error is None:
-        aper_stats = ApertureStats(data, apertures, sigma_clip=None)
-        flux = aper_stats.sum - (bkg_stats.median * aper_stats.sum_aper_area.value)
+    if error is None:
         if morph_params == True:
-            prop_list = morph_parameters(data, x, y, invert=invert)
+            prop_list = morph_parameters(data, x, y, median_bkg=background, invert=invert, deblend=deblend)
             tbl = make_table(prop_list)
             df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag,
-                flux=flux, bkg=bkg_stats.median, save=save_file, path=path)
+                flux=flux, median_bkg=background, save=save_file, path=path)
             return df
 
         df = make_dataframe(table=None, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
-            flux=flux, bkg=bkg_stats.median, save=save_file, path=path)
+            flux=flux, median_bkg=background, save=save_file, path=path)
         return df
        
-    flux = aper_stats.sum - (bkg_stats.median * aper_stats.sum_aper_area.value)
-    flux_err = aper_stats.sum_error
     if morph_params == True:
-        prop_list = morph_parameters(data, x, y, invert=invert)
+        prop_list = morph_parameters(data, x, y, median_bkg=background, invert=invert, deblend=deblend)
         tbl = make_table(prop_list)
         df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
-            flux=flux, flux_err=flux_err, bkg=bkg_stats.median, save=save_file, path=path)
+            flux=flux, flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path)
         return df
 
     df = make_dataframe(table=None, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, flux=flux, 
-        flux_err=flux_err, bkg=bkg_stats.median, save=save_file, path=path)
-    return df
+        flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path)
+    return df, prop_list
 
-def morph_parameters(data, x, y, invert=False, nsig=2):
+def morph_parameters(data, x, y, size=100, median_bkg=None, invert=False, deblend=False):
     """
     Applies image segmentation on each object to calculate morphological 
-    parameters. These parameters can be used to train a machine learning classifier.
+    parameters calculated from the moment-based properties. These parameters 
+    can be used to train a machine learning classifier.
+
+    By default the data is assumed to be background subtracted.
     
     Args:
         data (ndarray): 2D array.
@@ -168,11 +182,17 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
             Can contain one position or multiple samples.
         y (ndarray): 1D array or list containing the y-pixel position.
             Can contain one position or multiple samples.
+        size (int, optional): The size of the box to consider when calculating
+            features related to the local environment. Default is 100 pixels, which
+            is also the default image size the image classifier uses.
+        median_bkg (ndarray, optional): 1D array containing the median background
+            around the annuli of each (x,y) object. This is not a standard rms or background
+            map input. Defaults to None, in which case data is assumed to be background-subtracted.
         invert (bool): If True the x & y coordinates will be switched
             when cropping out the object, see Note below. Defaults to False.
-        nsig (int): Objects in the image are detected if their peak intensity is
-            higher than at least nsig times the standard deviation derived from
-            sigma-clipped statistics. Default is 2.
+        deblend (bool, optional): If True, the objects are deblended during the segmentation
+            procedure, thus deblending the objects before the morphological features
+            are computed. Defaults to False so as to keep blobs as one segmentation object.
 
     Note:
         This function requires x & y positions as each source 
@@ -196,46 +216,52 @@ def morph_parameters(data, x, y, invert=False, nsig=2):
         each position.
         
     """
-
-    if data.shape[0]<100 or data.shape[1]<100:
-        raise ValueError('Data shape must be at least 100x100 to fit the required sub-array.')
+    if data.shape[0] < 100:
+        warn('Small image warning: results may be unstable if the object does not fit entirely within the frame.')
     try: #If position array is a single number it will be converted into a list of unit length
         len(x)
     except TypeError:
         x, y = [x], [y]
 
-    prop_list=[]
     print('Applying image segmentation, this could take a while...')
-    for i in range(len(x)):
-        new_data = data_processing.crop_image(data, int(x[i]), int(y[i]), 100, invert=invert)
-        threshold = detect_threshold(new_data, nsigma=nsig)
+    size = 100 if data.shape[0] > 100 else data.shape[0]
+    prop_list=[]
 
-        sigma = 3.0 * gaussian_fwhm_to_sigma   
-        kernel = Gaussian2DKernel(sigma, x_size=3, y_size=3)
+    for i in range(len(x)):
+        new_data = data_processing.crop_image(data, int(x[i]), int(y[i]), size, invert=invert)
+        if median_bkg is not None:
+            new_data -= median_bkg[i] 
+
+        threshold = detect_threshold(new_data, nsigma=0.6, background=0.0)
+        kernel = Gaussian2DKernel(x_stddev=9*gaussian_fwhm_to_sigma, x_size=21, y_size=21)
         kernel.normalize()
-        segm = detect_sources(new_data, threshold, npixels=5, kernel=kernel)
+
+        convolved_data = convolve(new_data, kernel, normalize_kernel=False, preserve_nan=True)
+        segm = detect_sources(convolved_data, threshold, npixels=9, kernel=None, connectivity=8)
+        if deblend is True:
+            segm = segmentation.deblend_sources(convolved_data, segm, kernel=None, npixels=9, connectivity=8)
+
         try:
-            props = SourceCatalog(new_data, segm, kernel=kernel)
+            props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
         except:
-            warn('At least one object could not be detected in segmentation... perhaps the object is too faint or there is a coordinate error. NOTE: This object is still in the catalog, the morphologcail features have been set to zero.', stacklevel=2)
-            prop_list.append(0)
+            prop_list.append(-999) #If the object can't be segmented 
             continue
 
         sep_list=[]
         for xx in range(len(props)): #This is to select the segmented object closest to the center, (x,y)=(50,50)
             xcen = float(props[xx].centroid[0])
             ycen = float(props[xx].centroid[1])
-        
-            sep = np.sqrt((xcen-50)**2 + (ycen-50)**2)
-            sep_list.append(sep)
+            sep_list.append(np.sqrt((xcen-(size/2))**2 + (ycen-(size/2))**2))
 
         inx = np.where(sep_list == np.min(sep_list))[0]
-        if len(inx) > 1:
-            inx = inx[0]
+        if len(inx) > 1: #In case objects can't be deblended
+            inx = inx[0] 
 
         prop_list.append(props[inx])
 
-    return np.array(prop_list)
+    if -999 in prop_list:
+        warn('At least one object could not be detected in segmentation... perhaps the object is too faint or there is a coordinate error. This object is still in the catalog, the morphological features have been set to -999.')
+    return np.array(prop_list, dtype=object)
 
 def make_table(props):
     """
@@ -244,72 +270,61 @@ def make_table(props):
     Source Catalog documentation: https://photutils.readthedocs.io/en/stable/api/photutils.segmentation.SourceCatalog.html
     
     Args:
-        Props (source catalog): A source catalog containing the 30 segmentation parameters.
+        Props (source catalog): A source catalog containing the segmentation parameters.
         
     Returns:
         Array containing the morphological features. 
 
     """
+    prop_list = ['area', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'bbox',
+        'covar_sigx2', 'covar_sigxy', 'covar_sigy2', 'covariance_eigvals', 'cxx', 'cxy', 
+        'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm',
+        'gini', 'isscalar', 'kron_flux', 'kron_radius', 'max_value', 'maxval_xindex', 
+        'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex', 'moments', 
+        'moments_central', 'orientation', 'perimeter', 'segment_flux', 'semimajor_sigma', 
+        'semiminor_sigma']
 
     table = []
     for i in range(len(props)):
-        prop_list = []
+        morph_feats = []
         try:
             props[i][0].area
         except:
-            for j in range(30): #number of morphological params
-                prop_list.append(0)
-            table.append(prop_list)
+            for j in range(len(prop_list)+31): #+31 because covariance eigenvalue param is actually 2 params, and the moments to 3rd order are each 16
+                morph_feats.append(-999)
+            table.append(morph_feats)
             continue
 
-        #Need to make params unitless 
-        prop_list.append(float(props[i][0].area / u.pix**2))
-        prop_list.append(props[i][0].bbox_xmax)
-        prop_list.append(props[i][0].bbox_xmin)
-        prop_list.append(props[i][0].bbox_ymax)
-        prop_list.append(props[i][0].bbox_ymin)
-        prop_list.append(props[i][0].bbox.shape[0] * props[i][0].bbox.shape[1])
-        prop_list.append(float(props[i][0].covar_sigx2 / u.pix**2))
-        prop_list.append(float(props[i][0].covar_sigxy / u.pix**2))
-        prop_list.append(float(props[i][0].covar_sigy2 / u.pix**2))
-        prop_list.append(float(props[i][0].covariance_eigvals[0] / u.pix**2))
-        prop_list.append(float(props[i][0].covariance_eigvals[1] / u.pix**2))
-        prop_list.append(float(props[i][0].cxx * u.pix**2))
-        prop_list.append(float(props[i][0].cxy * u.pix**2))
-        prop_list.append(float(props[i][0].cyy * u.pix**2))
-        prop_list.append(float(props[i][0].eccentricity))
-        prop_list.append(float(props[i][0].ellipticity))
-        prop_list.append(float(props[i][0].elongation))
-        prop_list.append(float(props[i][0].equivalent_radius / u.pix))
-        prop_list.append(float(props[i][0].fwhm / u.pix))
-        prop_list.append(props[i][0].gini)
-        prop_list.append(props[i][0].kron_flux)
-        prop_list.append(float(props[i][0].kron_radius / u.pix))
-        prop_list.append(props[i][0].max_value)
-        prop_list.append(props[i][0].min_value)
-        prop_list.append(float(props[i][0].orientation / u.degree))
-        prop_list.append(float(props[i][0].perimeter / u.pix))
-        prop_list.append(props[i][0].segment_flux)
-        prop_list.append(float(props[i][0].semimajor_sigma / u.pix))
-        prop_list.append(float(props[i][0].semiminor_sigma / u.pix))
+        QTable = props[i][0].to_table(columns=prop_list)
+        for param in prop_list:
+            if param == 'moments' or param == 'moments_central': #To 3rd order there are 16 image moments (4x4)
+                for moment in np.ravel(QTable[param]):
+                    morph_feats.append(moment)
+            elif param == 'covariance_eigvals': #In two dimensions there are 2 eigenvalues
+                morph_feats.append(np.ravel(QTable[param])[0].value)
+                morph_feats.append(np.ravel(QTable[param])[1].value)
+            elif param == 'isscalar':
+                if QTable[param] == True: #Checks whether it's a single source, 1 for true, 0 for false
+                    morph_feats.append(1)
+                else:
+                    morph_feats.append(0)
+            elif param == 'bbox': #Calculate area of rectangular bounding box
+                morph_feats.append(props[i][0].bbox.shape[0] * props[i][0].bbox.shape[1])
+            else:
+                morph_feats.append(QTable[param].value[0])
 
-        if props[i][0].isscalar == True: #Checks whether it's a single source
-            prop_list.append(1)
-        else:
-            prop_list.append(0)
-        table.append(prop_list)
+        table.append(morph_feats)
 
-    return np.array(table)
+    return np.array(table, dtype=object)
 
-def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, bkg=None, obj_name=None,
-    field_name=None, flag=None, save=True, path=None, filename=None):
+def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_bkg=None, 
+    obj_name=None, field_name=None, flag=None, save=True, path=None, filename=None):
     """
     This function takes as input the catalog of morphological features
-    which is output by the make_cat_tbl function -- this catalog is converted
-    into a Pandas dataframe. 
+    and other metrics and compiles the data as a Pandas dataframe. 
 
     Args:
-        table (optional): Table containing the object features. Can make with make_table() function.
+        table (ndarray, optional): Array containing the object features. Can make with make_table() function.
             If None then a Pandas dataframe containing only the input columns will be generated. Defaults to None.
         x (ndarray, optional): 1D array containing the x-pixel position.
             If input it must be an array of x positions for all objects in the table. 
@@ -321,8 +336,8 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, bkg=Non
             of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
         flux_err (ndarray, optional): 1D array containing the calculated flux error
             of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
-        bkg (ndarray, optional): 1D array containing the median flux of the background annulus created for
-            each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
+        median_bkg (ndarray, optional):  1D array containing the median background around the source annuli.
+            This will be appended to the dataframe for cataloging purposes. Defaults to None.
         name (ndarray, str, optional): A corresponding array or list of object name(s). This will be appended to 
             the dataframe for cataloging purposes. Defaults to None.
         flag (ndarray, optional): 1D array containing a flag value for each object corresponding
@@ -348,15 +363,20 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, bkg=Non
         will be saved to the local directory, unless a path is specified.
 
     """
-
     if filename is None:
         filename = 'pyBIA_catalog'
 
     prop_list = ['area', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'bbox',
         'covar_sigx2', 'covar_sigxy', 'covar_sigy2', 'covariance_eigvals1', 'covariance_eigvals2',
         'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm',
-        'gini', 'kron_flux', 'kron_radius', 'max_value', 'min_value', 'orientation', 'perimeter', 
-        'segment_flux', 'semimajor_sigma', 'semiminor_sigma', 'isscalar' ]
+        'gini', 'isscalar', 'kron_flux', 'kron_radius', 'max_value', 'maxval_xindex', 
+        'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex', 'moments_1', 'moments_2',
+        'moments_3', 'moments_4', 'moments_5', 'moments_6', 'moments_7', 'moments_8', 'moments_9', 'moments_10',
+        'moments_11', 'moments_12', 'moments_13', 'moments_14', 'moments_15', 'moments_16', 'moments_central_1',
+        'moments_central_2', 'moments_central_3', 'moments_central_4', 'moments_central_5', 'moments_central_6', 
+        'moments_central_7', 'moments_central_8', 'moments_central_9', 'moments_central_10', 'moments_central_11', 
+        'moments_central_12', 'moments_central_13', 'moments_central_14', 'moments_central_15', 'moments_central_16',
+        'orientation', 'perimeter', 'segment_flux', 'semimajor_sigma', 'semiminor_sigma']
 
     data_dict = {}
 
@@ -374,16 +394,17 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, bkg=Non
         data_dict['flux'] = flux
     if flux_err is not None:
         data_dict['flux_err'] = flux_err
-    if bkg is not None:
-        data_dict['background'] = bkg
+    if median_bkg is not None:
+        data_dict['median_bkg'] = median_bkg
     
     if table is None:
         df = pd.DataFrame(data_dict)
         if save == True:
-            if path is not None:
-                df.to_csv(path+filename) 
-                return df
-            df.to_csv(filename)  
+            if path is None:
+                print("No path specified, saving catalog to local home directory.")
+                path = '~/'
+            df.to_csv(path+filename) 
+            return df
         return df
 
     try:
@@ -391,15 +412,177 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, bkg=Non
     except TypeError:
         table = [table]
 
-    for i in range(len(table[0])):
+    for i in range(len(prop_list)):
         data_dict[prop_list[i]] = table[:,i]
 
     df = pd.DataFrame(data_dict)
     if save == True:
-        if path is not None:
-            df.to_csv(path+filename) 
-            return df
-        df.to_csv(filename)  
+        if path is None:
+            print("No path specified, saving catalog to local home directory.")
+            path = '~/'
+        df.to_csv(path+filename) 
         return df
     return df
+
+
+def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, kernel_size=21, invert=False,
+    deblend=False, pix_conversion=5, cmap='viridis', path=None, name='', savefig=False):
+    """
+    Plots two subplots: source and segementation object. 
+
+    Note:
+        If savefig=True, the image will not plot, it will only be saved.
+
+    Args:
+        data (ndarray): 2D array of a single image.
+        xpix (ndarray, optional): 1D array or list containing the x-pixel position.
+            Can contain one position or multiple samples. Defaults to None, in which case
+            the whole image is plotted.
+        ypix (ndarray, optional): 1D array or list containing the y-pixel position.
+            Can contain one position or multiple samples. Defaults to None, in which case
+            the whole image is plotted.
+        size (int): length/width of the output image. Defaults to
+            100 pixels or data.shape[0] if image is small.
+        median_bkg (ndarray, optional): If None then the median background will be
+            subtracted. If data is already background subtracted set median_bkg = 0.
+        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
+            deviations from the background will be detected during segmentation. Defaults to 0.6.
+        kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
+            the data. This length must be odd. Defaults to 21.
+        invert (bool): If True the x & y coordinates will be switched
+            when cropping out the object, see Note below. Defaults to False. 
+        deblend (bool, optional): If True, the objects are deblended during the segmentation
+            procedure, thus deblending the objects before the morphological features
+            are computed. Defaults to False so as to keep blobs as one segmentation object.
+        pix_conversion (int): Pixels per arcseconds conversion factor. This is used to set
+            the image axes. 
+        cmap (str): Colormap to use when generating the image.
+        path (str, optional): By default the text file containing the photometry will be
+            saved to the local directory, unless an absolute path to a directory is entered here.
+        name (str, optional): Title displayed above the image. 
+        savefig (bool, optional): If True the plot will be saved to the specified
+       
+    Returns:
+        AxesImage.
+
+    """
+    if data.shape[0] < size:
+       size = data.shape[0]
+    if len(data.shape) != 2:
+        raise ValueError('Data must be 2 dimensional, 3d images not currently supported.')
+
+    try: 
+        len(xpix)
+    except TypeError:
+        xpix = [xpix]
+    try:
+        len(ypix)
+    except TypeError:
+        ypix = [ypix]
+    if xpix is None and ypix is None:
+        xpix, ypix = data.shape[0]/2, data.shape[1]/2
+
+    for i in range(len(xpix)):
+        new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
+        if median_bkg is None:
+            annulus_apertures = CircularAnnulus((xpix[i], ypix[i]), r_in=25, r_out=35)
+            bkg_stats = ApertureStats(data, annulus_apertures, sigma_clip=SigmaClip())
+            median_bkg = bkg_stats.median  
+
+        new_data -= median_bkg 
+
+        threshold = detect_threshold(new_data, nsigma=nsig, background=0.0)
+        sigma = 9.0 * gaussian_fwhm_to_sigma   # FWHM = 9. smooth the data with a 2D circular Gaussian kernel with a FWHM of 3 pixels to filter the image prior to thresholding:
+        kernel = Gaussian2DKernel(sigma, x_size=kernel_size, y_size=kernel_size, mode='center')
+        convolved_data = convolve(new_data, kernel, normalize_kernel=True, preserve_nan=True)
+        segm = detect_sources(convolved_data, threshold, npixels=9, kernel=None, connectivity=8)
+        if deblend is True:
+            segm = deblend_sources(convolved_data, segm, npixels=5, kernel=None)
+        props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
+
+        with plt.rc_context({'axes.edgecolor':'silver', 'axes.linewidth':5, 'xtick.color':'black', 
+            'ytick.color':'black', 'figure.facecolor':'white', 'axes.titlesize':22}):
+            std = np.median(np.abs(new_data-np.median(new_data)))
+            vmin = np.median(new_data) - 3*std
+            vmax = np.median(new_data) + 10*std
+            #'seismic', 'twilight', 'YlGnBu_r', 'bone', 'cividis' #best cmaps
+            plt.rcParams["font.family"] = "Times New Roman"
+            plt.rcParams["font.weight"] = "bold"
+            plt.rcParams["axes.labelweight"] = "bold"
+            plt.rcParams['figure.figsize'] = 5, 7
+            plt.rcParams['xtick.major.pad'] = 6
+            plt.rcParams['ytick.major.pad'] = 6
+
+            fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)#, subplot_kw=dict(frameon=False))
+            ax1 = plt.subplot(2,1,1)
+            ax2 = plt.subplot(2,1,2, sharex=ax1, sharey=ax1)
+
+            ax1.imshow(np.flip(np.flip(new_data)), vmin=vmin, vmax=vmax, cmap=cmap)
+            ax2.imshow(segm.data, origin='lower',  cmap=segm.make_cmap(seed=19))
+            #plt.tight_layout()
+            #apertures.plot(color='white', lw=1.5, alpha=0.5)
+            plt.gcf().set_facecolor("black")
+            plt.subplots_adjust(wspace=0, hspace=0)
+            ax1.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
+            ax2.grid(True, alpha=0.35, linestyle='--')
+
+            ax1.tick_params(axis="both", which="both", colors="white", direction="in", labeltop=True,
+                labelright=True, length=10, width=2, bottom=True, top=True, left=True, right=True, labelsize=12)
+            ax2.tick_params(axis="both", which="both", colors="r", direction="in", labelbottom=True,
+                labelleft=True, length=10, width=2, bottom=True, top=True, left=True, right=True, labelsize=12)
+
+            for axis in ['right', 'left', 'bottom', 'top']:
+                ax1.spines[axis].set_color("silver")
+                ax1.spines[axis].set_linewidth(0.95)
+                ax1.spines[axis].set_visible(True)
+                ax2.spines[axis].set_color("silver")
+                ax2.spines[axis].set_linewidth(0.95)
+                ax2.spines[axis].set_visible(True)
+
+            ax1.xaxis.set_visible(True)
+            ax2.xaxis.set_visible(True)
+            ax2.yaxis.set_visible(True)
+            if isinstance(name, str):
+                ax1.set_ylabel(name, color='mediumturquoise', loc='top', size=30)
+            else:
+                ax1.set_ylabel(name[i], color='mediumturquoise', loc='top', size=30)
+
+            ax2.set_xlabel(r'$\Delta\alpha$ [arcsec] ', fontweight='ultralight', color='snow', size=18)
+            ax2.set_ylabel(r'$\Delta\delta$ [arcsec] ', fontweight='ultralight', color='snow', size=18)
+            
+            ax1.yaxis.tick_right()
+            ax1.xaxis.set_major_locator(plt.MaxNLocator(5))
+            ax1.yaxis.set_major_locator(plt.MaxNLocator(5))
+            ax2.yaxis.set_major_locator(plt.MaxNLocator(5))
+            ax2.xaxis.set_major_locator(plt.MaxNLocator(5))
+            ax1.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
+            ax1.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
+            ax2.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
+            ax2.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
+
+            ax1.tick_params(axis="both", which='minor', length=5, color='w', direction='in')
+            ax2.tick_params(axis="both", which='minor', length=5, color='r', direction='in')
+
+            size = new_data.shape[0]
+            x_label_list = [str(size/-2./pix_conversion), str(size/-4./pix_conversion), 0, str(size/4./pix_conversion), str(size/2./pix_conversion)]
+            ticks = [0,size-3*size/4,size-size/2,size-size/4,size]
+            
+            ax1.set_xticks(ticks)
+            ax1.set_xticklabels(x_label_list)
+            ax1.set_yticks(ticks)
+            ax1.set_yticklabels(x_label_list)
+            ax1.set_frame_on(True)
+            ax2.set_frame_on(True)
+
+            ax2.set_xticks(ticks)
+            ax2.set_xticklabels(x_label_list)
+            ax2.set_yticks(ticks)
+            ax2.set_yticklabels(x_label_list)
+            if savefig is True:
+                if path is None:
+                    print("No path specified, saving catalog to local home directory.")
+                    path = '~/'
+                fig.savefig(path+name, dpi=300)
+                continue
+            plt.show()    
 

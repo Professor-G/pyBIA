@@ -115,7 +115,7 @@ def resize(data, size=50):
     if width != height:
         raise ValueError("Can only resize square images")
     if width == size:
-        warn("No resizing necessary, image shape is already in desired size")
+        warn("No resizing necessary, image shape is already in desired size", stacklevel=2)
         if len(data.shape) == 4:
             data = data[:, :, :, 0]
         return data
@@ -144,7 +144,7 @@ def plot(data, cmap='gray', title=''):
     Args:
         data (array): 2D array for single image, or 3D array with stacked channels.
         cmap (str): Colormap to use when generating the image.
-        title (str, optional): Title displayed above the image. 
+            title (str, optional): Title displayed above the image. 
 
     Returns:
         AxesImage.

@@ -424,14 +424,18 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
         return df
     return df
 
-
 def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, cmap='viridis', path=None, name='', savefig=False):
+    deblend=False, pix_conversion=5, cmap='viridis', path=None, name=' ', savefig=False):
     """
     Plots two subplots: source and segementation object. 
 
+    If no x & y positions are input, the whole image will be output.
+
     Note:
-        If savefig=True, the image will not plot, it will only be saved.
+        If savefig=True, the image will not plot, it will only be saved. If path=None
+        the .png will be saved to the local home directory.
+
+        If data is backgrond subtracted, set median_bkg = 0.
 
     Args:
         data (ndarray): 2D array of a single image.
@@ -444,7 +448,8 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
         size (int): length/width of the output image. Defaults to
             100 pixels or data.shape[0] if image is small.
         median_bkg (ndarray, optional): If None then the median background will be
-            subtracted. If data is already background subtracted set median_bkg = 0.
+            subtracted using the median value within an annuli around the source. 
+            If data is already background subtracted set median_bkg = 0.
         nsig (float): The sigma detection limit. Objects brighter than nsig standard 
             deviations from the background will be detected during segmentation. Defaults to 0.6.
         kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
@@ -466,10 +471,23 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
         AxesImage.
 
     """
-    if data.shape[0] < size:
-       size = data.shape[0]
+    if data.shape[0] > 500 and median_bkg is None and xpix is None:
+        warn('Background subtraction is not as robust when the image is too large. This will also affect the data range the colormap covers.')
     if len(data.shape) != 2:
         raise ValueError('Data must be 2 dimensional, 3d images not currently supported.')
+
+    if data.shape[0] < size:
+       size = data.shape[0]
+    if data.shape[0] < 36:
+        r_out = data.shape[0]-1
+        r_in = r_out - 10 #This is a 10 pixel annulus. 
+    elif data.shape[0] >= 36:
+        r_out = 35
+        r_in = 25 #Default annulus used to calculate the median bkg
+    
+    if xpix is None and ypix is None:
+        xpix, ypix = data.shape[1]/2, data.shape[0]/2
+        size = data.shape[0]
 
     try: 
         len(xpix)
@@ -479,13 +497,16 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
         len(ypix)
     except TypeError:
         ypix = [ypix]
-    if xpix is None and ypix is None:
-        xpix, ypix = data.shape[0]/2, data.shape[1]/2
 
     for i in range(len(xpix)):
-        new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
+        if size != data.shape[0]: 
+            new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
+        else:
+            new_data = data
+
+
         if median_bkg is None:
-            annulus_apertures = CircularAnnulus((xpix[i], ypix[i]), r_in=25, r_out=35)
+            annulus_apertures = CircularAnnulus((xpix[i], ypix[i]), r_in=r_in, r_out=r_out)
             bkg_stats = ApertureStats(data, annulus_apertures, sigma_clip=SigmaClip())
             median_bkg = bkg_stats.median  
 
@@ -502,9 +523,14 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
 
         with plt.rc_context({'axes.edgecolor':'silver', 'axes.linewidth':5, 'xtick.color':'black', 
             'ytick.color':'black', 'figure.facecolor':'white', 'axes.titlesize':22}):
-            std = np.median(np.abs(new_data-np.median(new_data)))
-            vmin = np.median(new_data) - 3*std
-            vmax = np.median(new_data) + 10*std
+            fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)#, subplot_kw=dict(frameon=False))
+            ax1 = plt.subplot(2,1,1)
+            ax2 = plt.subplot(2,1,2, sharex=ax1, sharey=ax1)
+            #plt.tight_layout()
+            std = np.median(np.abs(data-np.median(data)))
+            vmin, vmax = np.median(data) - 3*std, np.median(data) + 10*std
+            ax1.imshow(np.flip(np.flip(data)), vmin=vmin, vmax=vmax, cmap=cmap)
+            ax2.imshow(segm.data, origin='lower', cmap=segm.make_cmap(seed=19))
             #'seismic', 'twilight', 'YlGnBu_r', 'bone', 'cividis' #best cmaps
             plt.rcParams["font.family"] = "Times New Roman"
             plt.rcParams["font.weight"] = "bold"
@@ -513,14 +539,6 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
             plt.rcParams['xtick.major.pad'] = 6
             plt.rcParams['ytick.major.pad'] = 6
 
-            fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)#, subplot_kw=dict(frameon=False))
-            ax1 = plt.subplot(2,1,1)
-            ax2 = plt.subplot(2,1,2, sharex=ax1, sharey=ax1)
-
-            ax1.imshow(np.flip(np.flip(new_data)), vmin=vmin, vmax=vmax, cmap=cmap)
-            ax2.imshow(segm.data, origin='lower',  cmap=segm.make_cmap(seed=19))
-            #plt.tight_layout()
-            #apertures.plot(color='white', lw=1.5, alpha=0.5)
             plt.gcf().set_facecolor("black")
             plt.subplots_adjust(wspace=0, hspace=0)
             ax1.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
@@ -585,4 +603,22 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
                 fig.savefig(path+name, dpi=300)
                 continue
             plt.show()    
+
+ra = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/ndwfs_catalog_bw_85', usecols=0)
+dec = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/ndwfs_catalog_bw_85', usecols=1)
+field_name = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/ndwfs_catalog_bw_85', usecols=2, dtype=str)
+indices = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/indices_bw_85')
+
+indices = np.argsort(indices)
+ra, dec, field_name = ra[indices], dec[indices], field_name[indices] #To match Moire's paper
+i=7#5, 21 50 69
+for i in range(15,16):
+    fieldname = field_name[i]
+    hdu = fits.open('/Users/daniel/Desktop/NDWFS_Tiles/Bw_FITS/'+field_name[i]+'_Bw_03_fix.fits')
+    data = hdu[0].data 
+
+    wcs = WCS(header = hdu[0].header)
+    xpix, ypix = wcs.all_world2pix(ra[i], dec[i], 0) 
+    plot_segm(data, xpix=None, ypix=None, name='Candidate {}'.format(i), invert=True, size=100)
+
 

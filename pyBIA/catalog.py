@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from photutils.detection import DAOStarFinder
-from photutils import detect_threshold, detect_sources, segmentation
+from photutils import detect_threshold, detect_sources, deblend_sources, segmentation
 from photutils.aperture import ApertureStats, CircularAperture, CircularAnnulus
 from astropy.stats import sigma_clipped_stats, SigmaClip, gaussian_fwhm_to_sigma
 from astropy.convolution import Gaussian2DKernel, convolve
@@ -425,7 +425,7 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
     return df
 
 def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, cmap='viridis', path=None, name=' ', savefig=False):
+    deblend=False, pix_conversion=5, cmap='viridis', path=None, name=' ', savefig=False, dpi=300):
     """
     Plots two subplots: source and segementation object. 
 
@@ -469,11 +469,14 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
         name (str, ndarray, optional): The title of the image. This can be an array containing
             multiple names, in which case it must contain a name for each object.
         savefig (bool, optional): If True the plot will be saved to the specified
+        dpi (int, optional): Dots per inch (resolution) when savefig=True. 
+            Set dpi='figure' to use the image's dpi. Defaults to 300.
        
     Returns:
         AxesImage.
 
     """
+
     if data.shape[0] > 500 and median_bkg is None and xpix is None:
         warn('Background subtraction is not as robust when the image is too large. If data is background subtracted set median_bkg=0.')
     if len(data.shape) != 2:
@@ -534,8 +537,8 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
             ax1 = plt.subplot(2,1,1)
             ax2 = plt.subplot(2,1,2, sharex=ax1, sharey=ax1)
             #plt.tight_layout()
-            index = np.where(np.isfinite(new_data))[0]
-            std = np.median(np.abs(new_data[index]-np.median(new_data[index])))
+            index = np.where(np.isfinite(new_data))
+            std = np.median(np.abs(new_data[index] - np.median(new_data[index])))
             vmin, vmax = np.median(new_data[index]) - 3*std, np.median(new_data[index]) + 10*std
             ax1.imshow(new_data, vmin=vmin, vmax=vmax, cmap=cmap)
             ax2.imshow(segm.data, origin='lower', cmap=segm.make_cmap(seed=19))
@@ -586,29 +589,48 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
             ax2.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
             ax2.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
 
-            ax1.tick_params(axis="both", which='minor', length=5, color='w', direction='in')
-            ax2.tick_params(axis="both", which='minor', length=5, color='r', direction='in')
-
             length = new_data.shape[0]
             x_label_list = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
             ticks = [0,length-3*length/4,length-length/2,length-length/4,length]
-            
             ax1.set_xticks(ticks)
             ax1.set_xticklabels(x_label_list)
             ax1.set_yticks(ticks)
             ax1.set_yticklabels(x_label_list)
             ax1.set_frame_on(True)
             ax2.set_frame_on(True)
-
             ax2.set_xticks(ticks)
             ax2.set_xticklabels(x_label_list)
             ax2.set_yticks(ticks)
             ax2.set_yticklabels(x_label_list)
+
+            ax1.tick_params(axis="both", which='minor', length=5, color='w', direction='in')
+            ax2.tick_params(axis="both", which='minor', length=5, color='r', direction='in')
+
             if savefig is True:
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = '~/'
-                fig.savefig(path+name, dpi=300)
+                fig.savefig(path+name, dpi=dpi)
                 continue
             plt.show()    
+
+
+###TEST###
+ra = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/ndwfs_catalog_bw_85', usecols=0)
+dec = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/ndwfs_catalog_bw_85', usecols=1)
+field_name = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/ndwfs_catalog_bw_85', usecols=2, dtype=str)
+indices = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/indices_bw_85')
+
+indices = np.argsort(indices)
+ra, dec, field_name = ra[indices], dec[indices], field_name[indices] #To match Moire's paper
+i=7#5, 21 50 69
+for i in range(10):
+    fieldname = field_name[i]
+    hdu = fits.open('/Users/daniel/Desktop/NDWFS_Tiles/Bw_FITS/'+field_name[i]+'_Bw_03_fix.fits')
+    data = hdu[0].data 
+
+    wcs = WCS(header = hdu[0].header)
+    xpix, ypix = wcs.all_world2pix(ra[i], dec[i], 0) 
+#    ypix, xpix = 8673, 400
+    plot_segm(data, xpix=xpix, ypix=ypix, name='Candidate {}'.format(i), invert=True, deblend=True, size=100)
 

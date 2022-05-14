@@ -604,21 +604,3 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
                 continue
             plt.show()    
 
-ra = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/ndwfs_catalog_bw_85', usecols=0)
-dec = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/ndwfs_catalog_bw_85', usecols=1)
-field_name = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/ndwfs_catalog_bw_85', usecols=2, dtype=str)
-indices = np.loadtxt('/Users/daniel/Desktop/NDWFS_Tiles/photometric_catalog/85/indices_bw_85')
-
-indices = np.argsort(indices)
-ra, dec, field_name = ra[indices], dec[indices], field_name[indices] #To match Moire's paper
-i=7#5, 21 50 69
-for i in range(15,16):
-    fieldname = field_name[i]
-    hdu = fits.open('/Users/daniel/Desktop/NDWFS_Tiles/Bw_FITS/'+field_name[i]+'_Bw_03_fix.fits')
-    data = hdu[0].data 
-
-    wcs = WCS(header = hdu[0].header)
-    xpix, ypix = wcs.all_world2pix(ra[i], dec[i], 0) 
-    plot_segm(data, xpix=None, ypix=None, name='Candidate {}'.format(i), invert=True, size=100)
-
-

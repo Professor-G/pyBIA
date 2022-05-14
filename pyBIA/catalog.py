@@ -449,7 +449,9 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
             100 pixels or data.shape[0] if image is small.
         median_bkg (ndarray, optional): If None then the median background will be
             subtracted using the median value within an annuli around the source. 
-            If data is already background subtracted set median_bkg = 0.
+            If data is already background subtracted set median_bkg = 0. If this is
+            an array, it must contain the local medium background around each source
+            in (xpix, ypix).
         nsig (float): The sigma detection limit. Objects brighter than nsig standard 
             deviations from the background will be detected during segmentation. Defaults to 0.6.
         kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
@@ -464,7 +466,8 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
         cmap (str): Colormap to use when generating the image.
         path (str, optional): By default the text file containing the photometry will be
             saved to the local directory, unless an absolute path to a directory is entered here.
-        name (str, optional): Title displayed above the image. 
+        name (str, ndarray, optional): The title of the image. This can be an array containing
+            multiple names, in which case it must contain a name for each object.
         savefig (bool, optional): If True the plot will be saved to the specified
        
     Returns:
@@ -472,9 +475,12 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
 
     """
     if data.shape[0] > 500 and median_bkg is None and xpix is None:
-        warn('Background subtraction is not as robust when the image is too large. This will also affect the data range the colormap covers.')
+        warn('Background subtraction is not as robust when the image is too large. If data is background subtracted set median_bkg=0.')
     if len(data.shape) != 2:
         raise ValueError('Data must be 2 dimensional, 3d images not currently supported.')
+    if isinstance(median_bkg, np.ndarray) and len(median_bkg)>1:
+        if len(median_bkg) != len(xpix):
+            raise ValueError('If more than one median_bkg is input, the size of the array must be the number of sources (xpix, ypix) input.')
 
     if data.shape[0] < size:
        size = data.shape[0]
@@ -499,18 +505,19 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
         ypix = [ypix]
 
     for i in range(len(xpix)):
-        if size != data.shape[0]: 
-            new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
-        else:
+        if size == data.shape[0]:
             new_data = data
-
+        else: 
+            new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
 
         if median_bkg is None:
             annulus_apertures = CircularAnnulus((xpix[i], ypix[i]), r_in=r_in, r_out=r_out)
             bkg_stats = ApertureStats(data, annulus_apertures, sigma_clip=SigmaClip())
-            median_bkg = bkg_stats.median  
-
-        new_data -= median_bkg 
+            new_data -= bkg_stats.median  
+        elif isinstance(median_bkg, np.ndarray) and len(median_bkg)>1:
+            new_data -= median_bkg[i]
+        else:
+            new_data -= median_bkg 
 
         threshold = detect_threshold(new_data, nsigma=nsig, background=0.0)
         sigma = 9.0 * gaussian_fwhm_to_sigma   # FWHM = 9. smooth the data with a 2D circular Gaussian kernel with a FWHM of 3 pixels to filter the image prior to thresholding:
@@ -523,13 +530,14 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
 
         with plt.rc_context({'axes.edgecolor':'silver', 'axes.linewidth':5, 'xtick.color':'black', 
             'ytick.color':'black', 'figure.facecolor':'white', 'axes.titlesize':22}):
-            fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)#, subplot_kw=dict(frameon=False))
+            fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
             ax1 = plt.subplot(2,1,1)
             ax2 = plt.subplot(2,1,2, sharex=ax1, sharey=ax1)
             #plt.tight_layout()
-            std = np.median(np.abs(data-np.median(data)))
-            vmin, vmax = np.median(data) - 3*std, np.median(data) + 10*std
-            ax1.imshow(np.flip(np.flip(data)), vmin=vmin, vmax=vmax, cmap=cmap)
+            index = np.where(np.isfinite(new_data))[0]
+            std = np.median(np.abs(new_data[index]-np.median(new_data[index])))
+            vmin, vmax = np.median(new_data[index]) - 3*std, np.median(new_data[index]) + 10*std
+            ax1.imshow(new_data, vmin=vmin, vmax=vmax, cmap=cmap)
             ax2.imshow(segm.data, origin='lower', cmap=segm.make_cmap(seed=19))
             #'seismic', 'twilight', 'YlGnBu_r', 'bone', 'cividis' #best cmaps
             plt.rcParams["font.family"] = "Times New Roman"
@@ -581,9 +589,9 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
             ax1.tick_params(axis="both", which='minor', length=5, color='w', direction='in')
             ax2.tick_params(axis="both", which='minor', length=5, color='r', direction='in')
 
-            size = new_data.shape[0]
-            x_label_list = [str(size/-2./pix_conversion), str(size/-4./pix_conversion), 0, str(size/4./pix_conversion), str(size/2./pix_conversion)]
-            ticks = [0,size-3*size/4,size-size/2,size-size/4,size]
+            length = new_data.shape[0]
+            x_label_list = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
+            ticks = [0,length-3*length/4,length-length/2,length-length/4,length]
             
             ax1.set_xticks(ticks)
             ax1.set_xticklabels(x_label_list)

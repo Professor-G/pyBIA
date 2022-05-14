@@ -151,7 +151,7 @@ def plot(data, cmap='gray', title=''):
         
     """
     
-    index = np.where(np.isfinite(data))
+    index = np.where(np.isfinite(data))[0]
     std = np.median(np.abs(data[index]-np.median(data[index])))
     vmin = np.median(data[index]) - 3*std
     vmax = np.median(data[index]) + 10*std

@@ -7,6 +7,7 @@ Created on Thu Nov 17 28 10:10:11 2021
 from astropy.utils.exceptions import AstropyWarning
 from warnings import warn, filterwarnings, simplefilter
 filterwarnings("ignore", category=AstropyWarning) #Ignore NaN & inf warnings
+filterwarnings("ignore", category=RuntimeWarning) #Ignore sigma_clipping NaN warning
 from astropy.io import fits 
 from astropy.wcs import WCS
 import matplotlib.pyplot as plt
@@ -23,19 +24,19 @@ from astropy.convolution import Gaussian2DKernel, convolve
 from pyBIA import data_processing
 
 
-def create(data, error=None, morph_params=True, deblend=False, x=None, y=None, obj_name=None, field_name=None, 
-    flag=None, aperture=15, annulus_in=20, annulus_out=35, invert=False, fwhm=14, save_file=True, path=None, 
-    filename=None):
+def create(data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0.6, deblend=False, 
+    obj_name=None, field_name=None, flag=None, aperture=15, annulus_in=20, annulus_out=35, 
+    invert=False, save_file=True, path=None, filename=None):
     """
     Creates a photometric and morphological catalog containing the object(s) in 
     the given position(s) at the given order. The parameters x and y should be 1D 
     arrays containing the pixel location of each source. The input can be for a 
-    single object or multiple objects.
+    single source or multiple objects.
 
-    If no positions are input then a catalog is automatically 
-    generated using the DAOFIND algorithm. Sources with local density
-    maxima greater than 3 standard deviations from the background. 
-    
+    If data is background subtracted, set bkg=0. If no positions are input
+    then a catalog is automatically generated using the segmentation threshold
+    parameters (nsig). 
+
     Example:
         We can use the world coordinate system in astropy
         to convert ra/dec to pixels and then call pyBIA.catalog:
@@ -51,16 +52,21 @@ def create(data, error=None, morph_params=True, deblend=False, x=None, y=None, o
 
     Args:
         data (ndarray): 2D array.
-        error (ndarray, optional): 2D array containing the rms error map.
-        morph_params (bool, optional): If True, image segmentation is performed and
-            morphological parameters are computed. Defaults to True. 
-        deblend (bool, optional): If True, the objects are deblended during the segmentation
-            procedure, thus deblending the objects before the morphological features
-            are computed. Defaults to False so as to keep blobs as one segmentation object.
         x (ndarray, optional): 1D array or list containing the x-pixel position.
             Can contain one position or multiple samples.
         y (ndarray, optional): 1D array or list containing the y-pixel position.
             Can contain one position or multiple samples.
+        bkg (None, optional): If bkg=0 the data is assumed to be background-subtracted.
+            The other optional is bkg=None, in which case the background will be
+            automatically calculated for local regions.
+        error (ndarray, optional): 2D array containing the rms error map.
+        morph_params (bool, optional): If True, image segmentation is performed and
+            morphological parameters are computed. Defaults to True. 
+        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
+            deviations from the background will be detected during segmentation. Defaults to 0.6.
+        deblend (bool, optional): If True, the objects are deblended during the segmentation
+            procedure, thus deblending the objects before the morphological features
+            are computed. Defaults to False so as to keep blobs as one segmentation object.
         obj_name (ndarray, str, optional): 1D array containing the name of each object
             corresponding to the x & y position. This will be appended to the first
             column of the output catalog. Defaults to None.
@@ -77,8 +83,6 @@ def create(data, error=None, morph_params=True, deblend=False, x=None, y=None, o
         invert (bool, optional): If True, the x & y coordinates will be switched
             when cropping out the object during the image segmentation step. For
             more information see the morph_parameters function. Defaults to False.
-        fwhm (int): The circularized full width at half maximum (FWHM). 
-            Default is 2.
         save_file (bool): If set to False then the catalog will not be saved to the machine. 
             You can always save manually, for example, if df = catalog(), then you can save 
             with: df.to_csv('filename'). Defaults to True.
@@ -102,9 +106,10 @@ def create(data, error=None, morph_params=True, deblend=False, x=None, y=None, o
         A catalog of all objects input (or automatically detected if there were no position arguments), 
         containing both photometric and morphological information. A CSV file titled "pyBIA_catalog" 
         will also be saved to the local directory, unless an absolute path argument is specified.
-          
     """
-    
+
+    if bkg is not None and bkg != 0:
+        raise ValueError('Invalid background input -- if data is background subtracted set bkg=0, otherwise if bkg=None the background will be approximated.')
     if error is not None:
         if data.shape != error.shape:
             raise ValueError("The rms error map must be the same shape as the data array.")
@@ -119,35 +124,68 @@ def create(data, error=None, morph_params=True, deblend=False, x=None, y=None, o
             raise ValueError("The two position arrays (x & y) must be the same size.")
     if invert == False:
         warn('If data is from .fits file you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.')
-    if x is None: #Apply DAOFIND (Stetson 1987) to detect sources in the image
-        median, std = sigma_clipped_stats(data)[1:]
-        print('Performing source detection...')
-        daofind = DAOStarFinder(threshold=4.*std, fwhm=fwhm)  #Found this threshold and fwhm as ideal through trial and error using blobs for validation
-        sources = daofind(data - median)
-        try:
-            index = np.where((sources['ycentroid']<0) | (sources['xcentroid']<0))[0]
-        except:
-            print('No objects found! Perhaps the fwhm is too low, default is fwhm=9.')
-            return None
-        sources = np.delete(sources, index)
-        x, y = np.array(sources['xcentroid']), np.array(sources['ycentroid'])
+    """
+    #Apply DAOFIND (Stetson 1987) to detect sources in the image
+    if x is None: 
+        x, y = DAO(data, fwhm)
         #print('{} objects found!'.format(len(x)))
+    """
+    if x is None: #Background approximation to create preliminary source positions
+        Nx, Ny = data.shape[1], data.shape[0]
+        length = annulus_out*2*2. #The sub-array when padding will be be a square encapsulating the outer annuli
+        
+        if Nx < length or Ny < length: #Small image, no need to pad just take robust median
+            if bkg is None:
+                background  = sigma_clipped_stats(data)[1] #Sigma clipped median
+                data -= background
+        #Subtract local background in regions of sizez length x length
+        else:
+            if bkg is None:
+                pad_x = length - (Nx % length) 
+                pad_y = length - (Ny % length) 
+                padded_matrix = np.pad(data, [(0, int(pad_y)), (0, int(pad_x))], mode='symmetric')
 
+                x_increments = int(padded_matrix.shape[1] / length)
+                y_increments = int(padded_matrix.shape[0] / length)
+
+                initial_x, initial_y = length/2, length/2
+                x_range = [initial_x+length*n for n in range(x_increments)]
+                y_range = [initial_y+length*n for n in range(y_increments)]
+
+                positions=[]
+                for xp in x_range:
+                    for yp in y_range:
+                        positions.append((xp, yp))
+                
+                for i in range(len(positions)):
+                    x,y = positions[i][0], positions[i][1]
+                    background  = sigma_clipped_stats(padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x])[1] #Sigma clipped median                        
+                    padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x] -= background
+                data = padded_matrix[:-int(pad_x),:-int(pad_y)] #Slice away the padding 
+   
+        segm, convolved_data = segm_find(data, nsig=nsig, kernel_size=kernel_size, deblend=deblend)
+        props = segmentation.SourceCatalog(data, segm, convolved_data=convolved_data)
+        x, y = props.centroid[0], props.centroid[1]
+     
     positions = []
     for j in range(len(x)):
         positions.append((x[j], y[j]))
 
     apertures = CircularAperture(positions, r=aperture)
-    annulus_apertures = CircularAnnulus(positions, r_in=annulus_in, r_out=annulus_out)
     aper_stats = ApertureStats(data, apertures, error=error)
-    bkg_stats = ApertureStats(data, annulus_apertures, error=error, sigma_clip=SigmaClip())
-    
-    background = bkg_stats.median  
-    flux = aper_stats.sum - (background * apertures.area)
+
+    if bkg is None:
+        annulus_apertures = CircularAnnulus(positions, r_in=annulus_in, r_out=annulus_out)
+        bkg_stats = ApertureStats(data, annulus_apertures, error=error, sigma_clip=SigmaClip())
+        background = bkg_stats.median
+        flux = aper_stats.sum - (background * apertures.area)
+    elif bkg == 0:
+        flux = aper_stats.sum 
+        background = None 
 
     if error is None:
         if morph_params == True:
-            prop_list = morph_parameters(data, x, y, median_bkg=background, invert=invert, deblend=deblend)
+            prop_list = morph_parameters(data, x, y, nsig=nsig, median_bkg=background, invert=invert, deblend=deblend)
             tbl = make_table(prop_list)
             df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag,
                 flux=flux, median_bkg=background, save=save_file, path=path)
@@ -158,7 +196,7 @@ def create(data, error=None, morph_params=True, deblend=False, x=None, y=None, o
         return df
        
     if morph_params == True:
-        prop_list = morph_parameters(data, x, y, median_bkg=background, invert=invert, deblend=deblend)
+        prop_list = morph_parameters(data, x, y, nsig=nsig, median_bkg=background, invert=invert, deblend=deblend)
         tbl = make_table(prop_list)
         df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
             flux=flux, flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path)
@@ -168,13 +206,14 @@ def create(data, error=None, morph_params=True, deblend=False, x=None, y=None, o
         flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path)
     return df, prop_list
 
-def morph_parameters(data, x, y, size=100, median_bkg=None, invert=False, deblend=False):
+def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=None, invert=False, deblend=False):
     """
     Applies image segmentation on each object to calculate morphological 
-    parameters calculated from the moment-based properties. These parameters 
+    parameters calculated from the moment-based properties (see: ). These parameters 
     can be used to train a machine learning classifier.
 
-    By default the data is assumed to be background subtracted.
+    By default the data is assumed to be background subtracted, otherwise the
+    median_bkg argument needs to be set for proper image detection.
     
     Args:
         data (ndarray): 2D array.
@@ -185,6 +224,8 @@ def morph_parameters(data, x, y, size=100, median_bkg=None, invert=False, deblen
         size (int, optional): The size of the box to consider when calculating
             features related to the local environment. Default is 100 pixels, which
             is also the default image size the image classifier uses.
+        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
+            deviations from the background will be detected during segmentation. Defaults to 0.6.
         median_bkg (ndarray, optional): 1D array containing the median background
             around the annuli of each (x,y) object. This is not a standard rms or background
             map input. Defaults to None, in which case data is assumed to be background-subtracted.
@@ -232,16 +273,8 @@ def morph_parameters(data, x, y, size=100, median_bkg=None, invert=False, deblen
         new_data = data_processing.crop_image(data, int(x[i]), int(y[i]), size, invert=invert)
         if median_bkg is not None:
             new_data -= median_bkg[i] 
-
-        threshold = detect_threshold(new_data, nsigma=0.6, background=0.0)
-        kernel = Gaussian2DKernel(x_stddev=9*gaussian_fwhm_to_sigma, x_size=21, y_size=21)
-        kernel.normalize()
-
-        convolved_data = convolve(new_data, kernel, normalize_kernel=False, preserve_nan=True)
-        segm = detect_sources(convolved_data, threshold, npixels=9, kernel=None, connectivity=8)
-        if deblend is True:
-            segm = segmentation.deblend_sources(convolved_data, segm, kernel=None, npixels=9, connectivity=8)
-
+       
+        segm, convolved_data = segm_find(new_data, nsig=nsig, kernel_size=kernel_size, deblend=deblend)
         try:
             props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
         except:
@@ -302,7 +335,7 @@ def make_table(props):
             if param == 'moments' or param == 'moments_central': #To 3rd order there are 16 image moments (4x4)
                 for moment in np.ravel(QTable[param]):
                     morph_feats.append(moment)
-            elif param == 'covariance_eigvals': #In two dimensions there are 2 eigenvalues
+            elif param == 'covariance_eigvals': #Data is 2D therefore we get two eigenvalues
                 morph_feats.append(np.ravel(QTable[param])[0].value)
                 morph_feats.append(np.ravel(QTable[param])[1].value)
             elif param == 'isscalar':
@@ -310,7 +343,7 @@ def make_table(props):
                     morph_feats.append(1)
                 else:
                     morph_feats.append(0)
-            elif param == 'bbox': #Calculate area of rectangular bounding box
+            elif param == 'bbox': #Calculate area of bounding box
                 morph_feats.append(props[i][0].bbox.shape[0] * props[i][0].bbox.shape[1])
             else:
                 morph_feats.append(QTable[param].value[0])
@@ -430,15 +463,33 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
 def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, kernel_size=21, invert=False,
     deblend=False, pix_conversion=5, cmap='viridis', path=None, name=' ', savefig=False, dpi=300):
     """
-    Plots two subplots: source and segementation object. 
+    Returns two subplots: source and segementation object. 
 
-    If no x & y positions are input, the whole image will be output.
+    If no x & y positions are input, the whole image will be used. If there are
+    position areguments then a subimage of area size x size will be cropped out 
+    first, centered around a given (x, y). By default size=100, although this should
+    be a window size that comfortably encapsulates all objects. If this is too large
+    the automatic background measurements will be less robust.
 
     Note:
-        If savefig=True, the image will not plot, it will only be saved. If path=None
+        If savefig=True, the image will not outpout, it will only be saved. If path=None
         the .png will be saved to the local home directory.
 
         If data is backgrond subtracted, set median_bkg = 0.
+
+    Example:
+        If the data is background subtracted, to plot the entire image and the corresponding
+        segmentation objects, we can do the following:
+
+        >>> from pyBIA.catalog import plot_segm
+        >>> plot_segm(data, median_bkg=0)
+
+        If we wish to isolate a certain object, we input the (x,y) position(s) and a window size.
+        If x & y are arrays that contain multiple positions, then each will plot in sequence.
+        Since image data from .fits files has the (0,0) position on the top left, we will 
+        also set invert=True so that the object is cropped out at the correct pixel position:
+
+        >>> plot_segm(data, x, y, size=50, median_bkg=0, invert=True)
 
     Args:
         data (ndarray): 2D array of a single image.
@@ -453,8 +504,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
         median_bkg (ndarray, optional): If None then the median background will be
             subtracted using the median value within an annuli around the source. 
             If data is already background subtracted set median_bkg = 0. If this is
-            an array, it must contain the local medium background around each source
-            in (xpix, ypix).
+            an array, it must contain the local medium background around each source.        
         nsig (float): The sigma detection limit. Objects brighter than nsig standard 
             deviations from the background will be detected during segmentation. Defaults to 0.6.
         kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
@@ -480,26 +530,24 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
 
     """
 
-    if data.shape[0] > 500 and median_bkg is None and xpix is None:
-        warn('Background subtraction is not as robust when the image is too large. If data is background subtracted set median_bkg=0.')
     if len(data.shape) != 2:
         raise ValueError('Data must be 2 dimensional, 3d images not currently supported.')
     if isinstance(median_bkg, np.ndarray) and len(median_bkg)>1:
         if len(median_bkg) != len(xpix):
             raise ValueError('If more than one median_bkg is input, the size of the array must be the number of sources (xpix, ypix) input.')
 
-    if data.shape[0] < size:
-       size = data.shape[0]
-    if data.shape[0] < 36:
-        r_out = data.shape[0]-1
-        r_in = r_out - 10 #This is a 10 pixel annulus. 
-    elif data.shape[0] >= 36:
+    if data.shape[1] < size:
+       size = data.shape[1]
+    if data.shape[1] < 70: 
+        r_out = data.shape[1]-1
+        r_in = r_out - 15 #This is a 15 pixel annulus. 
+    elif data.shape[1] >= 70:
         r_out = 35
-        r_in = 25 #Default annulus used to calculate the median bkg
+        r_in = 20 #Default annulus used to calculate the median bkg
     
     if xpix is None and ypix is None:
-        xpix, ypix = data.shape[1]/2, data.shape[0]/2
-        size = data.shape[0]
+        xpix, ypix = data.shape[1]/2, data.shape[1]/2
+        size = data.shape[1]
 
     try: 
         len(xpix)
@@ -511,27 +559,50 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
         ypix = [ypix]
 
     for i in range(len(xpix)):
-        if size == data.shape[0]:
+        if size == data.shape[1]:
             new_data = data
         else: 
             new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
+        if median_bkg is None: #Hard coding annuli size, 25 -> 35
+            if new_data.shape[0] > 200 and len(xpix) == 1:
+                print('Calculating background, this could take a while... if data is background subtracted set median_bkg=0.')
+                Nx, Ny = new_data.shape[1], new_data.shape[0]
+                length = 70*2 #The sub-array when padding will be be a square encapsulating the outer annuli
+                if Nx < length or Ny < length: #Small image, no need to pad just take robust median
+                    background  = sigma_clipped_stats(data)[1] #Sigma clipped median
+                    new_data -= background
+                else:
+                    pad_x = length - (Nx % length) 
+                    pad_y = length - (Ny % length) 
+                    padded_matrix = np.pad(new_data, [(0, int(pad_y)), (0, int(pad_x))], mode='symmetric')
+                   
+                    x_increments = int(padded_matrix.shape[1] / length)
+                    y_increments = int(padded_matrix.shape[0] / length)
 
-        if median_bkg is None:
-            annulus_apertures = CircularAnnulus((xpix[i], ypix[i]), r_in=r_in, r_out=r_out)
-            bkg_stats = ApertureStats(data, annulus_apertures, sigma_clip=SigmaClip())
-            new_data -= bkg_stats.median  
+                    initial_x, initial_y = int(length/2), int(length/2)
+                    x_range = [initial_x+length*n for n in range(x_increments)]
+                    y_range = [initial_y+length*n for n in range(y_increments)]
+
+                    positions=[]
+                    for xp in x_range:
+                        for yp in y_range:
+                            positions.append((xp, yp))
+                
+                    for i in range(len(positions)):
+                        x,y = positions[i][0], positions[i][1]
+                        background  = sigma_clipped_stats(padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x])[1] #Sigma clipped median                        
+                        padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x] -= background
+                    new_data = padded_matrix[:-int(pad_x),:-int(pad_y)] #Slice away the padding 
+            else:
+                annulus_apertures = CircularAnnulus((new_data.shape[1]/2, new_data.shape[0]/2), r_in=r_in, r_out=r_out)
+                bkg_stats = ApertureStats(new_data, annulus_apertures, sigma_clip=SigmaClip())
+                new_data -= bkg_stats.median
         elif isinstance(median_bkg, np.ndarray) and len(median_bkg)>1:
             new_data -= median_bkg[i]
         else:
             new_data -= median_bkg 
 
-        threshold = detect_threshold(new_data, nsigma=nsig, background=0.0)
-        sigma = 9.0 * gaussian_fwhm_to_sigma   # FWHM = 9. smooth the data with a 2D circular Gaussian kernel with a FWHM of 3 pixels to filter the image prior to thresholding:
-        kernel = Gaussian2DKernel(sigma, x_size=kernel_size, y_size=kernel_size, mode='center')
-        convolved_data = convolve(new_data, kernel, normalize_kernel=True, preserve_nan=True)
-        segm = detect_sources(convolved_data, threshold, npixels=9, kernel=None, connectivity=8)
-        if deblend is True:
-            segm = deblend_sources(convolved_data, segm, npixels=5, kernel=None)
+        segm, convolved_data = segm_find(new_data, nsig=nsig, kernel_size=kernel_size, deblend=deblend)
         props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
 
         with plt.rc_context({'axes.edgecolor':'silver', 'axes.linewidth':5, 'xtick.color':'black', 
@@ -560,7 +631,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
 
             ax1.tick_params(axis="both", which="both", colors="white", direction="in", labeltop=True,
                 labelright=True, length=10, width=2, bottom=True, top=True, left=True, right=True, labelsize=12)
-            ax2.tick_params(axis="both", which="both", colors="r", direction="in", labelbottom=True,
+            ax2.tick_params(axis="both", which="both", colors="white", direction="in", labelbottom=True,
                 labelleft=True, length=10, width=2, bottom=True, top=True, left=True, right=True, labelsize=12)
 
             for axis in ['right', 'left', 'bottom', 'top']:
@@ -572,6 +643,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
                 ax2.spines[axis].set_visible(True)
 
             ax1.xaxis.set_visible(True)
+            ax1.yaxis.set_visible(True)
             ax2.xaxis.set_visible(True)
             ax2.yaxis.set_visible(True)
             if isinstance(name, str):
@@ -595,11 +667,11 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
             length = new_data.shape[0]
             x_label_list = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
             ticks = [0,length-3*length/4,length-length/2,length-length/4,length]
+            ax1.set_frame_on(True)
             ax1.set_xticks(ticks)
             ax1.set_xticklabels(x_label_list)
             ax1.set_yticks(ticks)
             ax1.set_yticklabels(x_label_list)
-            ax1.set_frame_on(True)
             ax2.set_frame_on(True)
             ax2.set_xticks(ticks)
             ax2.set_xticklabels(x_label_list)
@@ -607,7 +679,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
             ax2.set_yticklabels(x_label_list)
 
             ax1.tick_params(axis="both", which='minor', length=5, color='w', direction='in')
-            ax2.tick_params(axis="both", which='minor', length=5, color='r', direction='in')
+            ax2.tick_params(axis="both", which='minor', length=5, color='w', direction='in')
 
             if savefig is True:
                 if path is None:
@@ -617,4 +689,65 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
                 continue
             plt.show()    
 
+def DAO_find(data, fwhm):
+    """
+    Applyies DAOFIND algorithm (Stetson 1987) to detect sources in the image.
+    Application 
+
+    Arg:
+        data (ndarray): 2D array of a single image.
+        fwhm (int): The full width at half maximum to use when . 
+            Default is 14.
+
+    Returns:
+        First output is x-pixel array, second output is y-pixel array.
+    """
+
+    median, std = sigma_clipped_stats(data)[1:]
+    print('Performing source detection...')
+    daofind = DAOStarFinder(threshold=4.*std, fwhm=fwhm)  
+    sources = daofind(data - median)
+    try:
+        index = np.where((sources['ycentroid']<0) | (sources['xcentroid']<0))[0]
+    except:
+        print('No objects found! Perhaps the fwhm is too low, default is fwhm=9.')
+        return None
+    sources = np.delete(sources, index)
+    x, y = np.array(sources['xcentroid']), np.array(sources['ycentroid'])
+    print('{} objects found!'.format(len(x)))
+    
+    return x, y
+
+def segm_find(data, nsig=0.6, kernel_size=21, deblend=False):
+    """
+    Finds objects using the segmentation detection threshold. 
+    
+    Note:
+        Data must be background subtracted.
+
+    Args:
+        data (ndarray): 2D array of a single image.
+        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
+            deviations from the background will be detected during segmentation. Defaults to 0.6.
+        kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
+            the data. This length must be odd. Defaults to 21.
+        deblend (bool, optional): If True, the objects are deblended during the segmentation
+            procedure, thus deblending the objects before the morphological features
+            are computed. Defaults to False so as to keep blobs as one segmentation object.
+
+    Returns:
+        First output is the segmentation image object, the second output is the convolved data
+        that was used when cataloging the segmentation objects.
+
+    """
+
+    threshold = detect_threshold(data, nsigma=nsig, background=0.0)
+    sigma = 9.0 * gaussian_fwhm_to_sigma   # FWHM = 9. smooth the data with a 2D circular Gaussian kernel with a FWHM of 3 pixels to filter the image prior to thresholding:
+    kernel = Gaussian2DKernel(sigma, x_size=kernel_size, y_size=kernel_size, mode='center')
+    convolved_data = convolve(data, kernel, normalize_kernel=True, preserve_nan=True)
+    segm = detect_sources(convolved_data, threshold, npixels=9, kernel=None, connectivity=8)
+    if deblend is True:
+        segm = deblend_sources(convolved_data, segm, npixels=5, kernel=None)
+    
+    return segm, convolved_data 
 

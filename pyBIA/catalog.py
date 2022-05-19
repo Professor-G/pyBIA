@@ -136,33 +136,11 @@ def create(data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0
         
         if Nx < length or Ny < length: #Small image, no need to pad just take robust median
             if bkg is None:
-                background  = sigma_clipped_stats(data)[1] #Sigma clipped median
-                data -= background
-        #Subtract local background in regions of sizez length x length
+                data -= sigma_clipped_stats(data)[1] #Sigma clipped median
         else:
             if bkg is None:
-                pad_x = length - (Nx % length) 
-                pad_y = length - (Ny % length) 
-                padded_matrix = np.pad(data, [(0, int(pad_y)), (0, int(pad_x))], mode='symmetric')
+                data = subtract_background(data, length=length)
 
-                x_increments = int(padded_matrix.shape[1] / length)
-                y_increments = int(padded_matrix.shape[0] / length)
-
-                initial_x, initial_y = length/2, length/2
-                x_range = [initial_x+length*n for n in range(x_increments)]
-                y_range = [initial_y+length*n for n in range(y_increments)]
-
-                positions=[]
-                for xp in x_range:
-                    for yp in y_range:
-                        positions.append((xp, yp))
-                
-                for i in range(len(positions)):
-                    x,y = positions[i][0], positions[i][1]
-                    background  = sigma_clipped_stats(padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x])[1] #Sigma clipped median                        
-                    padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x] -= background
-                data = padded_matrix[:-int(pad_x),:-int(pad_y)] #Slice away the padding 
-   
         segm, convolved_data = segm_find(data, nsig=nsig, kernel_size=kernel_size, deblend=deblend)
         props = segmentation.SourceCatalog(data, segm, convolved_data=convolved_data)
         x, y = props.centroid[0], props.centroid[1]
@@ -188,22 +166,22 @@ def create(data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0
             prop_list = morph_parameters(data, x, y, nsig=nsig, median_bkg=background, invert=invert, deblend=deblend)
             tbl = make_table(prop_list)
             df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag,
-                flux=flux, median_bkg=background, save=save_file, path=path)
+                flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
             return df
 
         df = make_dataframe(table=None, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
-            flux=flux, median_bkg=background, save=save_file, path=path)
+            flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
         return df
        
     if morph_params == True:
         prop_list = morph_parameters(data, x, y, nsig=nsig, median_bkg=background, invert=invert, deblend=deblend)
         tbl = make_table(prop_list)
         df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
-            flux=flux, flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path)
+            flux=flux, flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
         return df
 
     df = make_dataframe(table=None, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, flux=flux, 
-        flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path)
+        flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
     return df, prop_list
 
 def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=None, invert=False, deblend=False):
@@ -563,43 +541,18 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
             new_data = data
         else: 
             new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
+        
         if median_bkg is None: #Hard coding annuli size, 25 -> 35
             if new_data.shape[0] > 200 and len(xpix) == 1:
-                print('Calculating background, this could take a while... if data is background subtracted set median_bkg=0.')
-                Nx, Ny = new_data.shape[1], new_data.shape[0]
-                length = 70*2 #The sub-array when padding will be be a square encapsulating the outer annuli
-                if Nx < length or Ny < length: #Small image, no need to pad just take robust median
-                    background  = sigma_clipped_stats(data)[1] #Sigma clipped median
-                    new_data -= background
-                else:
-                    pad_x = length - (Nx % length) 
-                    pad_y = length - (Ny % length) 
-                    padded_matrix = np.pad(new_data, [(0, int(pad_y)), (0, int(pad_x))], mode='symmetric')
-                   
-                    x_increments = int(padded_matrix.shape[1] / length)
-                    y_increments = int(padded_matrix.shape[0] / length)
-
-                    initial_x, initial_y = int(length/2), int(length/2)
-                    x_range = [initial_x+length*n for n in range(x_increments)]
-                    y_range = [initial_y+length*n for n in range(y_increments)]
-
-                    positions=[]
-                    for xp in x_range:
-                        for yp in y_range:
-                            positions.append((xp, yp))
-                
-                    for i in range(len(positions)):
-                        x,y = positions[i][0], positions[i][1]
-                        background  = sigma_clipped_stats(padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x])[1] #Sigma clipped median                        
-                        padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x] -= background
-                    new_data = padded_matrix[:-int(pad_x),:-int(pad_y)] #Slice away the padding 
+                print('Calculating background in local regions, this will take a while... if data is background subtracted set median_bkg=0.')
+                new_data = subtract_background(new_data)
             else:
                 annulus_apertures = CircularAnnulus((new_data.shape[1]/2, new_data.shape[0]/2), r_in=r_in, r_out=r_out)
                 bkg_stats = ApertureStats(new_data, annulus_apertures, sigma_clip=SigmaClip())
                 new_data -= bkg_stats.median
         elif isinstance(median_bkg, np.ndarray) and len(median_bkg)>1:
             new_data -= median_bkg[i]
-        else:
+        elif median_bkg == 0:
             new_data -= median_bkg 
 
         segm, convolved_data = segm_find(new_data, nsig=nsig, kernel_size=kernel_size, deblend=deblend)
@@ -751,3 +704,49 @@ def segm_find(data, nsig=0.6, kernel_size=21, deblend=False):
     
     return segm, convolved_data 
 
+def subtract_background(data, length=150):
+    """
+    Removes the background by subtracting the local median pixel value 
+    in sub-regions of size (length x length). The data matrix will be 
+    padded accordingly usying symmetrical boundary conditions to ensure
+    the local regions can expand evenly.
+
+    Arg:
+        data (ndarray): 2D array of a single image.
+        length (int): The length of the rectangular local regions. Default
+            is 150 pixels, therefore local background is subtracted by calculating
+            a robust median in 150x150 regions.
+
+    Returns:
+        The background subtracted data array.
+    """
+
+    Nx, Ny = data.shape[1], data.shape[0]
+    if Nx < length or Ny < length: #Small image, no need to pad just take robust median
+        background  = sigma_clipped_stats(data)[1] #Sigma clipped median
+        data -= background
+        return data
+
+    pad_x = length - (Nx % length) 
+    pad_y = length - (Ny % length) 
+    padded_matrix = np.pad(data, [(0, int(pad_y)), (0, int(pad_x))], mode='symmetric')
+   
+    x_increments = int(padded_matrix.shape[1] / length)
+    y_increments = int(padded_matrix.shape[0] / length)
+
+    initial_x, initial_y = int(length/2), int(length/2)
+    x_range = [initial_x+length*n for n in range(x_increments)]
+    y_range = [initial_y+length*n for n in range(y_increments)]
+
+    positions=[]
+    for xp in x_range:
+        for yp in y_range:
+            positions.append((xp, yp))
+
+    for i in range(len(positions)):
+        x,y = positions[i][0], positions[i][1]
+        background  = sigma_clipped_stats(padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x])[1] #Sigma clipped median                        
+        padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x] -= background
+    
+    data = padded_matrix[:-int(pad_x),:-int(pad_y)] #Slice away the padding 
+    return data

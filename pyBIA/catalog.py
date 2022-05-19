@@ -711,10 +711,10 @@ def subtract_background(data, length=150):
     padded accordingly usying symmetrical boundary conditions to ensure
     the local regions can expand evenly.
 
-    Arg:
+    Args:
         data (ndarray): 2D array of a single image.
         length (int): The length of the rectangular local regions. Default
-            is 150 pixels, therefore local background is subtracted by calculating
+            is 150 pixels, thus the local background is subtracted by calculating
             a robust median in 150x150 regions.
 
     Returns:

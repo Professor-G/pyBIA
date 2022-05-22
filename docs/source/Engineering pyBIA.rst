@@ -17,11 +17,11 @@ We outline below how we created pyBIA, and the associated model which has been s
 
 1) Constructing the Catalog
 -----------
-We first downloaded the data for all subfields within the `Boötes survey <https://legacy.noirlab.edu/noao/noaodeep/>`_ -- with these 27 fits files we can use pyBIA to automatically detect sources and create a photometric and morphological catalog, although the NDWFS team included `merged catalogs <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/matchedFITS/>`_ with their data release. We extracted four items from their merged catalogs: the ra & dec positions of each detected source, the name of the corresponding subfield, as well as its NDWFS object name. This was saved as a Pandas dataframe.
+We first downloaded the data for all subfields within the `Boötes survey <https://legacy.noirlab.edu/noao/noaodeep/>`_ -- with these 27 fits files we can use pyBIA to automatically detect sources and create a photometric and morphological catalog, although the NDWFS team included `merged catalogs <https://legacy.noirlab.edu/noao/noaodeep/DR3/DR3cats/matchedFITS/>`_ with their data release. We extracted four items from their merged catalogs: the ra & dec positions of each detected source, the name of the corresponding subfield, and its object name. 
 
 To create a catalog we can use the pyBIA.catalog module, which takes as optional inputs the x and y pixel positions of each object (if no positions are entered then DAOFINDER is applied to detect sources). Since we need pixel positions we need to load astropy and use their `World Coordinate System implementation <https://docs.astropy.org/en/stable/wcs/index.html>`_ to convert our ra/dec equatorial coordinates to image pixel coordinates.
 
-We start by importing our modules and loading our Pandas dataframe titled 'ndwfs_bootes', which contains the following items extracted from the NDWFS merged catalogs:  ra // dec // field_name // NDWFS_objname. 
+We start by importing our modules and loading the file csv file 'ndwfs_bootes', which contains the following items extracted from the NDWFS merged catalogs:  ra // dec // field_name // NDWFS_objname. 
 
 .. code-block:: python
 	
@@ -51,13 +51,13 @@ Since there are 27 different subfields, we load each one at a time and then crea
     	frame.append(cat)
 
     frame = pandas.concat(frame, axis=0, join='inner') #merge all 27 frames into one
-    frame.to_csv('NDWFS_master_catalog') 	#save as 'NDWFS_master_catalog'
+    frame.to_csv('~/Bootes_Field/NDWFS_master_catalog', chunksize=1000) #save as 'NDWFS_master_catalog' 
 
-When creating a catalog using pyBIA there are numerous parameters you can control, `see the API reference for the catalog class <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_. These features can be used to train a machine learning model, which is why we've included a flag parameter, in which we can input an array containing labels or flags for each object. In the above example, we flagged every object with a value of one, which is what we label any astrophysical object that is not a Lyman-alpha blob. This flag input can also contain an array of strings, which could correspond to actual class labels, e.g. 'GALAXY' or 'STAR'
+The NDWFS Bootes field catalog contains a total of 2509039 detected objects. When creating a catalog using pyBIA there are numerous optional parameters that can be contolled, `see the API reference for the catalog class <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_. These features can be used to train a machine learning model, which is why we've included a flag parameter, in which we can input an array containing labels or flags for each object. In the above example, we flagged every object with a value of one, which is what we label any astrophysical object that is not a Lyman-alpha blob. This flag input can also contain an array of strings, which could correspond to actual class labels, e.g. 'GALAXY' or 'STAR'
 
 2) DIFFUSE Training Class
 -----------
-`Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_ conducted a systematic search for Lyman-alpha Nebulae in the Boötes field, from which 866 total candidates were selected after visual inspection. From this sample, 85 had a larger (B-R) value, which could indicate stronger Lyman-alpha emission at z > 2 as the Lyman-alpha wavelength (~1210 Angstroms) from such distance would be redshifted to blue as observed on Earth. Only about a third of these 85 candidates have been followed up, and to-date only 5 of these sources have been sprectoscopically confirmed as true Lyman-alpha nebulae. 
+`Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_ conducted a systematic search for Lyman-alpha Nebulae in the Boötes field, from which 866 total candidates were selected after visual inspection. From this sample, 85 were of particular interest as they were within the (bluer) color space of a handful of confirmed Lyman-alpha Nebulae. Their bluer color could indicate stronger Lyman-alpha emission at z > 2, as at :math:`\lambda` ~ 1210 :math:`\r{A}`, this hydrogen emission would be redshifted to blue when observed on Earth. Only about a third of these 85 candidates have been followed up, and to-date only 5 of these sources have been sprectoscopically confirmed as true Lyman-alpha nebulae. 
 
 The entire sample of 866 objects display morphologies and features which are characteristic of diffuse emission, as such we can begin by extracting these 866 sources from our master catalog. These objects will serve as our initial training sample of diffuse nebulae. We will begin by loading the NDWFS object names of these 866 candidates which we have saved as a file titled 'obj_names_866'. Each object in the survey has a unique name, therefore this can be used to index the master catalog.
 
@@ -85,7 +85,6 @@ When we initially created the catalog, we set the 'flag' column to 1 for all obj
 	other_catalog = master_catalog[other_index]
 
 Finally, we will extract 2D arrays of size 100x100, centered around the positions of each of the 866 diffuse objects. We need these images to train the CNN. As was done when creating the catalog, we will loop over all 27 subfields, find the objects in each one, crop out the subarray, and append the images to a list. We can crop out the image of each object using the crop_image function in pyBIA.data_processing:
-
 
 .. code-block:: python
 	

@@ -64,7 +64,7 @@ The entire sample of 866 objects display morphologies and features which are cha
 .. code-block:: python
 	
     master_catalog = pandas.read_csv('NDWFS_master_catalog')
-    obj_names_866 = np.loadtxt('obj_names_866', dtype=str)
+    obj_names_866 = np.loadtxt('obj_names_789', dtype=str)
 
     index_866 = []
 
@@ -196,7 +196,24 @@ With our model saved we can now classify any object by entering the 50x50 2D arr
 	
 	prediction = models.predict(data, model, normalize=True, min_pixel=638, max_pixel=1500)
 
-In practice we don't need to create models from scratch, as trained models are included in the pyBIA installation and can be loaded directly. For more information see the Example page. 
+Trained models for Lyman-alpha blob detection are included in the pyBIA installation and can be loaded directly. For more information on how to run pyBIA modules please see the Example page. 
+
+Machine Learning
+===========
+
+While the convolutional neural network is the primary engine pyBIA applies for source detection, we explored the utility of other machine learning algorithms as well, of which the random forest was applied as a preliminary filter. Unlike the image classifier, the random forest model we've created takes as input numerous morphological parameters calculated from image moments. 
+
+Given the extended emission features of Lyman-alpha Nebulae, these parameters can be used to differentiate between extended and compact objects which display no diffuse characteristics. Applying the random forest as a preliminary filter ultimately reduces the false-positive rate and optimizes the data requirements of the pipeline. 
+
+Details on the machine learning models are available `here <https://pybia.readthedocs.io/en/latest/source/Machine_Learning.html>`_. 
+
+
+
+
+
+
+
+
 
 
 

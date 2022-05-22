@@ -61,6 +61,7 @@ Pages
 
    source/Lyman-alpha Nebulae
    source/Engineering pyBIA
+   source/Machine Learning
    source/Examples
 
 Documentation

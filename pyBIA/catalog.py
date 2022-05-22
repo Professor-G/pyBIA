@@ -272,7 +272,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=
         prop_list.append(props[inx])
 
     if -999 in prop_list:
-        warn('At least one object could not be detected in segmentation... perhaps the object is too faint or there is a coordinate error. This object is still in the catalog, the morphological features have been set to -999.')
+        warn('At least one object could not be detected in segmentation... perhaps the object is too faint. This object is still in the catalog, the morphological features have been set to -999.')
     return np.array(prop_list, dtype=object)
 
 def make_table(props):
@@ -436,7 +436,116 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
             path = '~/'
         df.to_csv(path+filename) 
         return df
-    return df
+    return df    
+
+def DAO_find(data, fwhm):
+    """
+    Applyies DAOFIND algorithm (Stetson 1987) to detect sources in the image.
+    Application 
+
+    Arg:
+        data (ndarray): 2D array of a single image.
+        fwhm (int): The full width at half maximum to use when . 
+            Default is 14.
+
+    Returns:
+        First output is x-pixel array, second output is y-pixel array.
+    """
+
+    median, std = sigma_clipped_stats(data)[1:]
+    print('Performing source detection...')
+    daofind = DAOStarFinder(threshold=4.*std, fwhm=fwhm)  
+    sources = daofind(data - median)
+    try:
+        index = np.where((sources['ycentroid']<0) | (sources['xcentroid']<0))[0]
+    except:
+        print('No objects found! Perhaps the fwhm is too low, default is fwhm=9.')
+        return None
+    sources = np.delete(sources, index)
+    x, y = np.array(sources['xcentroid']), np.array(sources['ycentroid'])
+    print('{} objects found!'.format(len(x)))
+    
+    return x, y
+
+def segm_find(data, nsig=0.6, kernel_size=21, deblend=False):
+    """
+    Finds objects using the segmentation detection threshold. 
+    
+    Note:
+        Data must be background subtracted.
+
+    Args:
+        data (ndarray): 2D array of a single image.
+        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
+            deviations from the background will be detected during segmentation. Defaults to 0.6.
+        kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
+            the data. This length must be odd. Defaults to 21.
+        deblend (bool, optional): If True, the objects are deblended during the segmentation
+            procedure, thus deblending the objects before the morphological features
+            are computed. Defaults to False so as to keep blobs as one segmentation object.
+
+    Returns:
+        First output is the segmentation image object, the second output is the convolved data
+        that was used when cataloging the segmentation objects.
+
+    """
+
+    threshold = detect_threshold(data, nsigma=nsig, background=0.0)
+    sigma = 9.0 * gaussian_fwhm_to_sigma   # FWHM = 9. smooth the data with a 2D circular Gaussian kernel with a FWHM of 3 pixels to filter the image prior to thresholding:
+    kernel = Gaussian2DKernel(sigma, x_size=kernel_size, y_size=kernel_size, mode='center')
+    convolved_data = convolve(data, kernel, normalize_kernel=True, preserve_nan=True)
+    segm = detect_sources(convolved_data, threshold, npixels=9, kernel=None, connectivity=8)
+    if deblend is True:
+        segm = deblend_sources(convolved_data, segm, npixels=5, kernel=None)
+    
+    return segm, convolved_data 
+
+def subtract_background(data, length=150):
+    """
+    Removes the background by subtracting the local median pixel value 
+    in sub-regions of size (length x length). The data matrix will be 
+    padded accordingly usying symmetrical boundary conditions to ensure
+    the local regions can expand evenly.
+
+    Args:
+        data (ndarray): 2D array of a single image.
+        length (int): The length of the rectangular local regions. Default
+            is 150 pixels, thus the local background is subtracted by calculating
+            a robust median in 150x150 regions.
+
+    Returns:
+        The background subtracted data array.
+    """
+
+    Nx, Ny = data.shape[1], data.shape[0]
+    if Nx < length or Ny < length: #Small image, no need to pad, just take robust median
+        background  = sigma_clipped_stats(data)[1] #Sigma clipped median
+        data -= background
+        return data
+
+    pad_x = length - (Nx % length) 
+    pad_y = length - (Ny % length) 
+    padded_matrix = np.pad(data, [(0, int(pad_y)), (0, int(pad_x))], mode='symmetric')
+   
+    x_increments = int(padded_matrix.shape[1] / length)
+    y_increments = int(padded_matrix.shape[0] / length)
+
+    initial_x, initial_y = int(length/2), int(length/2)
+    x_range = [initial_x+length*n for n in range(x_increments)]
+    y_range = [initial_y+length*n for n in range(y_increments)]
+
+    positions=[]
+    for xp in x_range:
+        for yp in y_range:
+            positions.append((xp, yp))
+
+    for i in range(len(positions)):
+        x,y = positions[i][0], positions[i][1]
+        background  = sigma_clipped_stats(padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x])[1] #Sigma clipped median                        
+        padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x] -= background
+    
+    data = padded_matrix[:-int(pad_x),:-int(pad_y)] #Slice away the padding 
+    return data
 
 def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, kernel_size=21, invert=False,
     deblend=False, pix_conversion=5, cmap='viridis', path=None, name=' ', savefig=False, dpi=300):
@@ -640,113 +749,4 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
                     path = '~/'
                 fig.savefig(path+name, dpi=dpi)
                 continue
-            plt.show()    
-
-def DAO_find(data, fwhm):
-    """
-    Applyies DAOFIND algorithm (Stetson 1987) to detect sources in the image.
-    Application 
-
-    Arg:
-        data (ndarray): 2D array of a single image.
-        fwhm (int): The full width at half maximum to use when . 
-            Default is 14.
-
-    Returns:
-        First output is x-pixel array, second output is y-pixel array.
-    """
-
-    median, std = sigma_clipped_stats(data)[1:]
-    print('Performing source detection...')
-    daofind = DAOStarFinder(threshold=4.*std, fwhm=fwhm)  
-    sources = daofind(data - median)
-    try:
-        index = np.where((sources['ycentroid']<0) | (sources['xcentroid']<0))[0]
-    except:
-        print('No objects found! Perhaps the fwhm is too low, default is fwhm=9.')
-        return None
-    sources = np.delete(sources, index)
-    x, y = np.array(sources['xcentroid']), np.array(sources['ycentroid'])
-    print('{} objects found!'.format(len(x)))
-    
-    return x, y
-
-def segm_find(data, nsig=0.6, kernel_size=21, deblend=False):
-    """
-    Finds objects using the segmentation detection threshold. 
-    
-    Note:
-        Data must be background subtracted.
-
-    Args:
-        data (ndarray): 2D array of a single image.
-        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
-            deviations from the background will be detected during segmentation. Defaults to 0.6.
-        kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
-            the data. This length must be odd. Defaults to 21.
-        deblend (bool, optional): If True, the objects are deblended during the segmentation
-            procedure, thus deblending the objects before the morphological features
-            are computed. Defaults to False so as to keep blobs as one segmentation object.
-
-    Returns:
-        First output is the segmentation image object, the second output is the convolved data
-        that was used when cataloging the segmentation objects.
-
-    """
-
-    threshold = detect_threshold(data, nsigma=nsig, background=0.0)
-    sigma = 9.0 * gaussian_fwhm_to_sigma   # FWHM = 9. smooth the data with a 2D circular Gaussian kernel with a FWHM of 3 pixels to filter the image prior to thresholding:
-    kernel = Gaussian2DKernel(sigma, x_size=kernel_size, y_size=kernel_size, mode='center')
-    convolved_data = convolve(data, kernel, normalize_kernel=True, preserve_nan=True)
-    segm = detect_sources(convolved_data, threshold, npixels=9, kernel=None, connectivity=8)
-    if deblend is True:
-        segm = deblend_sources(convolved_data, segm, npixels=5, kernel=None)
-    
-    return segm, convolved_data 
-
-def subtract_background(data, length=150):
-    """
-    Removes the background by subtracting the local median pixel value 
-    in sub-regions of size (length x length). The data matrix will be 
-    padded accordingly usying symmetrical boundary conditions to ensure
-    the local regions can expand evenly.
-
-    Args:
-        data (ndarray): 2D array of a single image.
-        length (int): The length of the rectangular local regions. Default
-            is 150 pixels, thus the local background is subtracted by calculating
-            a robust median in 150x150 regions.
-
-    Returns:
-        The background subtracted data array.
-    """
-
-    Nx, Ny = data.shape[1], data.shape[0]
-    if Nx < length or Ny < length: #Small image, no need to pad just take robust median
-        background  = sigma_clipped_stats(data)[1] #Sigma clipped median
-        data -= background
-        return data
-
-    pad_x = length - (Nx % length) 
-    pad_y = length - (Ny % length) 
-    padded_matrix = np.pad(data, [(0, int(pad_y)), (0, int(pad_x))], mode='symmetric')
-   
-    x_increments = int(padded_matrix.shape[1] / length)
-    y_increments = int(padded_matrix.shape[0] / length)
-
-    initial_x, initial_y = int(length/2), int(length/2)
-    x_range = [initial_x+length*n for n in range(x_increments)]
-    y_range = [initial_y+length*n for n in range(y_increments)]
-
-    positions=[]
-    for xp in x_range:
-        for yp in y_range:
-            positions.append((xp, yp))
-
-    for i in range(len(positions)):
-        x,y = positions[i][0], positions[i][1]
-        background  = sigma_clipped_stats(padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x])[1] #Sigma clipped median                        
-        padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x] -= background
-    
-    data = padded_matrix[:-int(pad_x),:-int(pad_y)] #Slice away the padding 
-    return data
+            plt.show()

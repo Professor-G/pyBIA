@@ -199,7 +199,7 @@ With our model saved we can now classify any object by entering the 50x50 2D arr
 Trained models for Lyman-alpha blob detection are included in the pyBIA installation and can be loaded directly. For more information on how to run pyBIA modules please see the Example page. 
 
 Machine Learning
-===========
+-----------
 
 While the convolutional neural network is the primary engine pyBIA applies for source detection, we explored the utility of other machine learning algorithms as well, of which the random forest was applied as a preliminary filter. Unlike the image classifier, the random forest model we've created takes as input numerous morphological parameters calculated from image moments. 
 

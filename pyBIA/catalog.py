@@ -417,7 +417,7 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
             if path is None:
                 print("No path specified, saving catalog to local home directory.")
                 path = '~/'
-            df.to_csv(path+filename) 
+            df.to_csv(path+filename, index=False) 
             return df
         return df
 
@@ -434,7 +434,7 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
         if path is None:
             print("No path specified, saving catalog to local home directory.")
             path = '~/'
-        df.to_csv(path+filename) 
+        df.to_csv(path+filename, index=False) 
         return df
     return df    
 

@@ -19,7 +19,7 @@ module:
 
 	model = rf_model.create(data_x, data_y, impute=False, optimize=False)
 
-If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, we must also save the imputer that is fitted to the original training data, so that we can apply it to transform new data if it contains invalid values. We can set impute=True to perform the imputation, but the now the imputer will be the second output.
+If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, we must also save the imputer that is fitted to the original training data, so that we can apply it to transform new data if it contains invalid values. We can set impute=True to perform the imputation, but the now imputer will be the second output following the model:
 
 .. code-block:: python
 
@@ -91,7 +91,7 @@ Finally, we can predict using our optimized model:
 Assessing RF Performance
 -----------
 
-Using the model created above, we generate both a confusion matrix and a ROC curve.
+Using the model created above, we can generate both a confusion matrix and a ROC curve.
 
 .. code-block:: python
 
@@ -103,7 +103,7 @@ Using the model created above, we generate both a confusion matrix and a ROC cur
 	#ROC Curve
 	rf_model.plot_roc_curve(classifier=model, data_x, data_y)
 
-For more information refer to the `module documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/rf_model.html>`_.
+For more information refer to the `module documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/rf_model.html>`_.
 
 
 Convolutional Neural Network

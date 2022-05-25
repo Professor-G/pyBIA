@@ -47,7 +47,7 @@ Example:
 	prediction = rf_model.predict(new_data, model, imputer, feats_to_use)
 
 Example
-==================
+-----------
 
 We can load the diffuse_catalog and other_catalog files and create a Random Forest classifier as such:
 

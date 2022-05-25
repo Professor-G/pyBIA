@@ -71,14 +71,15 @@ We can load the diffuse_catalog and other_catalog files and create a Random Fore
 	rand_inx = [int(i) for i in random.sample(range(0, len(mask)), len(blob))] 
 	other = other.iloc[rand_inx]
 
-	#Create training data array 
+	#Create 2D training data array 
 	data_x = np.concatenate((blob, other))
 
-	#Create class label array
-	labels_blob = np.array(['DIFFUSE']*len(blob_train))
-	labels_other = np.array(['OTHER']*len(other_train))
+	#Create 1D class label array
+	labels_blob = np.array(['DIFFUSE']*len(blob))
+	labels_other = np.array(['OTHER']*len(other))
 	data_y = np.r_[labels_blob, labels_other]
 
+	#Save RF classifier, imputer transformation, and indices of good features
 	model, imputer, feats_to_use = rf_model.create(data_x, data_y)
 
 Finally, we can predict using our optimized model:

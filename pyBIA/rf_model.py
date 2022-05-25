@@ -109,8 +109,8 @@ def predict(data, model, imputer=None, feats_to_use=None):
 
     Returns:
         Array containing the classes and the corresponding probability prediction
-
     """
+    
     classes = ['DIFFUSE', 'OTHER']
     
     if imputer is None and feats_to_use is None:
@@ -155,7 +155,7 @@ def plot_conf_matrix(classifier, data_x, data_y, k_fold=10, normalize=True, clas
 
 def plot_roc_curve(classifier, data_x, data_y, k_fold=10, title="Receiver Operating Characteristic Curve"):
     """
-    Plots ROC curve with 10k fold validation, as such the 
+    Plots ROC curve with k-fold cross-validation, as such the 
     standard deviation variations are plotted.
     
     Example:

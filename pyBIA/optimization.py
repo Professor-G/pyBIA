@@ -6,8 +6,10 @@ Created on Wed Sep  11 12:04:23 2021
 @author: daniel
 """
 import sys 
-import random
+from warnings import filterwarnings
+filterwarnings("ignore", category=FutureWarning)
 import numpy as np
+import random
 
 import sklearn.neighbors._base
 sys.modules['sklearn.neighbors.base'] = sklearn.neighbors._base
@@ -16,6 +18,8 @@ from missingpy import MissForest
 from boruta import BorutaPy
 from sklearn.impute import KNNImputer
 from sklearn.model_selection import train_test_split, cross_validate
+from skopt import BayesSearchCV, plots
+from skopt.plots import plot_convergence, plot_objective
 
 """
 The RF imputation procedures improve performance if the features are heavily correlated.
@@ -143,6 +147,9 @@ def Strawman_imputation(data):
         The data array with the missing values filled in. 
     """
 
+    data[data>1e6] = 1e6
+    data[(data>0) * (data<1e-6)] = 1e-6
+
     if np.all(np.isfinite(data)):
         print('No missing values in data, returning original array.')
         return data 
@@ -217,6 +224,9 @@ def KNN_imputation(data, imputer=None, k=3):
         new data, prior to predictions. 
     """
 
+    data[data>1e6] = 1e6
+    data[(data>0) * (data<1e-6)] = 1e-6
+
     if np.all(np.isfinite(data)) and imputer is None:
         raise ValueError('No missing values in training dataset, do not apply imputation algorithms!')
 
@@ -264,12 +274,14 @@ def MissForest_imputation(data, imputer=None):
         The second output is the Miss Forest Imputer that should be used to transform
         new data, prior to predictions. 
     """
+    data[data>1e6] = 1e6
+    data[(data>0) * (data<1e-6)] = 1e-6
 
     if np.all(np.isfinite(data)) and imputer is None:
         raise ValueError('No missing values in training dataset, do not apply imputation algorithms!')
 
     if imputer is None:
-        imputer = MissForest()
+        imputer = MissForest(verbose=0)
         imputer.fit(data)
         imputed_data = imputer.transform(data)
         return imputed_data, imputer

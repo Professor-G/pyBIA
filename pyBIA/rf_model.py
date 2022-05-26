@@ -16,8 +16,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, auc, RocCurveDisplay
 from sklearn.model_selection import KFold, StratifiedKFold
 
-from skopt import BayesSearchCV, plots
-from skopt.plots import plot_convergence, plot_objective
 from pyBIA.optimization import hyper_opt, boruta_opt, KNN_imputation, MissForest_imputation
 
 #training_set = strawman_imputation(training_set)
@@ -66,8 +64,11 @@ def create(data_x, data_y, impute=True, optimize=True, imp_method='MissForest'):
         Random Forest classifier model created with scikit-learn. If optimize=True, this
         model will already include the optimal hyperparameters. 
     """
-    
+
+    data[data>1e6] = 1e6
+    data[(data>0) * (data<1e-6)] = 1e-6
     model = RandomForestClassifier()
+    
     if impute is False and optimize is False:
         model.fit(data_x, data_y)
         return model 
@@ -78,7 +79,7 @@ def create(data_x, data_y, impute=True, optimize=True, imp_method='MissForest'):
         elif imp_method == 'MissForest':
             data, imputer = MissForest_imputation(data=data_x, imputer=None)
         else:
-            raise ValueError('Invalid imputation method, currently only "KNN" and "MissForest" arguments are supported.')
+            raise ValueError('Invalid imputation method, currently only k-NN and MissForest algorithms are supported.')
         
         if optimize:
             data_x = data
@@ -110,6 +111,9 @@ def predict(data, model, imputer=None, feats_to_use=None):
     Returns:
         Array containing the classes and the corresponding probability prediction
     """
+
+    data[data>1e6] = 1e6
+    data[(data>0) * (data<1e-6)] = 1e-6
     
     classes = ['DIFFUSE', 'OTHER']
     

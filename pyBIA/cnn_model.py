@@ -240,13 +240,6 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
     print("Saving CNN model as: "+filename)
     save_model(model, filename+'_Model.h5')
 
-    print("Plotting learning evolution...")
-    #need subplot to also include loss vs epoch
-    plt.plot(range(len(history.history['accuracy'])), history.history['accuracy'])
-    plt.xlabel('Epochs')
-    plt.ylabel('Training Accuracy')
-    plt.title('Model Accuracy')
-
     return model
 
 def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000, target='DIFFUSE'):
@@ -286,3 +279,10 @@ def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000, target=
 
     return np.array(output)
 
+#print("Plotting learning evolution...")
+#need subplot to also include loss vs epoch
+#plt.plot(range(len(history.history['accuracy'])), history.history['accuracy'])
+#plt.xlabel('Epochs')
+#plt.ylabel('Training Accuracy')
+#plt.title('Model Accuracy')
+#plt.show()

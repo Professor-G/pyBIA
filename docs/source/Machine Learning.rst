@@ -19,13 +19,14 @@ module:
 
 	model = rf_model.create(data_x, data_y, impute=False, optimize=False)
 
-If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, we must also save the imputer that is fitted to the original training data, so that we can apply it to transform new data if it contains invalid values. We can set impute=True to perform the imputation, but the now imputer will be the second output of the function:
+If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, we must also save the imputer that is fitted to the original training data, so that we can apply it to transform new data if it contains invalid values. We can set impute=True to perform the imputation, but the now imputer will be the second output:
 
 .. code-block:: python
 
 	model, imputer = rf_model.create(data_x, data_y, impute=True, optimize=False)
 
 We can also set optimize=True, which will perform Bayesian hyperparameter optimization to identify the features that are useful. If we do this there will be an additional output: an array containing the indices of the good features which can be used to index the columns of the data_x array.
+
 .. code-block:: python
 
 	model, imputer, feats_to_use = rf_model.create(data_x, data_y, impute=True, optimize=True)

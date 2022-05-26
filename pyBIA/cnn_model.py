@@ -25,8 +25,9 @@ def bw_model():
     
     Note:
         Training new models with 1000 epochs can take over a week, this Bw model
-        was trained using NDWFS blue broadband images. The corresponding .h5 file is 
-        located in the data folder inside the pyBIA directory in the Python path. 
+        was trained using NDWFS blue broadband images of the Bootes field. The 
+        corresponding .h5 file is located in the data folder inside the pyBIA directory 
+        in the Python path. 
 
     Returns:
         The pyBIA CNN model used for classifying images in blue broadband surveys.
@@ -42,43 +43,6 @@ def bw_model():
     print('Bw model successfully loaded.')
     print('Note: Input data when using this model must be 50x50.')
     return model
-    
-def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000, target='DIFFUSE'):
-    """
-    Returns the class prediction. The input can either be a single 2D array 
-    or a 3D array if there are multiple samples.
-
-    Args:
-        data: 2D array for single image, 3D array for multiple images.
-        model: The trained Tensorflow model.
-        normalize (bool, optional): True will normalize the data using the input min and max pixels
-        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
-            Pixels with counts below this threshold will be set to this limit.
-        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
-            Pixels with counts above this threshold will be set to this limit.
-        target (str): The name of the target class, assuming binary classification in 
-            which there is an 'OTHER' class. Defaults to 'DIFFUSE'. 
-    Returns:
-        The class prediction(s), either 'DIFFUSE' or 'OTHER'.
-
-    """
-    if data.shape[-1] != 50:
-        raise ValueError('Data size is invalid. Each image must be a 50x50 2D array, resize the array \
-            using the crop_image function in the data_processing module.')
-
-    data = process_class(data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
-    predictions = model.predict(data)
-
-    output=[]
-    for i in range(len(predictions)):
-        if np.argmax(predictions[i]) == 0:
-            prediction = target
-        else:
-            prediction = 'OTHER'
-
-        output.append(prediction)
-
-    return np.array(output)
 
 def create(blob_data, other_data, img_num_channels=1, normalize=True, 
     min_pixel=638, max_pixel=3000, val_X=None, val_Y=None, 
@@ -90,9 +54,22 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
     Visual Recognition Challenge, AlexNet. Parameters were adapted for
     our astronomy case of detecting diffuse objects.
 
+    Note:
+        To avoid exploding gradients we need to normalize our pixels to be 
+        between 0 and 1. By default normalize=True, which will perform
+        min-max normalization using the min_pixel and max_pixel arguments, 
+        which should be set carefully.
+
+        The min_pixel parameter is set to 0 by default as the data is assumed
+        to be background-subtracted. The max_pixel must be adequately brighter
+        than the brighest expected target object. In this example we expected
+        the high redshift Lyman-alpha nebulae to appear diffuse and less bright,
+        so anything brighter than max_pixel=2000 can be categorized as too bright 
+        to be a candidate source.
+    
     Args:
-        blob_data (array): 3D array containing more than one image of diffuse objects.
-        other_data (array): 3D array containing more than one image of non-diffuse objects.
+        blob_data (ndarray): 3D array containing more than one image of diffuse objects.
+        other_data (ndarray): 3D array containing more than one image of non-diffuse objects.
         img_num_channels (int): The number of filters used. Defaults to 1, as pyBIA version 1
             has been trained with only blue broadband data.
         normalize (bool, optional): True will normalize the data using the input min and max pixels
@@ -130,24 +107,25 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
         filename (str, optional): The name of the metrics filename. The metrics files will be saved
             as 'model_metric'+filename.
 
-    Note:
+    Example:
         To use a validation dataset when training the model, the val_X and val_Y
         parameters must be input. The val_X is a 3D matrix containing all the images, and
         the val_Y is another matrix containing their class label (0 for DIFFUSE, 1 for OTHER).
 
-        If you have validation images of blobs and others, we can use the pyBIA data_processing module to
+        If you have validation data of blobs and others, we can use the pyBIA data_processing module to
         properly process our data and costruct validation arguments of appropriate shape. 
 
-            >>> val_other, val_other_labels = pyBIA.data_processing.process_class(other_test, label=1, normalize=False)
-            >>> val_blob, val_blob_labels = pyBIA.data_processing.process_class(blob_test, label=0, normalize=False)
+            >>> blob_x, blob_y = pyBIA.data_processing.process_class(blob_val, label=0, normalize=False)
+            >>> other_x, other_x = pyBIA.data_processing.process_class(other_val, label=1, normalize=False)
     
-            >>> val_X = np.r_[val_X1, val_X2]
-            >>> val_Y = np.r_[val_Y1, val_Y2]
+            >>> val_X = np.r_[blob_x, other_x]
+            >>> val_Y = np.r_[blob_y, other_y]
 
             >>> model = create(blob_train, other_train, val_X=val_X, val_Y=val_Y)
 
-        The process_class function will reshape our data and label array, as the CNN input data. This reshaped data array
-        can be constructed as follows:
+        The process_class function will reshape our data and label array, as per the CNN requirements.
+
+        If need-be, this reshaped data array can be constructed manually as follows:
 
             >>> data = channel.reshape(axis, img_width, img_height, img_num_channels)
 
@@ -158,12 +136,9 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
             >>> label_array = numpy.expand_dims(np.array([0]*len(channel)), axis=1)
             >>> label_array = tensorflow.keras.utils.to_categorical(label, 2)
         
-        The process_class function does will reshape both the image data and labels for us, so it's best to call 
-        pyBIA.data_processing.process_class() directly to properly reshape our data and labels; see example doc page.
         
     Returns:
         The trained CNN model.
-
     """
     
     if len(blob_data.shape) != len(other_data.shape):
@@ -273,4 +248,41 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
     plt.title('Model Accuracy')
 
     return model
+
+def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000, target='DIFFUSE'):
+    """
+    Returns the class prediction. The input can either be a single 2D array 
+    or a 3D array if there are multiple samples.
+
+    Args:
+        data: 2D array for single image, 3D array for multiple images.
+        model: The trained Tensorflow model.
+        normalize (bool, optional): True will normalize the data using the input min and max pixels
+        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
+            Pixels with counts below this threshold will be set to this limit.
+        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
+            Pixels with counts above this threshold will be set to this limit.
+        target (str): The name of the target class, assuming binary classification in 
+            which there is an 'OTHER' class. Defaults to 'DIFFUSE'. 
+    Returns:
+        The class prediction(s), either 'DIFFUSE' or 'OTHER'.
+
+    """
+    if data.shape[-1] != 50:
+        raise ValueError('Data size is invalid. Each image must be a 50x50 2D array, resize the array \
+            using the crop_image function in the data_processing module.')
+
+    data = process_class(data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+    predictions = model.predict(data)
+
+    output=[]
+    for i in range(len(predictions)):
+        if np.argmax(predictions[i]) == 0:
+            prediction = target
+        else:
+            prediction = 'OTHER'
+
+        output.append(prediction)
+
+    return np.array(output)
 

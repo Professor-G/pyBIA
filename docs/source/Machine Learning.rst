@@ -38,10 +38,7 @@ With our model saved, whether optimized or not, we can use the predict function 
 Example:
 
 .. code-block:: python
-	
-	model, imputer, feats_to_use = rf_model.create(data_x, data_y, impute=True, optimize=True)
 
-	#Prediction of new, unseen data
 	prediction = rf_model.predict(new_data, model, imputer, feats_to_use)
 
 Example

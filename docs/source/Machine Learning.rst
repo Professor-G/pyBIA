@@ -19,28 +19,25 @@ module:
 
 	model = rf_model.create(data_x, data_y, impute=False, optimize=False)
 
-If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, we must also save the imputer that is fitted to the original training data, so that we can apply it to transform new data if it contains invalid values. We can set impute=True to perform the imputation, but the now imputer will be the second output following the model:
+If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, we must also save the imputer that is fitted to the original training data, so that we can apply it to transform new data if it contains invalid values. We can set impute=True to perform the imputation, but the now imputer will be the second output of the function:
 
 .. code-block:: python
 
 	model, imputer = rf_model.create(data_x, data_y, impute=True, optimize=False)
 
-We can also set optimize=True, which will perform Bayesian hyperparameter optimization to identify the features that are useful. Doing this will also change the number of outputs, as now there will be a third output, an array containing the indicies of the good features which can be used to index the columns of the data_x array. It is important to index these features every time, as these were the ones that were used to create the final model.
-
+We can also set optimize=True, which will perform Bayesian hyperparameter optimization to identify the features that are useful. If we do this there will be an additional output: an array containing the indices of the good features which can be used to index the columns of the data_x array.
 .. code-block:: python
 
 	model, imputer, feats_to_use = rf_model.create(data_x, data_y, impute=True, optimize=True)
 
-By default both of these arguments are set to True. Note that depending on the size of the training data these procedures can take over an hour. 
+By default both of these arguments are set to True. Note that depending on the size of the training set these procedures may take up to an hour. In our example with a dataset of ~1800 samples, running this function with optimization and imputation took ~20 minutes.
 
-With our model saved, whether optimized or not, we can use the predict function to pre-process (optional) and predict the class label of unseen data. If the imputation and optimization algorithms are applied, we need to input both the imputer and indices of features to use to ensure we use only the columns that contain information. 
+With our model saved, whether optimized or not, we can use the predict function to pre-process and predict the class label of unseen data. If the imputation and optimization algorithms are applied, we need to input both the imputer and indices of features to use.
 
 Example:
 
 .. code-block:: python
 	
-	from pyBIA import rf_model
-
 	model, imputer, feats_to_use = rf_model.create(data_x, data_y, impute=True, optimize=True)
 
 	#Prediction of new, unseen data
@@ -99,12 +96,12 @@ Using the model created above, we can generate both a confusion matrix and a ROC
 	from pyBIA import rf_model
 
 	#Confusion Matrix
-	rf_model.plot_conf_matrix(classifier=model, data_x, data_y, classes=["DIFFUSE","OTHER"])
+	rf_model.plot_conf_matrix(model, data_x, data_y, classes=["DIFFUSE","OTHER"])
 
 	#ROC Curve
-	rf_model.plot_roc_curve(classifier=model, data_x, data_y)
+	rf_model.plot_roc_curve(model, data_x, data_y)
 
-For more information refer to the `module documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/rf_model.html>`_.
+For more information refer to the `module documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/rf_model/index.html>`_.
 
 
 Convolutional Neural Network

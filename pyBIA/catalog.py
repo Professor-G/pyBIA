@@ -292,10 +292,9 @@ def make_table(props):
     prop_list = ['area', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'bbox',
         'covar_sigx2', 'covar_sigxy', 'covar_sigy2', 'covariance_eigvals', 'cxx', 'cxy', 
         'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm',
-        'gini', 'isscalar', 'kron_flux', 'kron_radius', 'max_value', 'maxval_xindex', 
-        'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex', 'moments', 
-        'moments_central', 'orientation', 'perimeter', 'segment_flux', 'semimajor_sigma', 
-        'semiminor_sigma']
+        'gini', 'isscalar', 'max_value', 'maxval_xindex', 'maxval_yindex', 'min_value', 
+        'minval_xindex', 'minval_yindex', 'moments', 'moments_central', 'orientation', 
+        'perimeter', 'segment_flux', 'semimajor_sigma', 'semiminor_sigma']
 
     table = []
     for i in range(len(props)):
@@ -383,14 +382,14 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
     prop_list = ['area', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'bbox',
         'covar_sigx2', 'covar_sigxy', 'covar_sigy2', 'covariance_eigvals1', 'covariance_eigvals2',
         'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm',
-        'gini', 'isscalar', 'kron_flux', 'kron_radius', 'max_value', 'maxval_xindex', 
-        'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex', 'moments_1', 'moments_2',
-        'moments_3', 'moments_4', 'moments_5', 'moments_6', 'moments_7', 'moments_8', 'moments_9', 'moments_10',
-        'moments_11', 'moments_12', 'moments_13', 'moments_14', 'moments_15', 'moments_16', 'moments_central_1',
-        'moments_central_2', 'moments_central_3', 'moments_central_4', 'moments_central_5', 'moments_central_6', 
-        'moments_central_7', 'moments_central_8', 'moments_central_9', 'moments_central_10', 'moments_central_11', 
-        'moments_central_12', 'moments_central_13', 'moments_central_14', 'moments_central_15', 'moments_central_16',
-        'orientation', 'perimeter', 'segment_flux', 'semimajor_sigma', 'semiminor_sigma']
+        'gini', 'isscalar', 'max_value', 'maxval_xindex', 'maxval_yindex', 'min_value', 'minval_xindex', 
+        'minval_yindex', 'moments_1', 'moments_2', 'moments_3', 'moments_4', 'moments_5', 'moments_6', 
+        'moments_7', 'moments_8', 'moments_9', 'moments_10', 'moments_11', 'moments_12', 'moments_13', 
+        'moments_14', 'moments_15', 'moments_16', 'moments_central_1', 'moments_central_2', 'moments_central_3', 
+        'moments_central_4', 'moments_central_5', 'moments_central_6', 'moments_central_7', 'moments_central_8', 
+        'moments_central_9', 'moments_central_10', 'moments_central_11', 'moments_central_12', 'moments_central_13', 
+        'moments_central_14', 'moments_central_15', 'moments_central_16', 'orientation', 'perimeter', 'segment_flux', 
+        'semimajor_sigma', 'semiminor_sigma']
 
     data_dict = {}
 
@@ -404,12 +403,12 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
         data_dict['xpix'] = x
     if y is not None:
         data_dict['ypix'] = y
+    if median_bkg is not None:
+        data_dict['median_bkg'] = median_bkg
     if flux is not None:
         data_dict['flux'] = flux
     if flux_err is not None:
         data_dict['flux_err'] = flux_err
-    if median_bkg is not None:
-        data_dict['median_bkg'] = median_bkg
     
     if table is None:
         df = pd.DataFrame(data_dict)
@@ -548,7 +547,7 @@ def subtract_background(data, length=150):
     return data
 
 def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, cmap='viridis', path=None, name=' ', savefig=False, dpi=300):
+    deblend=False, pix_conversion=5, cmap='viridis', path=None, name='', savefig=False, dpi=300):
     """
     Returns two subplots: source and segementation object. 
 

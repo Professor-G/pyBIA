@@ -175,7 +175,15 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
         model_0 = MLPClassifier()
     elif clf == 'xgb':
         if all(isinstance(val, (int, str)) for val in data_y):
-            raise ValueError('XGBoost classifier requires numerical class labels! Convert data_y to numerical values and try again.')
+            print('XGBoost classifier requires numerical class labels! Converting class labels as follows:')
+            print('____________________________________')
+            y = np.zeros(len(data_y))
+            for i in range(len(np.unique(data_y))):
+                print('{} -----------> {}'.format(np.unique(data_y)[i], i))
+                index = np.where(data_y == np.unique(data_y)[i])[0]
+                y[index] = i
+            data_y = y 
+            print('____________________________________')
         model_0 = XGBClassifier()
     else:
         raise ValueError('clf argument must either be "rf", "nn", or "xgb".')
@@ -192,11 +200,10 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
     sampler = optuna.samplers.TPESampler(seed=1909) 
     study = optuna.create_study(direction='maximize', sampler=sampler)
 
-    print('Beginning optimization procedure, this will take a while...')
+    print('Running hyperparameter optimization procedure, this will take a while...')
     if clf == 'rf':
         try:
             study.optimize(lambda trial: objective_rf(trial, data_x=data_x, data_y=data_y), n_trials=n_iter, callbacks=[logging_callback])
-            #study.optimize(objective_rf(data_x=data_x, data_y=data_y), n_trials=n_iter, callbacks=[logging_callback])
             params = study.best_trial.params
             model = RandomForestClassifier(n_estimators=params['n_estimators'], criterion=params['criterion'], 
                 max_depth=params['max_depth'], min_samples_split=params['min_samples_split'], 
@@ -224,7 +231,6 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
     elif clf == 'nn':
         try:
             study.optimize(lambda trial: objective_nn(trial, data_x=data_x, data_y=data_y), n_trials=n_iter, callbacks=[logging_callback])
-            #study.optimize(objective_nn(data_x=data_x, data_y=data_y), n_trials=n_iter, callbacks=[logging_callback])
             params = study.best_trial.params
             layers = [param for param in params if 'n_units_' in param]
             layers = tuple(params[layer] for layer in layers)
@@ -237,7 +243,6 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
     elif clf == 'xgb':
         try:
             study.optimize(lambda trial: objective_xgb(trial, data_x=data_x, data_y=data_y), n_trials=n_iter, callbacks=[logging_callback])
-            #study.optimize(objective_xgb(data_x=data_x, data_y=data_y), n_trials=n_iter, callbacks=[logging_callback])
             params = study.best_trial.params
             if params['booster'] == 'dart':
                 model = XGBClassifier(booster=params['booster'], reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], 
@@ -322,10 +327,6 @@ def Strawman_imputation(data):
         The data array with the missing values filled in. 
     """
 
-    data[data>1e6] = 1e6
-    data[(data>0) * (data<1e-6)] = 1e-6
-    data_x[data_x<-1e6] = -1e6
-
     if np.all(np.isfinite(data)):
         print('No missing values in data, returning original array.')
         return data 
@@ -398,14 +399,7 @@ def KNN_imputation(data, imputer=None, k=3):
         The second output is the KNN Imputer that should be used to transform
         new data, prior to predictions. 
     """
-
-    data[data>1e6] = 1e6
-    data[(data>0) * (data<1e-6)] = 1e-6
-    data_x[data_x<-1e6] = -1e6
     
-    if np.all(np.isfinite(data)) and imputer is None:
-        raise ValueError('No missing values in training dataset, do not apply imputation algorithms!')
-
     if imputer is None:
         imputer = KNNImputer(n_neighbors=k)
         imputer.fit(data)
@@ -457,12 +451,9 @@ def MissForest_imputation(data):
         The second output is the Miss Forest Imputer that should be used to transform
         new data, prior to predictions. 
     """
-    data[data>1e6] = 1e6
-    data[(data>0) * (data<1e-6)] = 1e-6
-    data_x[data_x<-1e6] = -1e6
-    
+  
     if np.all(np.isfinite(data)):
-        raise ValueError('No missing values in training dataset, do not apply imputation algorithms!')
+        raise ValueError('No missing values in training dataset, do not apply MissForest imputation!')
     
     imputer = MissForest(verbose=0)
     imputer.fit(data)

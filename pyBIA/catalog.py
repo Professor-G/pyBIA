@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as tck 
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 from photutils.detection import DAOStarFinder
 from photutils import detect_threshold, detect_sources, deblend_sources, segmentation
@@ -415,7 +416,7 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
         if save == True:
             if path is None:
                 print("No path specified, saving catalog to local home directory.")
-                path = '~/'
+                path = str(Path.home())+'/'
             df.to_csv(path+filename, index=False) 
             return df
         return df
@@ -432,7 +433,7 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
     if save == True:
         if path is None:
             print("No path specified, saving catalog to local home directory.")
-            path = '~/'
+            path = str(Path.home())+'/'
         df.to_csv(path+filename, index=False) 
         return df
     return df    
@@ -745,7 +746,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
             if savefig is True:
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
-                    path = '~/'
+                    path = str(Path.home())+'/'
                 fig.savefig(path+name, dpi=dpi)
                 continue
             plt.show()

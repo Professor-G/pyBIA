@@ -109,7 +109,6 @@ def create(data_x, data_y, clf='rf', impute=True, optimize=True, imp_method='KNN
 
     features_index = boruta_opt(data_x, data_y)
     model, best_params = hyper_opt(data_x[:,features_index], data_y, clf=clf, n_iter=n_iter)
-    print('Hyperparameter optimization complete!')
     model.fit(data_x[:,features_index], data_y)
 
     return model, imputer, features_index

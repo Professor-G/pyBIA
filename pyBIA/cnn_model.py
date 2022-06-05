@@ -9,6 +9,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from warnings import warn
+from pathlib import Path
 #os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 from tensorflow.keras.models import Sequential, save_model
 from tensorflow.keras.initializers import VarianceScaling
@@ -230,15 +231,16 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
         val_X, val_Y = val_X[ix], val_Y[ix]
         history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=1)
 
+    path = str(Path.home())+'/'
+    print("Saving CNN model and metric files to the local directory.")
     if metrics:
-        np.savetxt('model_acc'+filename, history.history['accuracy'])
-        np.savetxt('model_loss'+filename, history.history['loss'])
+        np.savetxt(path+'model_acc'+filename, history.history['accuracy'])
+        np.savetxt(path+'model_loss'+filename, history.history['loss'])
         if val_X is not None:
-            np.savetxt('model_val_acc'+filename, history.history['val_accuracy'])
-            np.savetxt('model_val_loss'+filename, history.history['val_loss'])
+            np.savetxt(path+'model_val_acc'+filename, history.history['val_accuracy'])
+            np.savetxt(path+'model_val_loss'+filename, history.history['val_loss'])
 
-    print("Saving CNN model as: "+filename)
-    save_model(model, filename+'_Model.h5')
+    save_model(model, path+filename+'_Model.h5')
 
     return model
 

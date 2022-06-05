@@ -17,11 +17,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, auc, RocCurveDisplay
 from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.manifold import TSNE
+from xgboost import XGBClassifier
 
-import xgboost as xgb
+from pyBIA.optimization import KNN_imputation, MissForest_imputation, boruta_opt, hyper_opt
 
-
-def create(data_x, data_y, clf='rf', impute=True, optimize=True, imp_method='MissForest', n_iter=25):
+def create(data_x, data_y, clf='rf', impute=True, optimize=True, imp_method='KNN', n_iter=25):
     """Creates the Random Forest model and PCA transformation used for classification.
     
     Example:
@@ -72,9 +72,10 @@ def create(data_x, data_y, clf='rf', impute=True, optimize=True, imp_method='Mis
     elif clf == 'nn':
         model = MLPClassifier()
     elif clf == 'xgb':
-        model = xgb.XGBClassifier()
+        model = XGBClassifier()
     
     if impute is False and optimize is False:
+        print("Returning base model...")
         model.fit(data_x, data_y)
         return model 
 
@@ -82,7 +83,7 @@ def create(data_x, data_y, clf='rf', impute=True, optimize=True, imp_method='Mis
         if imp_method == 'KNN':
             data, imputer = KNN_imputation(data=data_x, imputer=None)
         elif imp_method == 'MissForest':
-            data, imputer = MissForest_imputation(data=data_x, imputer=None)
+            data, imputer = MissForest_imputation(data=data_x)
         else:
             raise ValueError('Invalid imputation method, currently only k-NN and MissForest algorithms are supported.')
         

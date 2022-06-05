@@ -14,6 +14,7 @@ plt.rc('font', family='serif')
 from sklearn import decomposition
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import confusion_matrix, auc, RocCurveDisplay
 from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.manifold import TSNE

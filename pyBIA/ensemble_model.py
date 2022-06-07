@@ -28,8 +28,7 @@ from sklearn.metrics import confusion_matrix, auc, RocCurveDisplay
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.manifold import TSNE
 
-from MicroLIA.optimization import hyper_opt, borutashap_opt, KNN_imputation, MissForest_imputation
-from MicroLIA import extract_features
+from pyBIA.optimization import hyper_opt, borutashap_opt, KNN_imputation, MissForest_imputation
 from xgboost import XGBClassifier
 import scikitplot as skplt
 
@@ -95,62 +94,10 @@ class classifier:
     def create(self):
         """
         Creates the machine learning engine, current options are either a
-        Random Forest or a Neural Network classifier. 
-        
-        Example:
-            If the impute and optimize arguments are set to False, only the Random Forest
-            classifier will be returned.
-
-            >>> classifier = create(data_x, data_y, impute=False, optimize=False)
-
-            If impute=True, the imputer will also be returned which is necessary to 
-            properly transform unseen, new data.
-
-            >>> classifier, imputer = create(data_x, data_y, impute=True, optimize=False)
-
-            Lastly, if optimize=True, the index of the useful features is also returned.
-
-            >>> classifier, index = create(data_x, data_y, impute=False, optimize=True)
-
-            By default, impute and optimize are set to True, therefore three items are returned.
-
-            >>> classfier, imputer, index = create(data_x, data_y)
-
-        Args:
-            data_x (ndarray): 2D array of size (n x m), where n is the
-                number of samples, and m the number of features.
-            data_y (ndarray, str): 1D array containing the corresponing labels.
-            clf (str): The machine learning classifier to optimize. Can either be
-                'rf' for Random Forest, 'nn' for Neural Network, or 'xgb' for Extreme Gradient Boosting. 
-                Defaults to 'rf'.
-            optimize (bool): If True the Boruta algorithm will be run to identify the features
-                that contain useful information, after which the optimal Random Forest hyperparameters
-                will be calculated using Bayesian optimization. 
-            impute (bool): If False no data imputation will be performed. Defaults to True,
-                which will result in two outputs, the classifier and the imputer to save
-                for future transformations. 
-            imp_method (str): The imputation techinque to apply, can either be 'KNN' for k-nearest
-                neighbors imputation, or 'MissForest' for the MissForest machine learning imputation
-                algorithm. Defaults to 'KNN'.
-            n_iter (int, optional): The maximum number of iterations to perform during 
-                the hyperparameter search. Defaults to 25. 
-            save_model (bool, optional): If True the machine learning model will be saved to the
-                local home directory. Defaults to False.
-            
-        Note:
-            If save_model=True, the path argument must be the absolute path, including the filename,
-            of where to save the model. If path=None the file will be saved to the local home directory.
-
-            This file can be loaded in the future and used to make predictions
-            
-            >>> import joblib
-            >>> 
-            >>> model = joblib.load(path)
-            >>> model.predict(time, mag, magerr, model=model)
+        Random Forest, XGBoost, or a Neural Network classifier. 
 
         Returns:
-            Random Forest classifier model created with scikit-learn. If optimize=True, this
-            model will already include the optimal hyperparameters. 
+            Trained and optimized classifier.
         """
 
         if self.data_x.shape[0] >= 5e3 and self.optimize is True:
@@ -212,48 +159,39 @@ class classifier:
         return
         #return model, imputer, features_index
 
-    def predict(self, time, mag, magerr, convert=True, zp=24):
+    def predict(self, data):
         """
-        Predics the class label of new, unseen data.
-
+        Predics the class label of new, unseen data
         Args:
-            time (ndarray): Array of observation timestamps.
-            mag (ndarray): Array of observed magnitudes.
-            magerr (ndarray): Array of corresponding magnitude errors.
-            model (object): The machine learning model to use for predictions.
+            data (ndarray): 2D array of size (n x m), where n is the
+                number of samples, and m the number of features.
+            model: The machine learning model to use for predictions.
             imputer: The imputer to use for imputation transformations.
                 Defaults to None, in which case no imputation is performed.
             feats_to_use (ndarray): Array containing indices of features
                 to use. This will be used to index the columns in the data array.
                 Defaults to None, in which case all columns in the data array are used.
-            convert (bool, optional): If False the features are computed with the input magnitudes.
-                Defaults to True to convert and compute in flux. 
-            zp (float): Zeropoint of the instrument, used to convert from magnitude
-                to flux. Defaults to 24.
-
         Returns:
-            Array containing the classes and the corresponding probability predictions.
+            Array containing the classes and the corresponding probability prediction
         """
-
-        if len(mag) < 30:
-            warn('The number of data points is low -- results may be unstable')
-
-        classes = ['CONSTANT', 'CV', 'LPV', 'ML', 'VARIABLE']
-
-        stat_array=[]
-        
+    
+        classes = ['DIFFUSE', 'OTHER']
+    
         if self.imputer is None and self.feats_to_use is None:
-            stat_array.append(extract_features.extract_all(time, mag, magerr, convert=convert, zp=zp))
-            pred = self.model.predict_proba(stat_array)
-            return np.c_[classes, pred[0]]
-        
-        stat_array.append(extract_features.extract_all(time, mag, magerr, convert=convert, zp=zp, feats_to_use=self.feats_to_use))
-        
-        if self.imputer is not None:
-            stat_array = self.imputer.transform(stat_array)
-        pred = self.model.predict_proba(stat_array)
+            pred = self.model.predict_proba(data)
+            return np.c_[classes,pred[0]]
 
-        return np.c_[classes, pred[0]]
+        if self.imputer is not None:
+            data = self.imputer.transform(data)
+
+        if self.feats_to_use is not None:
+            pred = self.model.predict_proba(data[:,self.feats_to_use])
+            return np.c_[classes,pred[0]]
+
+        pred = self.model.predict_proba(data[:,self.feats_to_use])
+
+        return np.c_[classes,pred[0]]
+
 
     def plot_tsne(self, norm=False, pca=False, title='Feature Parameter Space'):
         """
@@ -397,7 +335,7 @@ class classifier:
             plt.show()
             return
 
-        cv = StratifiedKFold(n_splits=k_fold)
+        cv = StratifiedKFold(n_splits=cv)
         
         tprs = []
         aucs = []

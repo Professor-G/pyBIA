@@ -10,36 +10,56 @@ Given the extended emission features of Lyman-alpha Nebulae, these parameters ca
 Random Forest
 -----------
 
-We can create our Random Forest machine learning classifier using the pyBIA `rf_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/rf_model/index.html>`_
+We can create our Random Forest machine learning classifier using the pyBIA `ensemble_models <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/rf_model/index.html>`_
 module:
 
 .. code-block:: python
 
-	from pyBIA import rf_model
+	from pyBIA import ensemble_models
 
-	model = rf_model.create(data_x, data_y, impute=False, optimize=False)
+	model = models.classifier(data_x, data_y, clf='rf', impute=False, optimize=False)
+	model.create()
 
-If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, we must also save the imputer that is fitted to the original training data, so that we can apply it to transform new data if it contains invalid values. We can set impute=True to perform the imputation, but the now imputer will be the second output:
 
-.. code-block:: python
-
-	model, imputer = rf_model.create(data_x, data_y, impute=True, optimize=False)
-
-We can also set optimize=True, which will perform Bayesian hyperparameter optimization to identify the features that are useful. If we do this there will be an additional output: an array containing the indices of the good features which can be used to index the columns of the data_x array.
+If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, the imputer is stored as object attribute as it will be needed to transform new data if it contains invalid values. We can set impute=True to perform the imputation:
 
 .. code-block:: python
 
-	model, imputer, feats_to_use = rf_model.create(data_x, data_y, impute=True, optimize=True)
+	model = models.classifier(data_x, data_y, clf='rf', impute=True, optimize=False)
+	model.create()
 
-By default both of these arguments are set to True. Note that depending on the size of the training set these procedures may take up to an hour. In our example with a dataset of ~1800 samples, running this function with optimization and imputation took ~20 minutes.
+We can also set optimize=True, which will perform Bayesian hyperparameter optimization to identify the features that are useful. If we do this the attribute model.feats_to_use will contain an array of indices which with to index the feature columns.
 
-With our model saved, whether optimized or not, we can use the predict function to pre-process and predict the class label of unseen data. If the imputation and optimization algorithms are applied, we need to input both the imputer and indices of features to use.
+.. code-block:: python
+
+	model = models.classifier(data_x, data_y, clf='rf', impute=True, optimize=True)
+	model.create()
+
+To avoid overfitting during the optimization procedure, 3-fold cross-validation is performed to assess performance at the end of each trial, therefore the hyperparameter optimization can take a long time depending on the size of the training set and the algorithm being optimized. 
+
+Note that pyBIA currently supports three machine learning algorithms: Random Forest, Extreme Gradient Boosting, and Neural Network. While clf='rf' for Random Forest is the default input, we can also set this to 'xgb' or 'nn'. Since neural networks require more tuning to properly identify the optimal number of layers and neurons, it is recommended to set n_iter to at least 100, as by default only 25 trials are performed when optimizing the hyperparameters:
+
+.. code-block:: python
+
+   model = models.classifier(data_x, data_y, clf='nn', n_iter=100)
+   model.create()
+
+There has been particular interest in the XGBoost algorithm, which can outperform the Random Forest:
+
+.. code-block:: python
+
+   model = models.classifier(data_x, data_y, clf='xgb')
+   model.create()
+
+`For details please refer to the function documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/models/index.html#pyBIA.ensemble_models.create>`_.
+
+With our model saved, whether optimized or not, we can use the predict method to predict the class label of unseen data. 
 
 Example:
 
 .. code-block:: python
 
-	prediction = rf_model.predict(new_data, model, imputer, feats_to_use)
+	prediction = model.predict(new_data)
 
 Example
 -----------
@@ -50,7 +70,7 @@ We can load the diffuse_catalog and other_catalog files and create a Random Fore
 	
 	import pandas
 	import numpy as np
-	from pyBIA import rf_model
+	from pyBIA import ensemble_models
 
 	blob = pandas.read_csv('diffuse_catalog')
 	other = pandas.read_csv('other_catalog')
@@ -74,39 +94,34 @@ We can load the diffuse_catalog and other_catalog files and create a Random Fore
 	labels_other = np.array(['OTHER']*len(other))
 	data_y = np.r_[labels_blob, labels_other]
 
-	#Save RF classifier, imputer transformation, and indices of good features
-	model, imputer, feats_to_use = rf_model.create(data_x, data_y)
+	#Save XGB classifier, imputer transformation, and indices of good features
+	model = models.classifier(data_x, data_y, clf='xgb', impute=True, optimize=True)
 
-Finally, we can predict using our optimized model:
-
-.. code-block:: python
-
-	prediction = rf_model.predict(new_data, model=model, imputer=imputer, feats_to_use=feats_to_use)
-
-
-Assessing RF Performance
------------
-
-Using the model created above, we can generate both a confusion matrix and a ROC curve.
+Finally, we can make predictions using our optimized model:
 
 .. code-block:: python
 
-	from pyBIA import rf_model
+	prediction = model.predict(new_data)
 
-	#Confusion Matrix
-	rf_model.plot_conf_matrix(model, data_x, data_y, classes=["DIFFUSE","OTHER"])
-
-	#ROC Curve
-	rf_model.plot_roc_curve(model, data_x, data_y)
-
-For more information refer to the `module documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/rf_model/index.html>`_.
-
-
-Convolutional Neural Network
+Visualizations
 -----------
+To assess the classification accuracy we can create a confusion matrix using the built-in function in the classifier class. By default the matrix displays the mean accuracy after 10-fold cross-validation, but this can be controlled with the k_fold parameter:
 
+.. code-block:: python
 
+   model.plot_conf_matrix(k_fold=3)
 
+We can also plot a two-dimensional t-SNE projection, which requires only the dataset. To properly visualize the feature space when using the eucledian distance metric, we will set norm=True so as to min-max normalize all the features:
+
+.. code-block:: python
+
+   model.plot_tsne(norm=True)
+
+Even though it's not used as often, we can also plot a ROC curve:
+
+.. code-block:: python
+
+	model.plot_roc_curve(k_fold=3)
 
 
 

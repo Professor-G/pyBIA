@@ -53,7 +53,6 @@ With our model loaded, we can classify any 50x50 image using the predict functio
 
 The output will either be 'DIFFUSE' or 'OTHER'. The input data can also be a 3-dimensional array containing multiple images.
 
-
 Pages
 ==================
 .. toctree::

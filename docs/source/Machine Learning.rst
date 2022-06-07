@@ -101,9 +101,9 @@ We can load the diffuse_catalog and other_catalog files and create a Random Fore
 	labels_other = np.array(['OTHER']*len(other))
 	data_y = np.r_[labels_blob, labels_other]
 
-	#Save XGB classifier, imputer transformation, and indices of good features
-	model = models.classifier(data_x, data_y, clf='xgb', impute=True, optimize=True)
-
+	model = models.classifier(data_x, data_y, clf='rf', impute=True, optimize=True)
+	model.create()
+	
 Finally, we can make predictions using our optimized model:
 
 .. code-block:: python

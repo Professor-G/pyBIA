@@ -17,7 +17,7 @@ module:
 
 	from pyBIA import ensemble_models
 
-	model = models.classifier(data_x, data_y, clf='rf', impute=False, optimize=False)
+	model = ensemble_models.classifier(data_x, data_y, clf='rf', impute=False, optimize=False)
 	model.create()
 
 
@@ -51,7 +51,7 @@ There has been particular interest in the XGBoost algorithm, which can outperfor
    model = models.classifier(data_x, data_y, clf='xgb')
    model.create()
 
-`For details please refer to the function documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/models/index.html#pyBIA.ensemble_models.create>`_.
+`For details please refer to the function documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_models/index.html#pyBIA.ensemble_models.create>`_.
 
 With our model saved, whether optimized or not, we can use the predict method to predict the class label of unseen data. 
 

@@ -205,7 +205,7 @@ While the convolutional neural network is the primary engine pyBIA applies for s
 
 Given the extended emission features of Lyman-alpha Nebulae, these parameters can be used to differentiate between extended and compact objects which display no diffuse characteristics. Applying the random forest as a preliminary filter ultimately reduces the false-positive rate and optimizes the data requirements of the pipeline. 
 
-Details on the machine learning models are available `here <https://pybia.readthedocs.io/en/latest/source/Machine_Learning.html>`_. 
+Details on the machine learning models are available `here <https://pybia.readthedocs.io/en/latest/source/Machine%20Learning.html>`_. 
 
 
 

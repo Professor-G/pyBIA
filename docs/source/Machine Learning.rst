@@ -11,7 +11,15 @@ Random Forest
 -----------
 
 We can create our Random Forest machine learning classifier using the pyBIA `ensemble_models <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/rf_model/index.html>`_
-module:
+module. Unless turned off, when creating the model three optimization procedures will automatically run, in the following order:
+
+-  Missing values (NaN) will be imputed using the `sklearn implementation of the k Nearest Neighbors imputation algorithm <https://scikit-learn.org/stable/modules/generated/sklearn.impute.KNNImputer.html>`_. The imputer will be saved so that it can be applied to transform new, unseen data, serving as a workaround for the issue of missing data values. 
+
+-  The features that contain information will be selected using `BorutaShap <https://zenodo.org/record/4247618>`_, a procedure based off of the Boruta algorithm developed by `Kursa and Rudnicki 2011 <https://arxiv.org/pdf/1106.5112.pdf>`_. This new method improves upon the original approach by coupling the Boruta algorithm's probabilistic approach to feature selection with `Shapley Values <https://christophm.github.io/interpretable-ml-book/shapley.html>`_. While bagging algorithms like the Random Forest are robust to irrelevant features, computation-wise, it is imperative that we compute only the features that are helpful.
+
+-  Finally, the model hyperparameters will be optimized using the hyperparameter optimization software `Optuna <https://optuna.org/>`_, developed by `Akiba et al 2019 <https://arxiv.org/abs/1907.10902>`_. The default sampler Optuna employs is the Tree Parzen Estimator, a Bayesian optimization approach that effectively reduces the error by narrowing the search space according to the performance of previous iterations, therefore in principle it is best to increase the number of trials to perform.
+
+These methods are enabled by default, but can be turned off when creating our classifier with the impute and optimize arguments:
 
 .. code-block:: python
 
@@ -19,7 +27,6 @@ module:
 
 	model = ensemble_models.classifier(data_x, data_y, clf='rf', impute=False, optimize=False)
 	model.create()
-
 
 If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, the imputer is stored as object attribute as it will be needed to transform new data if it contains invalid values. We can set impute=True to perform the imputation:
 

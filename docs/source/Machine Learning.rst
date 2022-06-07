@@ -32,14 +32,14 @@ If our training data contains invalid values such as NaN or inf, we can impute t
 
 .. code-block:: python
 
-	model = models.classifier(data_x, data_y, clf='rf', impute=True, optimize=False)
+	model = ensemble_models.classifier(data_x, data_y, clf='rf', impute=True, optimize=False)
 	model.create()
 
 We can also set optimize=True, which will perform Bayesian hyperparameter optimization to identify the features that are useful. If we do this the attribute model.feats_to_use will contain an array of indices which with to index the feature columns.
 
 .. code-block:: python
 
-	model = models.classifier(data_x, data_y, clf='rf', impute=True, optimize=True)
+	model = ensemble_models.classifier(data_x, data_y, clf='rf', impute=True, optimize=True)
 	model.create()
 
 To avoid overfitting during the optimization procedure, 3-fold cross-validation is performed to assess performance at the end of each trial, therefore the hyperparameter optimization can take a long time depending on the size of the training set and the algorithm being optimized. 
@@ -48,14 +48,14 @@ Note that pyBIA currently supports three machine learning algorithms: Random For
 
 .. code-block:: python
 
-   model = models.classifier(data_x, data_y, clf='nn', n_iter=100)
+   model = ensemble_models.classifier(data_x, data_y, clf='nn', n_iter=100)
    model.create()
 
 There has been particular interest in the XGBoost algorithm, which can outperform the Random Forest:
 
 .. code-block:: python
 
-   model = models.classifier(data_x, data_y, clf='xgb')
+   model = ensemble_models.classifier(data_x, data_y, clf='xgb')
    model.create()
 
 `For details please refer to the function documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_models/index.html#pyBIA.ensemble_models.create>`_.
@@ -101,7 +101,7 @@ We can load the diffuse_catalog and other_catalog files and create a Random Fore
 	labels_other = np.array(['OTHER']*len(other))
 	data_y = np.r_[labels_blob, labels_other]
 
-	model = models.classifier(data_x, data_y, clf='rf', impute=True, optimize=True)
+	model = ensemble_models.classifier(data_x, data_y, clf='rf', impute=True, optimize=True)
 	model.create()
 	
 Finally, we can make predictions using our optimized model:

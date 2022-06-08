@@ -101,10 +101,10 @@ pygments_style = None
 #
 # html_theme_options = {}
 html_static_path = ["./source/_static"]
-html_theme = 'alabaster'
-html_logo = "./source_static/pyBIA_logo.jpeg"
+html_logo = "_static/pyBIA_logo.jpeg"
+
 #html_logo = "_static/.png"
-#html_theme_options = {"logo_only": True}
+html_theme_options = {"logo_only": True}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

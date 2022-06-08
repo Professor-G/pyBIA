@@ -41,9 +41,9 @@ We have trained a Convolutional Neural Network using the high-level Keras API. O
 
 .. code-block:: python
 
-    from pyBIA import models
+    from pyBIA import cnn_model
 
-    model = models.bw_model()
+    model = cnn_model.bw_model()
 
 With our model loaded, we can classify any 50x50 image using the predict function.
 

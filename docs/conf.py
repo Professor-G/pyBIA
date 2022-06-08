@@ -101,7 +101,7 @@ pygments_style = None
 #
 # html_theme_options = {}
 html_static_path = ["./source/_static"]
-html_logo = "_static/pyBIA_logo.jpeg"
+html_logo = "./source/_static/pyBIA_logo.jpeg"
 
 #html_logo = "_static/.png"
 html_theme_options = {"logo_only": True}

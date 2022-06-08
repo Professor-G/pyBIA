@@ -147,7 +147,12 @@ class classifier:
                 return
                 #return model, imputer
 
-        self.feats_to_use = borutashap_opt(self.data_x, self.data_y)
+        self.feats_to_use = borutashap_opt(data, self.data_y)
+        if self.imp_method == 'KNN':
+            self.data_x, self.imputer = KNN_imputation(data=self.data_x[:,self.feats_to_use], imputer=None)
+        elif self.imp_method == 'MissForest':
+            self.data_x, self.imputer = MissForest_imputation(data=self.data_x[:,self.feats_to_use]), None 
+
         self.model, best_params = hyper_opt(self.data_x[:,self.feats_to_use], self.data_y, clf=self.clf, n_iter=self.n_iter)
         print("Fitting and returning final model...")
         self.model.fit(self.data_x[:,self.feats_to_use], self.data_y)

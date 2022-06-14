@@ -5,12 +5,7 @@ Created on Wed Sep 8 10:04:23 2021
 
 @author: daniel
 """
-# -*- coding: utf-8 -*-
-"""
-    Created on Sat Jan 21 23:59:14 2017
-    
-    @author: danielgodinez
-"""
+
 import joblib 
 import random
 import itertools
@@ -19,6 +14,7 @@ import matplotlib.pyplot as plt
 plt.rc('font', family='serif')
 from warnings import warn
 from pathlib import Path
+from collections import Counter  
 
 from sklearn import decomposition
 from sklearn.preprocessing import MinMaxScaler
@@ -68,16 +64,21 @@ class classifier:
         imp_method (str): The imputation techinque to apply, can either be 'KNN' for k-nearest
             neighbors imputation, or 'MissForest' for the MissForest machine learning imputation
             algorithm. Defaults to 'KNN'.
-        n_iter (int, optional): The maximum number of iterations to perform during 
+        n_iter (int): The maximum number of iterations to perform during 
             the hyperparameter search. Defaults to 25. 
-        save_model (bool, optional): If True the machine learning model will be saved to the
-            local home directory. Defaults to False.
-    
+        boruta_trials (int): The number of trials to run when running Boruta for
+            feature selection. Set to 0 for no feature selection. Defaults to 50.
+        balance (bool, optional): If True, a weights array will be calculated and used
+            when fitting the classifier. This can improve classification when classes
+            are imbalanced. This is only applied if the classification is a binary task. 
+            Defaults to True.        
+        
     Returns:
         Trained machine learning model.
 
     """
-    def __init__(self, data_x, data_y, clf='rf', optimize=True, impute=True, imp_method='KNN', n_iter=25, save_model=False):
+    def __init__(self, data_x, data_y, clf='rf', optimize=True, impute=True, imp_method='KNN', 
+        n_iter=25, boruta_trials=50, balance=True):
         self.data_x = data_x
         self.data_y = data_y
         self.clf = clf
@@ -85,24 +86,32 @@ class classifier:
         self.impute = impute
         self.imp_method = imp_method
         self.n_iter = n_iter
-        self.save_model = save_model
+        self.boruta_trials = boruta_trials
+        self.balance = balance 
 
         self.model = None
         self.imputer = None
         self.feats_to_use = None
 
-    def create(self):
+    def create(self, save_model=False):
         """
         Creates the machine learning engine, current options are either a
         Random Forest, XGBoost, or a Neural Network classifier. 
-
+        
+        Args:
+            save_model (bool, optional): If True the machine learning model will be saved to the
+                local home directory. Defaults to False.
+    
         Returns:
             Trained and optimized classifier.
         """
+        if self.optimize is False:
+            if len(np.unique(self.data_y)) == 2:
+                counter = Counter(self.data_y)
+                if counter[np.unique(self.data_y)[0]] != counter[np.unique(self.data_y)[1]]:
+                    if self.balance:
+                        print('Unbalanced dataset detected, to apply weights set optimize=True.')
 
-        if self.data_x.shape[0] >= 5e3 and self.optimize is True:
-            warn('Large dataset detected, optimization may take days...')
-            
         if self.clf == 'rf':
             model = RandomForestClassifier()
         elif self.clf == 'nn':
@@ -145,7 +154,10 @@ class classifier:
                 self.model = model 
                 return
 
-        self.feats_to_use = borutashap_opt(data, self.data_y)
+        self.feats_to_use = borutashap_opt(data, self.data_y, boruta_trials=self.boruta_trials)
+        if len(self.feats_to_use) == 0:
+            print('No features selected, increase the number of n_trials when running MicroLIA.optimization.borutashap_opt(). Using all features...')
+            self.feats_to_use = np.arange(data.shape[1])
         #Re-construct the imputer with the selected features as
         #new predictions will only compute these metrics, need to fit again!
         if self.imp_method == 'KNN':
@@ -155,16 +167,104 @@ class classifier:
         else: 
             self.data_x = self.data_x[:,self.feats_to_use]
 
-        self.model, best_params = hyper_opt(self.data_x, self.data_y, clf=self.clf, n_iter=self.n_iter)
+        self.model, best_params = hyper_opt(self.data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, balance=self.balance)
         print("Fitting and returning final model...")
         self.model.fit(self.data_x, self.data_y)
-        if self.save_model:
+        if save_model:
             print("Saving 'MicroLIA_Model' to local home directory.")
             path = str(Path.home())+'/MicroLIA_Model'
             joblib.dump(self.model, path)
-        print('Optimization complete!')
+        print('Process complete.')
         return
-        #return model, imputer, features_index
+
+    def save(self, path=None, overwrite=False):
+        """
+        Saves the trained classifier in a new directory named 'MicroLIA_models', 
+        as well as the imputer and the features to use attributes, if not None.
+        
+        Args:
+            path (str): Absolute path where the data folder will be saved
+                Defaults to None, in which case the directory is saved to the
+                local home directory.
+            overwrite (bool, optional): If True the 'MicroLIA_models' folder this
+                function creates in the specified path will be deleted if it exists
+                and created anew to avoid duplicate files. 
+        """
+        if self.model is None and self.imputer is None and self.feats_to_use is None:
+            raise ValueError('The models have not been created! Run classifier.create() first.')
+
+        if path is None:
+            path = str(Path.home())
+        if path[-1] != '/':
+            path+='/'
+
+        try:
+            os.mkdir(path+'MicroLIA_models')
+        except FileExistsError:
+            if overwrite:
+                try:
+                    os.rmdir(path+'MicroLIA_models')
+                except OSError:
+                    for file in os.listdir(path+'MicroLIA_models'):
+                        os.remove(path+'MicroLIA_models/'+file)
+                    os.rmdir(path+'MicroLIA_models')
+                os.mkdir(path+'MicroLIA_models')
+            else:
+                raise ValueError('Tried to create "MicroLIA_models" directory in specified path but folder already exists! If you wish to overwrite set overwrite=True.')
+        
+        path += 'MicroLIA_models/'
+        if self.model is not None:
+            joblib.dump(self.model, path+'Model')
+        if self.imputer is not None:
+            joblib.dump(self.imputer, path+'Imputer')
+        if self.feats_to_use is not None:
+            joblib.dump(self.feats_to_use, path+'Feats_Index')
+        print('Files saved in: {}'.format(path))
+        return 
+
+    def load(self, path=None):
+        """ 
+        Loads the model, imputer, and feats to use, if created and saved.
+        This function will look for a folder named 'MicroLIA_models' in the
+        local home directory, unless a path argument is set. 
+
+        Args:
+            path (str): Path where the directory 'MicroLIA_models' is saved. 
+            Defaults to None, in which case the folder is assumed to be in the 
+            local home directory.
+        """
+
+        if path is None:
+            path = str(Path.home())
+        if path[-1] != '/':
+            path+='/'
+
+        path += 'MicroLIA_models/'
+
+        try:
+            self.model = joblib.load(path+'Model')
+            model = 'model'
+        except FileNotFoundError:
+            model = ''
+            pass
+
+        try:
+            self.imputer = joblib.load(path+'Imputer')
+            imputer = 'imputer'
+        except FileNotFoundError:
+            pass
+            imputer = '' 
+
+        try:
+            self.feats_to_use = joblib.load(path+'Feats_Index')
+            feats = 'feats_to_use'
+        except FileNotFoundError:
+            feats = ''
+            pass
+
+        print('Successfully loaded the following class attributes: {}, {}, {}'.format(model, imputer, feats))
+        
+        return
 
     def predict(self, data):
         """
@@ -342,7 +442,7 @@ class classifier:
             plt.show()
             return
 
-        cv = StratifiedKFold(n_splits=cv)
+        cv = StratifiedKFold(n_splits=k_fold)
         
         tprs = []
         aucs = []
@@ -529,3 +629,4 @@ def min_max_norm(data_x):
         new_array[:,i] = (data_x[:,i] - np.min(data_x[:,i])) / (np.max(data_x[:,i]) - np.min(data_x[:,i]))
 
     return new_array
+    

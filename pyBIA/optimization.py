@@ -9,9 +9,9 @@ import sys
 import random
 import numpy as np
 from pandas import DataFrame
-from warnings import filterwarnings, warn
+from warnings import filterwarnings
 filterwarnings("ignore", category=FutureWarning)
-
+from collections import Counter 
 from sklearn.impute import KNNImputer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
@@ -43,19 +43,18 @@ class objective_xgb(object):
 
     def __call__(self, trial):
         booster = trial.suggest_categorical('booster', ['gbtree', 'dart'])
-        reg_lambda = trial.suggest_loguniform('reg_lambda', 1e-6, 1)
-        reg_alpha = trial.suggest_loguniform('reg_alpha', 1e-6, 1)
-        max_depth = trial.suggest_int('max_depth', 1, 9)
-        eta = trial.suggest_loguniform('eta', 1e-6, 1)
-        gamma = trial.suggest_loguniform('gamma', 1e-6, 1)
+        reg_lambda = trial.suggest_loguniform('reg_lambda', 1e-8, 1)
+        reg_alpha = trial.suggest_loguniform('reg_alpha', 1e-8, 1)
+        max_depth = trial.suggest_int('max_depth', 2, 25)
+        eta = trial.suggest_loguniform('eta', 1e-8, 1)
+        gamma = trial.suggest_loguniform('gamma', 1e-8, 1)
         grow_policy = trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
 
         if booster == "dart":
             sample_type = trial.suggest_categorical('sample_type', ['uniform', 'weighted'])
             normalize_type = trial.suggest_categorical('normalize_type', ['tree', 'forest'])
-            rate_drop = trial.suggest_loguniform('rate_drop', 1e-6, 1.0)
-            skip_drop = trial.suggest_loguniform('skip_drop', 1e-6, 1.0)
-
+            rate_drop = trial.suggest_loguniform('rate_drop', 1e-8, 1)
+            skip_drop = trial.suggest_loguniform('skip_drop', 1e-8, 1)
             clf = XGBClassifier(booster=booster, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
                 gamma=gamma, grow_policy=grow_policy, sample_type=sample_type, normalize_type=normalize_type,rate_drop=rate_drop, 
                 skip_drop=skip_drop)
@@ -118,7 +117,7 @@ class objective_rf(object):
     def __call__(self, trial):
         n_estimators = trial.suggest_int('n_estimators', 100, 3000)
         criterion = trial.suggest_categorical('criterion', ['gini', 'entropy'])
-        max_depth = trial.suggest_int('max_depth', 1, 25)
+        max_depth = trial.suggest_int('max_depth', 2, 25)
         min_samples_split = trial.suggest_int('min_samples_split', 2, 25)
         min_samples_leaf = trial.suggest_int('min_samples_leaf', 1, 15)
         max_features = trial.suggest_int('max_features', 1, self.data_x.shape[1])
@@ -133,7 +132,7 @@ class objective_rf(object):
 
         return final_score
 
-def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
+def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=False, balance=True):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for
@@ -175,9 +174,13 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
             Defaults to 'rf'.
         n_iter (int, optional): The maximum number of iterations to perform during 
             the hyperparameter search. Defaults to 25.
-        save_study (bool, optional): If True the Optuna study object will be returned. This
+        return_study (bool, optional): If True the Optuna study object will be returned. This
             can be used to review the method attributes, such as optimization plots. Defaults to False.
-        
+        balance (bool, optional): If True, a weights array will be calculated and used
+            when fitting the classifier. This can improve classification when classes
+            are imbalanced. This is only applied if the classification is a binary task. 
+            Defaults to True.        
+            
     Returns:
         The first output is the classifier with the optimal hyperparameters.
         Second output is a dictionary containing the optimal hyperparameters.
@@ -195,7 +198,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
             print('____________________________________')
             y = np.zeros(len(data_y))
             for i in range(len(np.unique(data_y))):
-                print('{} -----------> {}'.format(np.unique(data_y)[i], i))
+                print(str(np.unique(data_y)[i]).ljust(10)+'  ------------->     '+str(i))
                 index = np.where(data_y == np.unique(data_y)[i])[0]
                 y[index] = i
             data_y = y 
@@ -209,16 +212,37 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
     sampler = optuna.samplers.TPESampler(seed=1909) 
     study = optuna.create_study(direction='maximize', sampler=sampler)
     print('Starting hyperparameter optimization, this will take a while...')
+    #If binary classification task, can deal with imbalance classes with weights hyperparameter
+    if len(np.unique(data_y)) == 2:
+        counter = Counter(data_y)
+        if counter[np.unique(data_y)[0]] != counter[np.unique(data_y)[1]]:
+            if balance:
+                print('Unbalanced dataset detected, will train classifier with weights! To disable, set balance=False')
+                if clf == 'xgb':
+                    total_negative = len(np.where(data_y == counter.most_common(1)[0][0])[0])
+                    total_positive = len(data_y) - total_negative
+                    sample_weight = total_negative / total_positive
+                elif clf == 'rf':
+                    sample_weight = np.zeros(len(data_y))
+                    for i,label in enumerate(np.unique(data_y)):
+                        index = np.where(data_y == label)[0]
+                        sample_weight[index] = len(index) 
+                elif clf == 'nn':
+                    print('WARNING: Unbalanced dataset detected but MLPClassifier() does not support sample weights.')
+            else:
+                sample_weight = None
+        else:
+            sample_weight = None
+
     if clf == 'rf':
         try:
             objective = objective_rf(data_x, data_y)
             study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
-            #study.optimize(lambda trial: objective_rf(trial, data_x=data_x, data_y=data_y), n_trials=n_iter, callbacks=[logging_callback])
             params = study.best_trial.params
             model = RandomForestClassifier(n_estimators=params['n_estimators'], criterion=params['criterion'], 
                 max_depth=params['max_depth'], min_samples_split=params['min_samples_split'], 
                 min_samples_leaf=params['min_samples_leaf'], max_features=params['max_features'], 
-                bootstrap=params['bootstrap'])
+                bootstrap=params['bootstrap'], sample_weight=sample_weight)
         except:
             print('Failed to optimize with Optuna, switching over to BayesSearchCV...')
             params = {
@@ -242,7 +266,6 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
         try:
             objective = objective_nn(data_x, data_y)
             study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
-            #study.optimize(lambda trial: objective_nn(trial, data_x=data_x, data_y=data_y), n_trials=n_iter, callbacks=[logging_callback])
             params = study.best_trial.params
             layers = [param for param in params if 'n_units_' in param]
             layers = tuple(params[layer] for layer in layers)
@@ -268,18 +291,16 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
     elif clf == 'xgb':
         objective = objective_xgb(data_x, data_y)
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
-        #study.optimize(lambda trial: objective_xgb(trial, data_x=data_x, data_y=data_y), n_trials=n_iter, callbacks=[logging_callback])
         params = study.best_trial.params
         if params['booster'] == 'dart':
             model = XGBClassifier(booster=params['booster'], reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], 
                 max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], grow_policy=params['grow_policy'],
                 sample_type=params['sample_type'], normalize_type=params['normalize_type'],rate_drop=params['rate_drop'], 
-                skip_drop=params['skip_drop'])
+                skip_drop=params['skip_drop'], scale_pos_weight=sample_weight)
         elif params['booster'] == 'gbtree':
             model = XGBClassifier(booster=params['booster'], reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], 
                 max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], grow_policy=params['grow_policy'],
-                subsample=params['subsample'], sampling_method=params['sampling_method'], tree_method=params['tree_method'],
-                process_type=params['process_type'])
+                subsample=params['subsample'], scale_pos_weight=sample_weight)
        
     final_score = study.best_value
 
@@ -288,11 +309,11 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, save_study=False):
     else:
         print('Hyperparameter optimization complete! 3-fold CV accuracy of {} is higher than the base accuracy of {}.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
 
-    if save_study:
+    if return_study:
         return model, params, study
     return model, params
 
-def borutashap_opt(data_x, data_y, model='rf', n_trials=50):
+def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
     """
     Applies a combination of the Boruta algorithm and
     Shapley values, a method developed by Eoghan Keany (2020).
@@ -307,15 +328,18 @@ def borutashap_opt(data_x, data_y, model='rf', n_trials=50):
             the feature importance metric. Only two options are currently
             supported, 'rf' for Random Forest and 'xgb' for Extreme Gradient Boosting.
             Defaults to 'rf'.
-        n_trials (int): The number of trials to run. A larger number is
+        boruta_trials (int): The number of trials to run. A larger number is
             better as the distribution will be more robust to random fluctuations. 
             Defaults to 50.
     Returns:
         1D array containing the indices of the selected features. This can then
         be used to index the columns in the data_x array.
     """
-    if n_trials < 20:
-        warn('Results are unstable if n_trials is too low!')
+    if boruta_tirals == 0:
+        return np.arange(data_x.shape[1])
+
+    if boruta_tirals < 20:
+        print('Results are unstable if boruta_tirals is too low!')
     if np.any(np.isnan(data_x)):
         print('NaN values detected, applying Strawman imputation...')
         data_x = Strawman_imputation(data_x)
@@ -341,7 +365,7 @@ def borutashap_opt(data_x, data_y, model='rf', n_trials=50):
 
         feat_selector = BorutaShap(model=classifier, importance_measure='shap', classification=True)
         print('Running feature selection...')
-        feat_selector.fit(X=X, y=y, n_trials=n_trials, verbose=False, random_state=1909)
+        feat_selector.fit(X=X, y=y, n_trials=boruta_tirals, verbose=False, random_state=1909)
 
         index = np.array([int(feat) for feat in feat_selector.accepted])
         index.sort()

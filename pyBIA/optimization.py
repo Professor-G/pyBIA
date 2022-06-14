@@ -335,7 +335,7 @@ def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
         1D array containing the indices of the selected features. This can then
         be used to index the columns in the data_x array.
     """
-    if boruta_tirals == 0:
+    if boruta_trials == 0:
         return np.arange(data_x.shape[1])
 
     if boruta_tirals < 20:

@@ -338,8 +338,8 @@ def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
     if boruta_trials == 0:
         return np.arange(data_x.shape[1])
 
-    if boruta_tirals < 20:
-        print('Results are unstable if boruta_tirals is too low!')
+    if boruta_trials < 20:
+        print('Results are unstable if boruta_trials is too low!')
     if np.any(np.isnan(data_x)):
         print('NaN values detected, applying Strawman imputation...')
         data_x = Strawman_imputation(data_x)
@@ -365,7 +365,7 @@ def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
 
         feat_selector = BorutaShap(model=classifier, importance_measure='shap', classification=True)
         print('Running feature selection...')
-        feat_selector.fit(X=X, y=y, n_trials=boruta_tirals, verbose=False, random_state=1909)
+        feat_selector.fit(X=X, y=y, n_trials=boruta_trials, verbose=False, random_state=1909)
 
         index = np.array([int(feat) for feat in feat_selector.accepted])
         index.sort()

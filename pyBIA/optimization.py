@@ -74,8 +74,6 @@ class objective_nn(object):
     The Optuna objective function for the scikit-learn implementatin of the
     MLP classifier. The Optuna software for hyperparameter optimization
     was published in 2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
-
-    See Optuna examples: https://github.com/optuna/optuna-examples 
     """
 
     def __init__(self, data_x, data_y):
@@ -132,7 +130,7 @@ class objective_rf(object):
 
         return final_score
 
-def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=False, balance=True):
+def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for
@@ -175,7 +173,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=False, balance=T
         n_iter (int, optional): The maximum number of iterations to perform during 
             the hyperparameter search. Defaults to 25.
         return_study (bool, optional): If True the Optuna study object will be returned. This
-            can be used to review the method attributes, such as optimization plots. Defaults to False.
+            can be used to review the method attributes, such as optimization plots. Defaults to True.
         balance (bool, optional): If True, a weights array will be calculated and used
             when fitting the classifier. This can improve classification when classes
             are imbalanced. This is only applied if the classification is a binary task. 
@@ -209,7 +207,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=False, balance=T
     cv = cross_validate(model_0, data_x, data_y, cv=3)
     initial_score = np.round(np.mean(cv['test_score']), 6)
 
-    sampler = optuna.samplers.TPESampler(seed=1909) 
+    sampler = optuna.samplers.TPESampler()#seed=1909 
     study = optuna.create_study(direction='maximize', sampler=sampler)
     print('Starting hyperparameter optimization, this will take a while...')
     #If binary classification task, can deal with imbalance classes with weights hyperparameter
@@ -332,9 +330,12 @@ def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
             better as the distribution will be more robust to random fluctuations. 
             Defaults to 50.
     Returns:
-        1D array containing the indices of the selected features. This can then
-        be used to index the columns in the data_x array.
+        First output is a 1D array containing the indices of the selected features. 
+        These indices can then be used to select the columns in the data_x array.
+        Second output is the feature selection object, which contains feature selection
+        history information and visualization options.
     """
+    
     if boruta_trials == 0:
         return np.arange(data_x.shape[1])
 
@@ -374,7 +375,7 @@ def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
         print('Boruta with Shapley values failed, switching to original Boruta...')
         index = boruta_opt(data_x, data_y)
 
-    return index
+    return index, feat_selector
 
 def boruta_opt(data_x, data_y):
     """

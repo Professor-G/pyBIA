@@ -155,11 +155,9 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
             raise ValueError("Size of validation data and validation labels must be the same.")
     if batch_size < 16:
         warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.", stacklevel=2)
-    if len(blob_data.shape) == 3: #if matrix is 3D - contains multiple samples
-        img_width = blob_data[0].shape[0]
-        img_height = blob_data[0].shape[1]
-    else:
-        raise ValueError("Data must be 3D, first dimension is number of samples, followed by width and height.")
+    
+    img_width = blob_data[0].shape[0]
+    img_height = blob_data[0].shape[1]
 
     ix = np.random.permutation(len(blob_data))
     blob_data = blob_data[ix]
@@ -167,7 +165,7 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
     ix = np.random.permutation(len(other_data))
     other_data = other_data[ix]
 
-    X_train, Y_train = create_training_set(blob_data, other_data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+    X_train, Y_train = create_training_set(blob_data, other_data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
 
     X_train[X_train > 1] = 1
     X_train[X_train < 0] = 0
@@ -244,7 +242,7 @@ def create(blob_data, other_data, img_num_channels=1, normalize=True,
 
     return model
 
-def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000, target='DIFFUSE'):
+def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000, target='DIFFUSE', img_num_channels=1):
     """
     Returns the class prediction. The input can either be a single 2D array 
     or a 3D array if there are multiple samples.
@@ -267,7 +265,7 @@ def predict(data, model, normalize=False, min_pixel=638, max_pixel=3000, target=
         raise ValueError('Data size is invalid. Each image must be a 50x50 2D array, resize the array \
             using the crop_image function in the data_processing module.')
 
-    data = process_class(data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+    data = process_class(data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
     predictions = model.predict(data)
 
     output=[]

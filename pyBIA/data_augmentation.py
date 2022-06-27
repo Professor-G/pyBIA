@@ -9,13 +9,14 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from scipy.ndimage import rotate
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 
 from pyBIA.data_processing import crop_image
 from warnings import warn
 
 
-def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True, 
-    vertical=True, rotation=360, fill='nearest', image_size=50):
+def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5, height_shift=5, 
+    horizontal=True, vertical=True, rotation=360, fill='nearest', image_size=50):
     """
     This function takes in one image and applies data augmentation techniques.
     Shifts and rotations occur at random, for example, if width_shift is set
@@ -26,8 +27,12 @@ def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True,
     zero and the rotation argument. 
 
     Args:
-        data (array): 2D array of containing a single image, or a 3D array containing
-            multiple images.
+        channel1 (ndarray): 2D array of containing a single image, or a 3D array containing
+            multiple images. 
+        channel2 (ndarray, optional): 2D array of containing a single image, or a 3D array containing
+            multiple images. Must correspond with channel1. Default is None.
+        channel3 (ndarray, optional): 2D array of containing a single image, or a 3D array containing
+            multiple images. Must correspond with channel2. Default is None.
         batch (int): How many augmented images to create and save.
         width_shift (int): The max pixel shift allowed in either horizontal direction.
             If set to zero no horizontal shifts will be performed. Defaults to 5 pixels.
@@ -47,10 +52,11 @@ def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True,
         The training set pyBIA uses includes augmented images. The original image size was
         100x100 pixels before augmentation, these were cropped to 50x50 after the augmentation
         procedure so as to remove rotational effects at the outer boundaries of the image.
+        This cropping is controlled via the image_size parameter.
 
     Returns:
-        3D array containing the augmented images. 
-
+        Array containing the augmented images. When input, channel2 and channel3 yield 
+        additionl outputs, respectively.
     """
 
     if isinstance(width_shift, int) == False or isinstance(height_shift, int) == False or isinstance(rotation, int) == False:
@@ -69,24 +75,77 @@ def augmentation(data, batch=10, width_shift=5, height_shift=5, horizontal=True,
     if rotation != 0:
         datagen.preprocessing_function = image_rotation
 
-    if len(data.shape) != 4:
-        if len(data.shape) == 3 or len(data.shape) == 2:
-            data = np.array(np.expand_dims(data, axis=-1))
+    if len(channel1.shape) != 4:
+        if len(channel1.shape) == 3: 
+            data = np.array(np.expand_dims(channel1, axis=-1))
+        elif len(channel1.shape) == 2:
+            data = np.array(np.expand_dims(channel1, axis=-1))
+            data = data.reshape((1,) + data.shape)
         else:
             raise ValueError("Input data must be 2D for single sample or 3D for multiple samples")
 
     augmented_data = []
+    seeds = []
     for i in np.arange(0, len(data)):
         original_data = data[i].reshape((1,) + data[-i].shape)
-        for k in range(batch):
-        	augement = datagen.flow(original_data, batch_size=1)
-        	augmented_data.append(augement[0][0])
+        for j in range(batch):
+            seed = int(random.sample(range(int(1e6)), 1)[0])
+            seeds.append(seed)
+            augment = datagen.flow(original_data, batch_size=1, seed=seed)
+            augmented_data.append(augment[0][0])
 
     augmented_data = np.array(augmented_data)
     if augmented_data is not None:
         augmented_data = resize(augmented_data, size=image_size)
 
-    return augmented_data
+    if channel2 is None:
+        return augmented_data
+    else:
+        seeds = np.array(seeds)
+        if len(channel2.shape) != 4:
+            if len(channel2.shape) == 3: 
+                data = np.array(np.expand_dims(channel2, axis=-1))
+            elif len(channel2.shape) == 2:
+                data = np.array(np.expand_dims(channel2, axis=-1))
+                data = data.reshape((1,) + data.shape)
+
+        k=0
+        augmented_data2 = []
+        for i in np.arange(0, len(data)):
+            original_data = data[i].reshape((1,) + data[-i].shape)
+            for j in range(batch):
+                augment = datagen.flow(original_data, batch_size=1, seed=seeds[k])
+                augmented_data2.append(augment[0][0])
+                k+=1
+
+        augmented_data2 = np.array(augmented_data2)
+        if augmented_data2 is not None:
+            augmented_data2 = resize(augmented_data2, size=image_size)
+
+    if channel3 is None:
+        return augmented_data, augmented_data2
+    else:
+        if len(channel3.shape) != 4:
+            if len(channel3.shape) == 3: 
+                data = np.array(np.expand_dims(channel3, axis=-1))
+            elif len(channel3.shape) == 2:
+                data = np.array(np.expand_dims(channel3, axis=-1))
+                data = data.reshape((1,) + data.shape)
+
+        k=0
+        augmented_data3 = []
+        for i in np.arange(0, len(data)):
+            original_data = data[i].reshape((1,) + data[-i].shape)
+            for j in range(batch):
+                augment = datagen.flow(original_data, batch_size=1, seed=seeds[k])
+                augmented_data3.append(augment[0][0])
+                k+=1
+
+    augmented_data3 = np.array(augmented_data3)
+    if augmented_data3 is not None:
+        augmented_data3 = resize(augmented_data3, size=image_size)            
+
+    return augmented_data, augmented_data2, augmented_data3
 
 def resize(data, size=50):
     """

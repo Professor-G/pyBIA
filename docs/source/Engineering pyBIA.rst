@@ -26,8 +26,9 @@ We start by importing our modules and loading the file csv file 'ndwfs_bootes', 
 .. code-block:: python
 	
     import pandas
-    import astropy
     import numpy as np
+    import astropy
+    from astropy.io.fits import open, getdata
 
     from pyBIA import catalog
 
@@ -42,16 +43,17 @@ Since there are 27 different subfields, we load each one at a time and then crea
     for field_name in np.unique(ndwfs_bootes['field_name']):
 
     	index = np.where(ndwfs_bootes['field_name'] == field_name)[0]  #identify objects in this subfield
-    	hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
+    	hdu = open(field_name+'.fits')	 #load .fits field for this subfield only
 
     	wcsobj = astropy.wcs.WCS(header = hdu[0].header)  #create wcs object for coord conversion
     	xpix, ypix = wcsobj.all_world2pix(ndwfs_bootes['ra'][index], ndwfs_bootes['dec'][index], 0) #convert ra/dec to xpix/ypix
 
-    	cat = catalog.create(data=hdu[0].data, x=xpix, y=ypix, obj_name=ndwfs_bootes['NDWFS_objname'][index], field_name=ndwfs_bootes['field_name'][index], flag=np.ones(len(index)), invert=True, save_file=False)
-    	frame.append(cat)
+    	cat = catalog.Catalog(data=hdu[0].data, x=xpix, y=ypix, obj_name=ndwfs_bootes['obj_name'][index], field_name=ndwfs_bootes['field_name'][index], flag=np.ones(len(index)), invert=True)
+    	cat.create(save_file=False)
+    	frame.append(cat.cat)
 
     frame = pandas.concat(frame, axis=0, join='inner') #merge all 27 frames into one
-    frame.to_csv('~/Bootes_Field/NDWFS_master_catalog', chunksize=1000) #save as 'NDWFS_master_catalog' 
+    frame.to_csv('NDWFS_master_catalog', chunksize=1000) #save as 'NDWFS_master_catalog' 
 
 The NDWFS Bootes field catalog contains a total of 2509039 detected objects. When creating a catalog using pyBIA there are numerous optional parameters that can be contolled, `see the API reference for the catalog class <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_. These features can be used to train a machine learning model, which is why we've included a flag parameter, in which we can input an array containing labels or flags for each object. In the above example, we flagged every object with a value of one, which is what we label any astrophysical object that is not a Lyman-alpha blob. This flag input can also contain an array of strings, which could correspond to actual class labels, e.g. 'GALAXY' or 'STAR'
 
@@ -64,25 +66,29 @@ The entire sample of 866 objects display morphologies and features which are cha
 .. code-block:: python
 	
     master_catalog = pandas.read_csv('NDWFS_master_catalog')
-    obj_names_866 = np.loadtxt('obj_names_789', dtype=str)
+    obj_names_866 = np.loadtxt('obj_names_866', dtype=str)
 
     index_866 = []
 
     for obj_name in obj_names_866:
+
     	index = np.where(master_catalog['obj_name'] == obj_name)[0]
+
+    	#In case there are multiple detections, select the brightest one or flux/flux_err if error argument is input
+    	if len(index) > 1:
+    		index = index[np.argmax(master_catalog.iloc[index]['flux'])]
+
     	index_866.append(index)
 
-    index_866 = np.array(index_866)
-
-When we initially created the catalog, we set the 'flag' column to 1 for all objects, but now that we have the indices of the 866 blob candidates, we can set the 'flag' column to 0 for these entries, which we will interpret to mean DIFFUSE. For simplicity, we will break up our master catalog into a diffuse_catalog containing only these 866 candidates, and an other_catalog with everything else.
+When we initially created the catalog, we set the 'flag' column to 1 for all objects, but now that we have the indices of the 866 blob candidates, we can set the 'flag' column to 0 for these entries, which we will interpret to mean DIFFUSE. The master catalog can now be separated into a diffuse_catalog containing only these 866 candidates, and an other_catalog with everything else.
 
 .. code-block:: python
 
-	diffuse_catalog = master_catalog[index_866]
-	diffuse_catalog['flag'] = 0
-
+	master_catalog['flag'].iloc[index_866] = 0
 	other_index = np.where(master_catalog['flag'] == 1)[0]
-	other_catalog = master_catalog[other_index]
+
+	diffuse_catalog = master_catalog.iloc[index_866]
+	other_catalog = master_catalog.iloc[other_index]
 
 Finally, we will extract 2D arrays of size 100x100, centered around the positions of each of the 866 diffuse objects. We need these images to train the CNN. As was done when creating the catalog, we will loop over all 27 subfields, find the objects in each one, crop out the subarray, and append the images to a list. We can crop out the image of each object using the crop_image function in pyBIA.data_processing:
 
@@ -93,15 +99,16 @@ Finally, we will extract 2D arrays of size 100x100, centered around the position
     diffuse_images = []
 
     for field_name in np.unique(diffuse_catalog['field_name']):
-
     	index = np.where(diffuse_catalog['field_name'] == field_name)[0]  #identify objects in this subfield
-    	hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
+    	hdu = open('/Users/daniel/Desktop/NDWFS_Tiles/Bw_FITS/'+field_name+'_Bw_03_fix.fits')   #load .fits field for this subfield only
     	data = hdu[0].data
-
     	for i in range(len(index)): #Crop out objects
-    		image = data_processing.crop_image(data, x=diffuse_catalog['xpix'], y=diffuse_catalog['ypix'], size=100, invert=True)
+
+    		xpix = diffuse_catalog.xpix.iloc[index[i]]
+    		ypix = diffuse_catalog.ypix.iloc[index[i]]
+    		image = data_processing.crop_image(data, x=np.array(xpix), y=np.array(ypix), size=100, invert=True)
     		diffuse_images.append(image)
-    		
+
     diffuse_images = np.array(diffuse_images)
 
 The diffuse_images array now contains image data for our 'DIFFUSE' training class (flag=0), but a training class of 866 objects is very small. AlexNet, the convolutional neural network pyBIA is modeled after, used ~1.3 million images for training. Since Lyman-alpha nebulae are rare we don't have a large sample of these objects, as such, we must perform data augmentation techniques to inflate our 'DIFFUSE' training bag, after which we can randomly select a similar number of other objects to compose our 'OTHER' training class. 
@@ -122,9 +129,9 @@ To perform data augmentation, we can use pyBIA's data_augmentation module, we ju
 
 .. code-block:: python
 
-	from pyBIA import data_augmentation
+	from pyBIA.data_augmentation import augmentation
 
-	diffuse_training = augmentation(diffuse_images, batch=100, width_shift=5, height_shift=5, horizontal=True, vertical=True, rotation=360)
+	diffuse_training = augmentation(diffuse_images, batch=10, width_shift=5, height_shift=5, horizontal=True, vertical=True, rotation=360)
 
 By default the augmentation function will resize the image to 50x50 after performing the data augmentation, but this resizing can be controlled with the image_size argument. 
 
@@ -137,18 +144,22 @@ It is important to avoid class imbalance when training machine learning algorith
 
 .. code-block:: python
 	
-    index = random.sample(range(len(other_catalog)), 86600) #random index
+    rand_index = random.sample(range(len(other_catalog)), 86600) #random index
+    other_catalog = other_catalog.iloc[rand_index]
 
     other_images = []
 
-    for field_name in np.unique(other_catalog['field_name']):
+    for field_name in np.unique(other_catalog['field_name'].iloc[rand_index]):
 
-    	index = np.argwhere(other_catalog['field_name'] == field_name)  #identify objects in this subfield
-    	hdu = astropy.io.fits.open(field_name+'.fits')	 #load .fits field for this subfield only
+    	index = np.where(other_catalog['field_name'] == field_name)[0]  #identify objects in this subfield
+    	hdu = open(field_name+'.fits')	 #load .fits field for this subfield only
     	data = hdu[0].data
 
     	for i in range(len(index)): #Crop out objects
-    		image = crop_image(data, x=other_catalog['xpix'], y=other_catalog['ypix'], size=100, invert=True)
+
+    		xpix = other_catalog.xpix.iloc[index[i]]
+    		ypix = other_catalog.ypix.iloc[index[i]]
+    		image = data_processing.crop_image(data, x=np.array(xpix), y=np.array(ypix), size=50, invert=True)
     		other_images.append(image)
 
     other_training = np.array(other_images)
@@ -170,15 +181,15 @@ Since we have 86600 samples in each array, we will index the first 8660 to be th
 
 .. code-block:: python
 
-	val_X1, val_Y1 = process_class(diffuse_training[:8660], label=0, min_pixel=638, max_pixel=1500)
-	val_X2, val_Y2 = process_class(other_training[:8660], label=1, min_pixel=638, max_pixel=1500)
+	val_X1, val_Y1 = data_processing.process_class(diffuse_training[:866], label=0, min_pixel=638, max_pixel=1500)
+	val_X2, val_Y2 = data_processing.process_class(other_training[:866], label=1, min_pixel=638, max_pixel=1500)
 
 	val_X = np.r_[val_X1, val_X2]
 	val_Y = np.r_[val_Y1, val_Y2]
 
 The process_class function will output two arrays, the reshaped image data and the appropriately shaped labels. Both of these arrays are reshaped in preparation for the training. 
 
-IMPORTANT: When doing image classification it is imperative that we normalize our images so as to avoid exploding gradients. We applied min-max normalization, where min_pixel is the average background count of the data (or entire survey); in our case we set the min to be 638, the 0.01 quantile of the Boötes field. The max_pixel value is set to 1500, we set this value because Lyman-alpha nebulae are diffuse sources and thus we can ignore anything brighter than 1500,  which will result in more robust classification performance.
+IMPORTANT: When doing image classification it is important to normalize the images so as to avoid exploding gradients. We applied min-max normalization, where min_pixel is the average background count of the data (or entire survey); in our case we set the min to be 638, the 0.01 quantile of the Boötes field. The max_pixel value is set to 1500, we set this value because Lyman-alpha nebulae are diffuse sources and thus we can ignore anything brighter than 1500,  which will result in more robust classification performance.
 
 Since we used the first 10% of the data for validation, the remaining 90% will be used to train the CNN, we will create the CNN model using pyBIA.models.create():
 
@@ -186,7 +197,7 @@ Since we used the first 10% of the data for validation, the remaining 90% will b
 
 	from pyBIA import cnn_model
 
-	model = cnn_models.create(blob_train[8660:], other_train[8660:], validation_X=val_X, validation_Y=val_Y, min_pixel= 638, max_pixel=1500, filename='Bw_CNN')
+	model = cnn_model.create(diffuse_training[8660:], other_training[8660:], val_X=val_X, val_Y=val_Y, min_pixel= 638, max_pixel=1500, filename='Bw_CNN')
 
 When the pyBIA model is trained it will save metric files and an .h5 file containing the Tensorflow model. We did not set any of the parameters in the above example as the default ones are the ones we used, but please note that by default the CNN will train for 1000 epochs, which would take several days to complete. Because of the computation time needed to train the model, a checkpoint file will automatically be saved everytime the performance improves, that way we can resume training should the process be interrupted.
 

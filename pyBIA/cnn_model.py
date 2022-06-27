@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from warnings import warn
 import joblib
 from pathlib import Path
-#os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 from optuna.visualization.matplotlib import plot_optimization_history
 from tensorflow.keras.models import Sequential, save_model
 from tensorflow.keras.initializers import VarianceScaling

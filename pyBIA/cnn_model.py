@@ -165,9 +165,12 @@ class Classifier:
 
             save_model(model, path+'Keras_Model.h5')
 
+        if self.best_params is not None:
+            joblib.dump(self.best_params, path+'Best_Params')
         if self.optimization_results is not None:
             joblib.dump(self.optimization_results, path+'HyperOpt_Results')
         print('Files saved in: {}'.format(path))
+
         return 
 
     def load(self, path=None):
@@ -203,7 +206,14 @@ class Classifier:
             optimization_results = '' 
             pass
 
-        print('Successfully loaded the following class attributes: {}, {}, '.format(model, optimization_results))
+        try:
+            self.optimization_results = joblib.load(path+'Best_Params')
+            best_params = 'best_params'
+        except FileNotFoundError:
+            best_params = '' 
+            pass
+
+        print('Successfully loaded the following class attributes: {}, {}, {}'.format(model, optimization_results, best_params))
         
         return
 

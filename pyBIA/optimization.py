@@ -26,17 +26,82 @@ from skopt.space import Real, Integer, Categorical
 from skopt.utils import use_named_args
 
 import optuna
+from optuna.integration import TFKerasPruningCallback
+from tensorflow.keras.backend import clear_session 
+from tensorflow.keras.callbacks import EarlyStopping
 from boruta import BorutaPy
 from BorutaShap import BorutaShap
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 from xgboost import XGBClassifier
+from pyBIA.cnn_model import pyBIA_model
 
-class objective_xgb(object):
+class objective_cnn(object):
     """
-    The Optuna objective function for the tree-based XGBoost classifier. 
+    Optimization objective function for pyBIA's convolutional neural network. 
     The Optuna software for hyperparameter optimization was published in 
     2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
     """
+
+    def __init__(self, data_x, data_y, img_num_channels=1, normalize=True, min_pixel=638,
+        max_pixel=3000, val_X=None, val_Y=None, train_epochs=25):
+        self.data_x = data_x
+        self.data_y = data_y
+        self.img_num_channels = img_num_channels
+        self.normalize = normalize 
+        self.min_pixel = min_pixel
+        self.max_pixel = max_pixel
+        self.val_X = val_X
+        self.val_Y = val_Y
+        self.train_epochs = train_epochs
+
+    def __call__(self, trial):
+
+        clear_session()
+
+        batch_size = trial.suggest_int('batch_size', 2, 50)
+        lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
+        batch_norm = trial.suggest_categorical('batch', [False, True])
+        momentum = trial.suggest_float('momentum', 0, 1, step=0.1)
+        decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
+        nesterov = trial.suggest_categorical('nesterov', [True, False])
+        loss = trial.suggest_categorical('loss', ['categorical_crossentropy', 'squared_hinge', 'sparse_categorical_crossentropy'])
+        padding = trial.suggest_categorical('padding', ['same', 'valid'])
+        dropout_1 = trial.suggest_float('dropout_1', 0, 1, step=0.1)
+        dropout_2 = trial.suggest_float('dropout_2', 0, 1, step=0.1)
+        activation_conv = trial.suggest_categorical('activation_conv', ['relu', 'linear', 'softmax', 'sigmoid', 'tanh', 'softplus'])
+        activation_dense = trial.suggest_categorical('activation_dense', ['relu', 'softmax', 'sigmoid', 'tanh', 'softplus'])
+        maxpool_size = trial.suggest_int('maxpool_size', 1, 10)
+        maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
+        
+        if self.val_X is not None:
+            callbacks = [EarlyStopping(patience=3),TFKerasPruningCallback(objective, 'val_accuracy'),]
+        else:
+            callbacks = None
+
+        try:
+            model, history = pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
+                batch_size=batch_size, lr=lr, batch_norm=batch_norm, momentum=momentum, decay=decay, nesterov=nesterov, 
+                loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, padding=padding, dropout_1=dropout_1, 
+                dropout_2=dropout_2, maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, early_stop_callback=callbacks)
+        except: #Invalid combination
+            print("Invalid hyerparameter combination, skipping trial.")
+            return 0.0
+
+        if self.val_X is not None:
+            final_score = history.history['val_accuracy'][-1]
+        else:
+            final_score = history.history['accuracy'][-1]
+
+        return final_score
+
+class objective_xgb(object):
+    """
+    Optimization objective function for the tree-based XGBoost classifier. 
+    The Optuna software for hyperparameter optimization was published in 
+    2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
+    """
+
     def __init__(self, data_x, data_y):
         self.data_x = data_x
         self.data_y = data_y
@@ -55,14 +120,22 @@ class objective_xgb(object):
             normalize_type = trial.suggest_categorical('normalize_type', ['tree', 'forest'])
             rate_drop = trial.suggest_loguniform('rate_drop', 1e-8, 1)
             skip_drop = trial.suggest_loguniform('skip_drop', 1e-8, 1)
-            clf = XGBClassifier(booster=booster, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
-                gamma=gamma, grow_policy=grow_policy, sample_type=sample_type, normalize_type=normalize_type,rate_drop=rate_drop, 
-                skip_drop=skip_drop)
-        
+            try:
+                clf = XGBClassifier(booster=booster, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
+                    gamma=gamma, grow_policy=grow_policy, sample_type=sample_type, normalize_type=normalize_type,rate_drop=rate_drop, 
+                    skip_drop=skip_drop)
+            except:
+                print("Invalid hyerparameter combination, skipping trial.")
+                return 0.0
+
         elif booster == 'gbtree':
             subsample = trial.suggest_loguniform('subsample', 1e-6, 1.0)
-            clf = XGBClassifier(booster=booster, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
-                gamma=gamma, grow_policy=grow_policy, subsample=subsample)
+            try:
+                clf = XGBClassifier(booster=booster, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
+                    gamma=gamma, grow_policy=grow_policy, subsample=subsample)
+            except:
+                print("Invalid hyerparameter combination, skipping trial.")
+                return 0.0
 
         cv = cross_validate(clf, self.data_x, self.data_y, cv=3)
         final_score = np.round(np.mean(cv['test_score']), 6)
@@ -71,7 +144,7 @@ class objective_xgb(object):
 
 class objective_nn(object):
     """
-    The Optuna objective function for the scikit-learn implementatin of the
+    Optimization objective function for the scikit-learn implementatin of the
     MLP classifier. The Optuna software for hyperparameter optimization
     was published in 2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
     """
@@ -81,11 +154,11 @@ class objective_nn(object):
         self.data_y = data_y
 
     def __call__(self, trial):
-        learning_rate_init= trial.suggest_float('learning_rate_init', 1e-6, 1)
+        learning_rate_init= trial.suggest_float('learning_rate_init', 1e-4, 0.1, step=0.05)
         solver = trial.suggest_categorical("solver", ["sgd", "adam"]) #"lbfgs"
         activation = trial.suggest_categorical("activation", ["logistic", "tanh", "relu"])
         learning_rate = trial.suggest_categorical("learning_rate", ["constant", "invscaling", "adaptive"])
-        alpha = trial.suggest_float("alpha", 1e-6, 1)
+        alpha = trial.suggest_float("alpha", 1e-6, 1, step=0.05)
         batch_size = trial.suggest_int('batch_size', 1, 1000)
         
         n_layers = trial.suggest_int('hidden_layer_sizes', 1, 10)
@@ -93,9 +166,13 @@ class objective_nn(object):
         for i in range(n_layers):
             layers.append(trial.suggest_int(f'n_units_{i}', 100, 1000))
 
-        clf = MLPClassifier(hidden_layer_sizes=tuple(layers),learning_rate_init=learning_rate_init, 
-            solver=solver, activation=activation, alpha=alpha, batch_size=batch_size, max_iter=2500)
-        
+        try:
+            clf = MLPClassifier(hidden_layer_sizes=tuple(layers),learning_rate_init=learning_rate_init, 
+                solver=solver, activation=activation, alpha=alpha, batch_size=batch_size, max_iter=2500)
+        except:
+            print("Invalid hyerparameter combination, skipping trial")
+            return 0.0
+
         cv = cross_validate(clf, self.data_x, self.data_y, cv=3)
         final_score = np.round(np.mean(cv['test_score']), 6)
 
@@ -103,7 +180,7 @@ class objective_nn(object):
 
 class objective_rf(object):
     """
-    The Optuna objective function for the scikit-learn implementatin of the
+    Optimization objective function for the scikit-learn implementatin of the
     Random Forest classifier. The Optuna software for hyperparameter optimization
     was published in 2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
     """
@@ -121,16 +198,22 @@ class objective_rf(object):
         max_features = trial.suggest_int('max_features', 1, self.data_x.shape[1])
         bootstrap = trial.suggest_categorical('bootstrap', [True, False])
         
-        clf = RandomForestClassifier(n_estimators=n_estimators, criterion=criterion, max_depth=max_depth,
-                                    min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
-                                    max_features=max_features, bootstrap=bootstrap)
-        
+        try:
+            clf = RandomForestClassifier(n_estimators=n_estimators, criterion=criterion, max_depth=max_depth,
+                min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
+                max_features=max_features, bootstrap=bootstrap)
+        except:
+            print("Invalid hyerparameter combination, skipping trial")
+            return 0.0
+
         cv = cross_validate(clf, self.data_x, self.data_y, cv=3)
         final_score = np.round(np.mean(cv['test_score']), 6)
 
         return final_score
 
-def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True):
+def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, 
+    img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000, val_X=None, val_Y=None, 
+    train_epochs=25):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for
@@ -178,6 +261,21 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             when fitting the classifier. This can improve classification when classes
             are imbalanced. This is only applied if the classification is a binary task. 
             Defaults to True.        
+        img_num_channels (int): The number of filters used. Defaults to 1, as pyBIA version 1
+            has been trained with only blue broadband data. Only used when clf = 'cnn'.
+        normalize (bool, optional): If True the data will be min-max normalized using the 
+            input min and max pixels. Defaults to True. Only used when clf = 'cnn'.
+        min_pixel (int, optional): The minimum pixel count, defaults to 638. Pixels with counts 
+        below this threshold will be set to this limit. Only used when clf = 'cnn'.
+        max_pixel (int, optional): The maximum pixel count, defaults to 3000. Pixels with counts 
+        above this threshold will be set to this limit. Only used when clf = 'cnn'.
+        val_X (array, optional): 3D matrix containing the 2D arrays (images)
+            to be used for validation.
+        val_Y (array, optional): A binary class matrix containing the labels of the
+            corresponding validation data. This binary matrix representation can be created
+            using tensorflow, see example in the Notes.
+        train_epochs (int): Number of epochs used for training. The model accuracy will be
+            the validation accuracy at the end of this epoch. 
             
     Returns:
         The first output is the classifier with the optimal hyperparameters.
@@ -201,17 +299,20 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
                 y[index] = i
             data_y = y 
             print('------------------------------------')
+    elif clf == 'cnn':
+        pass 
     else:
         raise ValueError('clf argument must either be "rf", "nn", or "xgb".')
 
-    cv = cross_validate(model_0, data_x, data_y, cv=3)
-    initial_score = np.round(np.mean(cv['test_score']), 6)
+    if clf != 'cnn':
+        cv = cross_validate(model_0, data_x, data_y, cv=3)
+        initial_score = np.round(np.mean(cv['test_score']), 6)
 
     sampler = optuna.samplers.TPESampler()#seed=1909 
     study = optuna.create_study(direction='maximize', sampler=sampler)
     print('Starting hyperparameter optimization, this will take a while...')
     #If binary classification task, can deal with imbalance classes with weights hyperparameter
-    if len(np.unique(data_y)) == 2:
+    if len(np.unique(data_y)) == 2 and clf != 'cnn':
         counter = Counter(data_y)
         if counter[np.unique(data_y)[0]] != counter[np.unique(data_y)[1]]:
             if balance:
@@ -300,16 +401,27 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
                 max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], grow_policy=params['grow_policy'],
                 subsample=params['subsample'], scale_pos_weight=sample_weight)
        
+    elif clf == 'cnn':
+        objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
+            val_X=val_X, val_Y=val_Y, train_epochs=train_epochs)
+        study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
+        params = study.best_trial.params
+
     final_score = study.best_value
 
-    if initial_score > final_score:
-        print('Hyperparameter optimization complete! 3-fold CV accuracy of {} is lower than the base accuracy of {}, try increasing the value of n_iter and run again.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
+    if clf != 'cnn':
+        if initial_score > final_score:
+            print('Hyperparameter optimization complete! 3-fold CV accuracy of {} is lower than the base accuracy of {}, try increasing the value of n_iter and run again.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
+        else:
+            print('Hyperparameter optimization complete! 3-fold CV accuracy of {} is higher than the base accuracy of {}.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
+        if return_study:
+            return model, params, study
+        return model, params
     else:
-        print('Hyperparameter optimization complete! 3-fold CV accuracy of {} is higher than the base accuracy of {}.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
-
-    if return_study:
-        return model, params, study
-    return model, params
+        print('Hyperparameter optimization complete! Best validation accuracy: {}'.format(np.round(final_score, 4)))
+        if return_study:
+            return params, study
+        return params
 
 def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
     """

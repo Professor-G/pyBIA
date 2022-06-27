@@ -96,7 +96,7 @@ class classifier:
         self.feature_history = None  
         self.optimization_results = None 
 
-    def create(self, save=True):
+    def create(self):
         """
         Creates the machine learning engine, current options are either a
         Random Forest, XGBoost, or a Neural Network classifier. 
@@ -193,20 +193,20 @@ class classifier:
             path+='/'
 
         try:
-            os.mkdir(path+'pyBIA_models')
+            os.mkdir(path+'pyBIA_ensemble_model')
         except FileExistsError:
             if overwrite:
                 try:
                     os.rmdir(path+'pyBIA_models')
                 except OSError:
-                    for file in os.listdir(path+'pyBIA_models'):
-                        os.remove(path+'pyBIA_models/'+file)
-                    os.rmdir(path+'pyBIA_models')
-                os.mkdir(path+'pyBIA_models')
+                    for file in os.listdir(path+'pyBIA_ensemble_model'):
+                        os.remove(path+'pyBIA_ensemble_model/'+file)
+                    os.rmdir(path+'pyBIA_ensemble_model')
+                os.mkdir(path+'pyBIA_ensemble_model')
             else:
-                raise ValueError('Tried to create "pyBIA_models" directory in specified path but folder already exists! If you wish to overwrite set overwrite=True.')
+                raise ValueError('Tried to create "pyBIA_ensemble_model" directory in specified path but folder already exists! If you wish to overwrite set overwrite=True.')
         
-        path += 'pyBIA_models/'
+        path += 'pyBIA_ensemble_model/'
         if self.model is not None:
             joblib.dump(self.model, path+'Model')
         if self.imputer is not None:
@@ -248,8 +248,8 @@ class classifier:
             self.imputer = joblib.load(path+'Imputer')
             imputer = 'imputer'
         except FileNotFoundError:
-            pass
-            imputer = '' 
+            imputer = ''
+            pass 
 
         try:
             self.feats_to_use = joblib.load(path+'Feats_Index')
@@ -262,8 +262,8 @@ class classifier:
             self.optimization_results = joblib.load(path+'Optimization_Results')
             optimization_results = 'optimization_results'
         except FileNotFoundError:
-            pass
             optimization_results = '' 
+            pass
 
         print('Successfully loaded the following class attributes: {}, {}, {}, {}'.format(model, imputer, feats_to_use, optimization_results))
         

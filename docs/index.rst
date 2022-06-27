@@ -25,7 +25,7 @@ You can also clone the development version:
 .. code-block:: bash
 
     git clone https://github.com/Professor-G/pyBIA.git
-    python setup.py -U install
+    python setup.py install
     pip install -r requirements.txt
 
 
@@ -37,7 +37,7 @@ Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%
 Importing pyBIA 
 ==================
 
-We have trained a Convolutional Neural Network using the high-level Keras API. Our model took ~8 days to train to a thousand epochs, and is included in the standard pyBIA installation. This classifier is called 'bw_model' as the DIFFUSE training data sample includes diffuse objects in the blue broadband (see `Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_). We hope to add more models for different bands in the future.
+We have trained a Convolutional Neural Network using the high-level Keras API. Our model took ~8 days to train to a thousand epochs, and is included in the standard pyBIA installation. This classifier is called 'bw_model' as the DIFFUSE training data sample includes diffuse objects in the blue broadband (see `Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_). More models for different bands will be added in the future.
 
 .. code-block:: python
 
@@ -49,9 +49,10 @@ With our model loaded, we can classify any 50x50 image using the predict functio
 
 .. code-block:: python
 
-    prediction = models.predict(data, model, normalize=True, min_pixel=1000, max_pixel=1600)
+    prediction = models.predict(data, model, normalize=True)
 
 The output will either be 'DIFFUSE' or 'OTHER'. The input data can also be a 3-dimensional array containing multiple images.
+
 
 Pages
 ==================

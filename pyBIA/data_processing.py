@@ -51,6 +51,7 @@ def crop_image(data, x, y, size=50, invert=False):
         If your image is 200x200, then x, y = (100,100), and so on.
 
     """
+    
     if invert == True:
         x, y = y, x
 
@@ -64,7 +65,7 @@ def crop_image(data, x, y, size=50, invert=False):
 
     return out
 
-def concat_channels(channel1, channel2, channel3):
+def concat_channels(channel1, channel2, channel3=None):
     """
     This function concatenates three 2D arrays to make a three channel matrix.
     Useful for image classification when using multiple filters.
@@ -80,17 +81,17 @@ def concat_channels(channel1, channel2, channel3):
     Args:
         Channel1 (array): 2D array of the first channel.
         Channel2 (array): 2D array of the second channel.
-        Channel3 (array): 2D array of the third channel.
+        Channel3 (array, optional): 2D array of the third channel.
 
     Returns:
         3D array with each channel stacked.
 
     """
-
-    if channel1.ndim != 2 or channel2.ndim != 2 or channel3.ndim != 2:
-        raise ValueError("Every input channel must be a 2-dimensional array (width + height)")
-        
-    colorized = (channel1[..., np.newaxis], channel2[..., np.newaxis], channel3[..., np.newaxis])
+    
+    if channel3 is None:
+        colorized = (channel1[..., np.newaxis], channel2[..., np.newaxis])
+    else:
+        colorized = (channel1[..., np.newaxis], channel2[..., np.newaxis], channel3[..., np.newaxis])
 
     return np.concatenate(colorized, axis=-1)
 
@@ -127,7 +128,7 @@ def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
 
     return channel
 
-def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=3000):
+def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=3000, img_num_channels=1):
     """
     Takes image data and returns the reshaped data array, which is required when 
     entering data into the CNN classifier.
@@ -161,7 +162,7 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
         channel[channel < min_pixel] = min_pixel
         channel = normalize_pixels(channel, min_pixel=min_pixel, max_pixel=max_pixel)
 
-    if len(channel.shape) == 3:
+    if len(channel.shape) == 3 or len(channel.shape) == 4:
         img_width = channel[0].shape[0]
         img_height = channel[0].shape[1]
         axis = channel.shape[0]
@@ -172,7 +173,6 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
     else:
         raise ValueError("Channel must either be 2D for a single sample or 3D for multiple samples.")
 
-    img_num_channels = 1
     data = channel.reshape(axis, img_width, img_height, img_num_channels)
 
     if label is None:
@@ -186,7 +186,7 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
     return data, label
 
 
-def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=3000):
+def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=3000, img_num_channels=1):
     """
     Combines image data of known class to create a training set.
     This is used for training the machine learning models. 
@@ -205,8 +205,8 @@ def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, ma
 
     """
 
-    gb_data, gb_label = process_class(blob_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
-    other_data, other_label = process_class(other_data, label=1, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel)
+    gb_data, gb_label = process_class(blob_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+    other_data, other_label = process_class(other_data, label=1, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
     
     training_data = np.r_[gb_data, other_data]
     training_labels = np.r_[gb_label, other_label]

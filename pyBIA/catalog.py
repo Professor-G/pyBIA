@@ -44,7 +44,7 @@ class Catalog:
             kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
                 the data. This length must be odd. Defaults to 21.
             nsig (float): The sigma detection limit. Objects brighter than nsig standard 
-                deviations from the background will be detected during segmentation. Defaults to 0.6.
+                deviations from the background will be detected during segmentation. Defaults to 0.7.
             deblend (bool, optional): If True, the objects are deblended during the segmentation
                 procedure, thus deblending the objects before the morphological features
                 are computed. Defaults to False so as to keep blobs as one segmentation object.
@@ -67,10 +67,9 @@ class Catalog:
             cat (Dataframe): Pandas dataframe, use if the catalog has been creted. The objects
                 in this catalog must reside within the data array, therefore if subfields
                 need individual class instance. Defaults to None.
-
     """
 
-    def __init__(self, data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0.6, deblend=False, 
+    def __init__(self, data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0.7, deblend=False, 
         obj_name=None, field_name=None, flag=None, aperture=15, annulus_in=20, annulus_out=35, kernel_size=21,
         invert=False, save_file=True, path=None, filename=None, cat=None):
 
@@ -92,8 +91,19 @@ class Catalog:
         self.kernel_size = kernel_size
         self.invert = invert 
         self.cat = cat
-
-        Ny, Nx = self.data.shape
+        if self.cat is not None:
+            try:
+                self.obj_name = np.array(self.cat.cat['obj_name'])
+            except:
+                pass
+            try:
+                self.field_name = np.array(self.cat.cat['field_name'])
+            except:
+                pass
+            try:
+                self.flag = np.array(self.cat.cat['flag'])
+            except:
+                pass
 
         if isinstance(self.x, np.ndarray) is False:
             self.x = np.array(self.x)
@@ -106,6 +116,7 @@ class Catalog:
         if isinstance(self.flag, np.ndarray) is False:
             self.flag = np.array(self.flag)
 
+        Ny, Nx = self.data.shape
 
     def create(self, save_file=True, path=None, filename=None):
         """
@@ -228,16 +239,21 @@ class Catalog:
         uses the plot_segm() function which can subtract the background.
 
         """
-        median_bkg = float(self.cat['median_bkg']) if self.bkg != 0 else 0
             
         if obj_name is None:
+            median_bkg = float(self.cat['median_bkg']) if self.bkg != 0 else 0
             plot_segm(self.data, nsig=self.nsig, kernel_size=self.kernel_size, invert=self.invert, 
                 median_bkg=median_bkg, deblend=self.deblend, name=name)
         else:
-            mask = np.where(self.cat['obj_name'] == obj_name)[0]
-            data = self.cat.iloc[mask]
-            plot_segm(self.data, xpix=float(data['xpix']), ypix=float(data['ypix']), median_bkg=median_bkg, 
-                nsig=self.nsig, kernel_size=self.kernel_size, invert=self.invert, deblend=self.deblend, name=name)
+            if len(self.cat.shape) == 2:
+                mask = np.where(self.cat['obj_name'] == obj_name)[0]
+                data = self.cat.iloc[mask]
+                xpix, ypix, median_bkg = float(data['xpix']), float(data['ypix']), float(data['median_bkg'])
+            else:
+                xpix, ypix, median_bkg = float(self.cat['xpix']), float(self.cat['ypix']), float(self.cat['median_bkg'])
+
+            plot_segm(self.data, xpix=xpix, ypix=ypix, median_bkg=median_bkg, nsig=self.nsig, 
+                kernel_size=self.kernel_size, invert=self.invert, deblend=self.deblend, name=name)
         return
 
 def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=None, invert=False, deblend=False):
@@ -603,7 +619,7 @@ def subtract_background(data, length=150):
     data = padded_matrix[:-int(pad_x),:-int(pad_y)] #Slice away the padding 
     return data
 
-def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, kernel_size=21, invert=False,
+def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, kernel_size=21, invert=False,
     deblend=False, pix_conversion=5, cmap='viridis', path=None, name='', savefig=False, dpi=300):
     """
     Returns two subplots: source and segementation object. 
@@ -650,7 +666,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.6, k
             an array, it must contain the local medium background around each source as
             this scalar will be subtracted locally.        
         nsig (float): The sigma detection limit. Objects brighter than nsig standard 
-            deviations from the background will be detected during segmentation. Defaults to 0.6.
+            deviations from the background will be detected during segmentation. Defaults to 0.7.
         kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
             the data. This length must be odd. Defaults to 21.
         invert (bool): If True the x & y coordinates will be switched

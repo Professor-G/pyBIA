@@ -5,7 +5,7 @@ Created on Wed Sep 8 10:04:23 2021
 
 @author: daniel
 """
-
+import os
 import joblib 
 import random
 import itertools
@@ -93,15 +93,14 @@ class classifier:
         self.imputer = None
         self.feats_to_use = None
 
-    def create(self, save_model=False):
+        self.feature_history = None  
+        self.optimization_results = None 
+
+    def create(self, save=True):
         """
         Creates the machine learning engine, current options are either a
         Random Forest, XGBoost, or a Neural Network classifier. 
         
-        Args:
-            save_model (bool, optional): If True the machine learning model will be saved to the
-                local home directory. Defaults to False.
-    
         Returns:
             Trained and optimized classifier.
         """
@@ -123,7 +122,7 @@ class classifier:
                 print('________________________________')
                 y = np.zeros(len(self.data_y))
                 for i in range(len(np.unique(self.data_y))):
-                    print('{} -----------> {}'.format(np.unique(self.data_y)[i], i))
+                    print(str(np.unique(data_y)[i]).ljust(10)+'  ------------->     '+str(i))
                     index = np.where(self.data_y == np.unique(self.data_y)[i])[0]
                     y[index] = i
                 self.data_y = y 
@@ -154,9 +153,9 @@ class classifier:
                 self.model = model 
                 return
 
-        self.feats_to_use = borutashap_opt(data, self.data_y, boruta_trials=self.boruta_trials)
+        self.feats_to_use, self.feature_history = borutashap_opt(data, self.data_y, boruta_trials=self.boruta_trials)
         if len(self.feats_to_use) == 0:
-            print('No features selected, increase the number of n_trials when running MicroLIA.optimization.borutashap_opt(). Using all features...')
+            print('No features selected, increase the number of n_trials when running pyBIA.optimization.borutashap_opt(). Using all features...')
             self.feats_to_use = np.arange(data.shape[1])
         #Re-construct the imputer with the selected features as
         #new predictions will only compute these metrics, need to fit again!
@@ -167,26 +166,21 @@ class classifier:
         else: 
             self.data_x = self.data_x[:,self.feats_to_use]
 
-        self.model, best_params = hyper_opt(self.data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, balance=self.balance)
+        self.model, best_params, self.optimization_results = hyper_opt(self.data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, 
+            balance=self.balance, return_study=True)
         print("Fitting and returning final model...")
         self.model.fit(self.data_x, self.data_y)
-        if save_model:
-            print("Saving 'MicroLIA_Model' to local home directory.")
-            path = str(Path.home())+'/MicroLIA_Model'
-            joblib.dump(self.model, path)
-        print('Process complete.')
-        return
-
+        
     def save(self, path=None, overwrite=False):
         """
-        Saves the trained classifier in a new directory named 'MicroLIA_models', 
+        Saves the trained classifier in a new directory named 'pyBIA_models', 
         as well as the imputer and the features to use attributes, if not None.
         
         Args:
             path (str): Absolute path where the data folder will be saved
                 Defaults to None, in which case the directory is saved to the
                 local home directory.
-            overwrite (bool, optional): If True the 'MicroLIA_models' folder this
+            overwrite (bool, optional): If True the 'pyBIA_models' folder this
                 function creates in the specified path will be deleted if it exists
                 and created anew to avoid duplicate files. 
         """
@@ -199,37 +193,39 @@ class classifier:
             path+='/'
 
         try:
-            os.mkdir(path+'MicroLIA_models')
+            os.mkdir(path+'pyBIA_models')
         except FileExistsError:
             if overwrite:
                 try:
-                    os.rmdir(path+'MicroLIA_models')
+                    os.rmdir(path+'pyBIA_models')
                 except OSError:
-                    for file in os.listdir(path+'MicroLIA_models'):
-                        os.remove(path+'MicroLIA_models/'+file)
-                    os.rmdir(path+'MicroLIA_models')
-                os.mkdir(path+'MicroLIA_models')
+                    for file in os.listdir(path+'pyBIA_models'):
+                        os.remove(path+'pyBIA_models/'+file)
+                    os.rmdir(path+'pyBIA_models')
+                os.mkdir(path+'pyBIA_models')
             else:
-                raise ValueError('Tried to create "MicroLIA_models" directory in specified path but folder already exists! If you wish to overwrite set overwrite=True.')
+                raise ValueError('Tried to create "pyBIA_models" directory in specified path but folder already exists! If you wish to overwrite set overwrite=True.')
         
-        path += 'MicroLIA_models/'
+        path += 'pyBIA_models/'
         if self.model is not None:
             joblib.dump(self.model, path+'Model')
         if self.imputer is not None:
             joblib.dump(self.imputer, path+'Imputer')
         if self.feats_to_use is not None:
             joblib.dump(self.feats_to_use, path+'Feats_Index')
+        if self.optimization_results is not None:
+            joblib.dump(self.optimization_results, path+'HyperOpt_Results')
         print('Files saved in: {}'.format(path))
         return 
 
     def load(self, path=None):
         """ 
         Loads the model, imputer, and feats to use, if created and saved.
-        This function will look for a folder named 'MicroLIA_models' in the
+        This function will look for a folder named 'pyBIA_models' in the
         local home directory, unless a path argument is set. 
 
         Args:
-            path (str): Path where the directory 'MicroLIA_models' is saved. 
+            path (str): Path where the directory 'pyBIA_models' is saved. 
             Defaults to None, in which case the folder is assumed to be in the 
             local home directory.
         """
@@ -239,7 +235,7 @@ class classifier:
         if path[-1] != '/':
             path+='/'
 
-        path += 'MicroLIA_models/'
+        path += 'pyBIA_models/'
 
         try:
             self.model = joblib.load(path+'Model')
@@ -257,12 +253,19 @@ class classifier:
 
         try:
             self.feats_to_use = joblib.load(path+'Feats_Index')
-            feats = 'feats_to_use'
+            feats_to_use = 'feats_to_use'
         except FileNotFoundError:
-            feats = ''
+            feats_to_use = ''
             pass
 
-        print('Successfully loaded the following class attributes: {}, {}, {}'.format(model, imputer, feats))
+        try:
+            self.optimization_results = joblib.load(path+'Optimization_Results')
+            optimization_results = 'optimization_results'
+        except FileNotFoundError:
+            pass
+            optimization_results = '' 
+
+        print('Successfully loaded the following class attributes: {}, {}, {}, {}'.format(model, imputer, feats_to_use, optimization_results))
         
         return
 
@@ -279,28 +282,45 @@ class classifier:
                 to use. This will be used to index the columns in the data array.
                 Defaults to None, in which case all columns in the data array are used.
         Returns:
-            Array containing the classes and the corresponding probability prediction
+            2D array containing the classes and the corresponding probability prediction
         """
     
-        classes = ['DIFFUSE', 'OTHER']
-    
+        classes = np.unique(self.data_y)
+        output = []
+
         if self.imputer is None and self.feats_to_use is None:
-            pred = self.model.predict_proba(data)
-            return np.c_[classes,pred[0]]
+            proba = self.model.predict_proba(data)
+            for i in range(len(proba)):
+                index = np.argmax(proba[i])
+                output.append([classes[index], proba[i][index]])
+            return np.array(output)
+
+        if self.feats_to_use is not None:
+            if len(data.shape) == 1:
+                data = data[self.feats_to_use].reshape(1,-1)
+            else:
+                data = data[:,self.feats_to_use]
+                
+            if self.imputer is not None:
+                data = self.imputer.transform(data)
+
+            proba = self.model.predict_proba(data)
+            for i in range(len(proba)):
+                index = np.argmax(proba[i])
+                output.append([classes[index], proba[i][index]])
+            return np.array(output)
 
         if self.imputer is not None:
             data = self.imputer.transform(data)
 
-        if self.feats_to_use is not None:
-            pred = self.model.predict_proba(data[:,self.feats_to_use])
-            return np.c_[classes,pred[0]]
+        proba = self.model.predict_proba(data)
+        for i in range(len(proba)):
+            index = np.argmax(proba[i])
+            output.append([classes[index], proba[i][index]])
+            
+        return np.array(output)
 
-        pred = self.model.predict_proba(data[:,self.feats_to_use])
-
-        return np.c_[classes,pred[0]]
-
-
-    def plot_tsne(self, norm=False, pca=False, title='Feature Parameter Space'):
+    def plot_tsne(self, norm=True, pca=False, title='Feature Parameter Space'):
         """
         Plots a t-SNE projection using the sklearn.manifold.TSNE() method.
 
@@ -309,7 +329,7 @@ class classifier:
                 number of samples, and m the number of features.
             data_y (ndarray, str): 1D array containing the corresponing labels.
             norm (bool): If True the data will be min-max normalized. Defaults
-                to False.
+                to True.
             pca (bool): If True the data will be fit to a Principal Component
                 Analysis and all of the corresponding principal components will 
                 be used to generate the t-SNE plot. Defaults to False.
@@ -321,7 +341,7 @@ class classifier:
             print('Automatically imputing NaN values with KNN imputation.')
             data = KNN_imputation(data=self.data_x)[0]
         else:
-            data = self.data_x
+            data = self.data_x[:]
 
         if len(data) > 5e3:
             method = 'barnes_hut' #Scales with O(N)
@@ -330,7 +350,7 @@ class classifier:
 
         if norm:
             scaler = MinMaxScaler()
-            scaler.fit_transform(data)
+            data = scaler.fit_transform(data)
 
         if pca:
             pca_transformation = decomposition.PCA(n_components=data.shape[1], whiten=True, svd_solver='auto')
@@ -350,11 +370,13 @@ class classifier:
             mask = np.where(self.data_y == feat)[0]
             plt.scatter(x[mask], y[mask], marker=markers[count], label=str(feat), alpha=0.7)
 
-        plt.legend(loc='upper right', prop={'size': 8})
-        plt.title(title)
+        plt.legend(loc='upper right', prop={'size': 16})
+        plt.title(title, size=18)
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
         plt.show()
 
-    def plot_conf_matrix(self, norm=False, pca=False, k_fold=10, normalize=True, title='Confusion matrix'):
+    def plot_conf_matrix(self, norm=True, pca=False, k_fold=10, normalize=True, title='Confusion matrix'):
         """
         Returns a confusion matrix with k-fold validation.
 
@@ -363,7 +385,7 @@ class classifier:
                 number of samples, and m the number of features.
             data_y (ndarray, str): 1D array containing the corresponing labels.
             norm (bool): If True the data will be min-max normalized. Defaults
-                to False.
+                to True.
             pca (bool): If True the data will be fit to a Principal Component
                 Analysis and all of the corresponding principal components will 
                 be used to evaluate the classifier and construct the matrix. 
@@ -504,6 +526,52 @@ class classifier:
         plt.title(label=title,fontsize=18)
         plt.show()
 
+    def plot_hyper_opt(xlog=True, ylog=False):
+        """
+        Plots the hyperparameter optimization history.
+    
+        Args:
+            xlog (boolean): If True the x-axis will be log-scaled.
+                Defaults to True.
+            ylog (boolean): If True the y-axis will be log-scaled.
+                Defaults to False.
+
+        Returns:
+            AxesImage
+        """
+
+        fig = optuna.visualization.matplotlib.plot_optimization_history(self.optimization_results)
+        if xlog:
+            plt.xscale('log')
+        if ylog:
+            plt.yscale('log')
+        plt.xlabel('Trial #', size=16)
+        plt.ylabel('10-fold CV Accuracy', size=16)
+        plt.title(('Hyperparameter Optimization History'), size=18)
+        plt.xlim((1,1e4))
+        plt.ylim((0.9, 0.935))
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
+        plt.legend(prop={'size': 16})
+        plt.show()
+
+    def plot_feature_opt(feats='all'):
+        """
+        Returns whisker plot displaying the z-score distribution of each feature
+        across all trials.
+
+        Args:
+            feats (str): Defines what features to show, can either be
+                'accepted', 'rejected', or 'all'.
+
+        Returns:
+            AxesImage
+        """
+
+        self.feat_selector.plot(which_features=feats, X_size=14)
+
+
 #Helper functions below to generate confusion matrix
 def evaluate_model(classifier, data_x, data_y, normalize=True, k_fold=10):
     """
@@ -591,19 +659,19 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
     plt.colorbar()
 
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45)
-    plt.yticks(tick_marks, classes)
+    plt.xticks(tick_marks, classes, rotation=45, fontsize=14)
+    plt.yticks(tick_marks, classes, fontsize=14)
 
     fmt = '.2f' if normalize is True else 'd'
     thresh = conf_matrix.max() / 2.
 
     for i, j in itertools.product(range(conf_matrix.shape[0]), range(conf_matrix.shape[1])):
-        plt.text(j, i, format(conf_matrix[i, j], fmt), horizontalalignment="center",
+        plt.text(j, i, format(conf_matrix[i, j], fmt), fontsize=14, horizontalalignment="center",
                  color="white" if conf_matrix[i, j] > thresh else "black")
 
     plt.tight_layout()
-    plt.ylabel('True label',fontsize=16)
-    plt.xlabel('Predicted label',fontsize=16)
+    plt.ylabel('True label',fontsize=18)
+    plt.xlabel('Predicted label',fontsize=18)
 
     return conf_matrix
 

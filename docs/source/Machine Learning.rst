@@ -3,14 +3,14 @@
 Machine Learning
 ===========
 
-While the convolutional neural network is the primary engine pyBIA applies for source detection, we explored the utility of other machine learning algorithms as well, of which the random forest was applied as a preliminary filter. Unlike the image classifier, the random forest model we've created takes as input numerous morphological parameters calculated from image moments. These parameters can be calcualated for astrophysical objects using the `catalog module <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_
+While the convolutional neural network is the primary engine pyBIA applies for source detection, we explored the utility of other machine learning algorithms as well, of which Extreme Gradient Boosting was applied as a preliminary filter. Unlike the image classifier, the ensemble model we've created takes as input numerous morphological parameters calculated from image moments. These parameters can be calcualated for astrophysical objects using the `catalog module <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_
 
-Given the extended emission features of Lyman-alpha Nebulae, these parameters can be used to differentiate between extended and compact objects which display no diffuse characteristics. Applying the random forest as a preliminary filter ultimately reduces the false-positive rate and optimizes the data requirements of the pipeline. 
+Given the diffuse emission features of Lyman-alpha Nebulae, these parameters can be used to differentiate between extended and compact objects which display no diffuse characteristics. Applying XGB as a preliminary filter ultimately reduces the false-positive rate and optimizes the data requirements of the pipeline. 
 
-Random Forest
+Ensemble Model
 -----------
 
-We can create our Random Forest machine learning classifier using the pyBIA `ensemble_models <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/rf_model/index.html>`_
+We can create an XGB machine learning classifier using the pyBIA `ensemble_models <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/rf_model/index.html>`_
 module. Unless turned off, when creating the model three optimization procedures will automatically run, in the following order:
 
 -  Missing values (NaN) will be imputed using the `sklearn implementation of the k Nearest Neighbors imputation algorithm <https://scikit-learn.org/stable/modules/generated/sklearn.impute.KNNImputer.html>`_. The imputer will be saved so that it can be applied to transform new, unseen data, serving as a workaround for the issue of missing data values. 
@@ -25,21 +25,21 @@ These methods are enabled by default, but can be turned off when creating our cl
 
 	from pyBIA import ensemble_model
 
-	model = ensemble_model.classifier(data_x, data_y, clf='rf', impute=False, optimize=False)
+	model = ensemble_model.classifier(data_x, data_y, clf='xgb', impute=False, optimize=False)
 	model.create()
 
 If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, the imputer is stored as object attribute as it will be needed to transform new data if it contains invalid values. We can set impute=True to perform the imputation:
 
 .. code-block:: python
 
-	model = ensemble_model.classifier(data_x, data_y, clf='rf', impute=True, optimize=False)
+	model = ensemble_model.classifier(data_x, data_y, clf='xgb', impute=True, optimize=False)
 	model.create()
 
 We can also set optimize=True, which will perform Bayesian hyperparameter optimization to identify the features that are useful. If we do this the attribute model.feats_to_use will contain an array of indices which with to index the feature columns.
 
 .. code-block:: python
 
-	model = ensemble_model.classifier(data_x, data_y, clf='rf', impute=True, optimize=True)
+	model = ensemble_model.classifier(data_x, data_y, clf='xgb', impute=True, optimize=True)
 	model.create()
 
 To avoid overfitting during the optimization procedure, 3-fold cross-validation is performed to assess performance at the end of each trial, therefore the hyperparameter optimization can take a long time depending on the size of the training set and the algorithm being optimized. 
@@ -51,11 +51,11 @@ Note that pyBIA currently supports three machine learning algorithms: Random For
    model = ensemble_model.classifier(data_x, data_y, clf='nn', n_iter=100)
    model.create()
 
-There has been particular interest in the XGBoost algorithm, which can outperform the Random Forest:
+The Random Forest was the first algorithm we explored, which yielded accuracy shy of that provided by the XGB implementation. To make a Random Forest classifier we just set the `clf` argument to 'rf':
 
 .. code-block:: python
 
-   model = ensemble_model.classifier(data_x, data_y, clf='xgb')
+   model = ensemble_model.classifier(data_x, data_y, clf='rf')
    model.create()
 
 `For details please refer to the function documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_models/index.html#pyBIA.ensemble_models.create>`_.
@@ -67,6 +67,24 @@ Example:
 .. code-block:: python
 
 	prediction = model.predict(new_data)
+
+Visualizations
+-----------
+
+A confusion matrix, ROC curve, and/or t-SNE projection can be displayed via the corresponding model attributes:
+
+.. code-block:: python
+
+	model.plot_conf_matrix()
+	model.plot_roc_curve()
+	mode.plot_tsne()
+
+If optimizated, `model.optimization_results` and `model.feature_history` will contain the hyperparameter and feature selection histories, respectively. These can be used to visualize the optimization results:
+
+.. code-block:: python
+	
+	model.plot_hyper_opt()
+	model.plot_feature_opt()
 
 Example
 -----------
@@ -109,28 +127,6 @@ Finally, we can make predictions using our optimized model:
 .. code-block:: python
 
 	prediction = model.predict(new_data)
-
-Visualizations
------------
-To assess the classification accuracy we can create a confusion matrix using the built-in function in the classifier class. By default the matrix displays the mean accuracy after 10-fold cross-validation, but this can be controlled with the k_fold parameter:
-
-.. code-block:: python
-
-   model.plot_conf_matrix(k_fold=3)
-
-We can also plot a two-dimensional t-SNE projection, which requires only the dataset. To properly visualize the feature space when using the eucledian distance metric, we will set norm=True so as to min-max normalize all the features:
-
-.. code-block:: python
-
-   model.plot_tsne(norm=True)
-
-Even though it's not used as often, we can also plot a ROC curve:
-
-.. code-block:: python
-
-	model.plot_roc_curve(k_fold=3)
-
-
 
 
 

@@ -49,7 +49,6 @@ def crop_image(data, x, y, size=50, invert=False):
         >>> resize = data_processing.crop_image(data, x=50, y=50, size=50)
 
         If your image is 200x200, then x, y = (100,100), and so on.
-
     """
     
     if invert == True:
@@ -128,10 +127,11 @@ def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
 
     return channel
 
-def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=3000, img_num_channels=1):
+def process_class(channel, img_num_channels=1, label=None, normalize=True, min_pixel=638, max_pixel=3000):
     """
     Takes image data and returns the reshaped data array, which is required when 
-    entering data into the CNN classifier.
+    entering data into the CNN classifier. Note that if using multiple bands, the filters
+    must be processed individually, and concatenated afterwards.
     
     If label is set to either 0 or 1, then the reshaped data is
     returned along with an array containing the label array, also reshaped. 
@@ -144,6 +144,7 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
 
     Args:
         channel (array): 2D array for one image, 3D array for multiple images.
+        img_num_channels (int): The number of filters used. Defaults to 1.
         label (int, optional): Class label, 0 for blob, 1 for other. Defaults to None.
         normalize (bool, optional): True will apply min-max normalization.
         min_pixel (int, optional): The minimum pixel count, defaults to 638. 
@@ -186,7 +187,7 @@ def process_class(channel, label=None, normalize=True, min_pixel=638, max_pixel=
     return data, label
 
 
-def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, max_pixel=3000, img_num_channels=1):
+def create_training_set(blob_data, other_data, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000):
     """
     Combines image data of known class to create a training set.
     This is used for training the machine learning models. 
@@ -194,6 +195,7 @@ def create_training_set(blob_data, other_data, normalize=True, min_pixel=638, ma
     Args:
         blob_data (array): 3D array containing more than one image of diffuse objects.
         other_data (array): 3D array containing more than one image of non-diffuse objects.
+        img_num_channels (int): The number of filters used. Defaults to 1.
         normalize (bool, optional): True will normalize the data using the input min and max pixels
         min_pixel (int, optional): The minimum pixel count, defaults to 638. 
             Pixels with counts below this threshold will be set to this limit.

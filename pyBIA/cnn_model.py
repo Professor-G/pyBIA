@@ -157,11 +157,11 @@ class Classifier:
         
         path += 'pyBIA_cnn_model/'
         if self.model is not None:      
-            np.savetxt(path+'model_acc', history.history['accuracy'])
-            np.savetxt(path+'model_loss', history.history['loss'])
+            np.savetxt(path+'model_acc', self.history.history['accuracy'])
+            np.savetxt(path+'model_loss', self.history.history['loss'])
             if self.val_X is not None:
-                np.savetxt(path+'model_val_acc', history.history['val_accuracy'])
-                np.savetxt(path+'model_val_loss', history.history['val_loss'])
+                np.savetxt(path+'model_val_acc', self.history.history['val_accuracy'])
+                np.savetxt(path+'model_val_loss', self.history.history['val_loss'])
 
             save_model(model, path+'Keras_Model.h5')
 

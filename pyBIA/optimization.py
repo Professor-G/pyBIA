@@ -33,7 +33,7 @@ from boruta import BorutaPy
 from BorutaShap import BorutaShap
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 from xgboost import XGBClassifier
-from pyBIA.cnn_model import pyBIA_model
+from pyBIA import cnn_model 
 
 class objective_cnn(object):
     """
@@ -43,7 +43,7 @@ class objective_cnn(object):
     """
 
     def __init__(self, data_x, data_y, img_num_channels=1, normalize=True, min_pixel=638,
-        max_pixel=3000, val_X=None, val_Y=None, train_epochs=25):
+        max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='val_loss'):
         self.data_x = data_x
         self.data_y = data_y
         self.img_num_channels = img_num_channels
@@ -53,6 +53,8 @@ class objective_cnn(object):
         self.val_X = val_X
         self.val_Y = val_Y
         self.train_epochs = train_epochs
+        self.patience = patience 
+        self.metric = metric 
 
     def __call__(self, trial):
 
@@ -60,7 +62,7 @@ class objective_cnn(object):
 
         batch_size = trial.suggest_int('batch_size', 2, 50)
         lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
-        batch_norm = trial.suggest_categorical('batch', [False, True])
+        batch_norm = trial.suggest_categorical('batch_norm', [False, True])
         momentum = trial.suggest_float('momentum', 0, 1, step=0.1)
         decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
         nesterov = trial.suggest_categorical('nesterov', [True, False])
@@ -74,24 +76,27 @@ class objective_cnn(object):
         maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
         
         if self.val_X is not None:
-            callbacks = [EarlyStopping(patience=3),TFKerasPruningCallback(objective, 'val_accuracy'),]
+            callbacks = [EarlyStopping(patience=self.patience), TFKerasPruningCallback(trial, self.metric),]
         else:
             callbacks = None
 
         try:
-            model, history = pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+            model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
                 batch_size=batch_size, lr=lr, batch_norm=batch_norm, momentum=momentum, decay=decay, nesterov=nesterov, 
                 loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, padding=padding, dropout_1=dropout_1, 
-                dropout_2=dropout_2, maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, early_stop_callback=callbacks)
+                dropout_2=dropout_2, maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, early_stop_callback=callbacks, checkpoint=False)
         except: #Invalid combination
-            print("Invalid hyerparameter combination, skipping trial.")
+            print("Invalid hyperparameter combination, skipping trial.")
             return 0.0
 
         if self.val_X is not None:
-            final_score = history.history['val_accuracy'][-1]
+            final_score = history.history[self.metric][-1]
         else:
-            final_score = history.history['accuracy'][-1]
+            final_score = history.history[self.metric][-1]
+
+        if self.metric == 'val_loss' or self.metric == 'loss':
+            final_score = 1 - final_score
 
         return final_score
 
@@ -213,7 +218,7 @@ class objective_rf(object):
 
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, 
     img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000, val_X=None, val_Y=None, 
-    train_epochs=25):
+    train_epochs=25, metric='val_loss'):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for
@@ -251,8 +256,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             number of samples, and m the number of features.
         data_y (ndarray, str): 1D array containing the corresponing labels.
         clf (str): The machine learning classifier to optimize. Can either be
-            'rf' for Random Forest, 'nn' for Neural Network, or 'xgb' for eXtreme Gradient Boosting. 
-            Defaults to 'rf'.
+            'rf' for Random Forest, 'nn' for Neural Network, 'xgb' for eXtreme Gradient Boosting,
+            or 'cnn' for Convolutional Neural Network. Defaults to 'rf'.
         n_iter (int, optional): The maximum number of iterations to perform during 
             the hyperparameter search. Defaults to 25.
         return_study (bool, optional): If True the Optuna study object will be returned. This
@@ -260,15 +265,15 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         balance (bool, optional): If True, a weights array will be calculated and used
             when fitting the classifier. This can improve classification when classes
             are imbalanced. This is only applied if the classification is a binary task. 
-            Defaults to True.        
+            Defaults to True. Argument is ignored if clf='cnn'.
         img_num_channels (int): The number of filters used. Defaults to 1, as pyBIA version 1
             has been trained with only blue broadband data. Only used when clf = 'cnn'.
         normalize (bool, optional): If True the data will be min-max normalized using the 
             input min and max pixels. Defaults to True. Only used when clf = 'cnn'.
         min_pixel (int, optional): The minimum pixel count, defaults to 638. Pixels with counts 
-        below this threshold will be set to this limit. Only used when clf = 'cnn'.
+            below this threshold will be set to this limit. Only used when clf = 'cnn'.
         max_pixel (int, optional): The maximum pixel count, defaults to 3000. Pixels with counts 
-        above this threshold will be set to this limit. Only used when clf = 'cnn'.
+            above this threshold will be set to this limit. Only used when clf = 'cnn'.
         val_X (array, optional): 3D matrix containing the 2D arrays (images)
             to be used for validation.
         val_Y (array, optional): A binary class matrix containing the labels of the
@@ -276,6 +281,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             using tensorflow, see example in the Notes.
         train_epochs (int): Number of epochs used for training. The model accuracy will be
             the validation accuracy at the end of this epoch. 
+        metric (str): Assesment metric to use when both pruning and scoring the hyperparameter
+            optimization trial.
             
     Returns:
         The first output is the classifier with the optimal hyperparameters.
@@ -401,7 +408,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
                 max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], grow_policy=params['grow_policy'],
                 subsample=params['subsample'], scale_pos_weight=sample_weight)
        
-    elif clf == 'cnn':
+    else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
             val_X=val_X, val_Y=val_Y, train_epochs=train_epochs)
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)

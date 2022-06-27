@@ -9,8 +9,10 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from warnings import warn
+import joblib
 from pathlib import Path
 #os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+from optuna.visualization.matplotlib import plot_optimization_history
 from tensorflow.keras.models import Sequential, save_model
 from tensorflow.keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import SGD
@@ -34,7 +36,6 @@ class Classifier:
         save: save model
 
         predict: predict new samples
-
 
     Args:
         blob_data (ndarray, optional): 2D array of size (n x m), where n is the
@@ -67,11 +68,12 @@ class Classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, blob_data=None, other_data=None, optimize=True, n_iter=25, img_num_channels=1, normalize=True, min_pixel=638,
+    def __init__(self, blob_data=None, other_data=None, optimize=True, metric='val_loss', n_iter=25, img_num_channels=1, normalize=True, min_pixel=638,
         max_pixel=3000, val_X=None, val_Y=None, epochs=100, train_epochs=25):
         self.blob_data = blob_data
         self.other_data = other_data
         self.optimize = optimize 
+        self.metric = metric 
         self.n_iter = n_iter
 
         self.img_num_channels = img_num_channels
@@ -103,13 +105,18 @@ class Classifier:
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs)
             return      
 
-        self.best_params, self.optimization_results = hyper_opt(self.blob_data, self.other_data, clf='cnn', n_iter=self.n_iter, 
+        self.best_params, self.optimization_results = hyper_opt(self.blob_data, self.other_data, clf='cnn', metric='val_loss', n_iter=self.n_iter, 
             balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, 
             max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, train_epochs=self.train_epochs)
 
         print("Fitting and returning final model...")
-        #self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
-        #    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs) #params
+        self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
+            min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
+            lr=self.best_params['lr'], batch_norm=self.best_params['batch_norm'], momentum=self.best_params['momentum'],
+            decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], loss=self.best_params['loss'],
+            padding=self.best_params['padding'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
+            activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'],
+            maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride']) #params
         
         return 
 
@@ -237,6 +244,36 @@ class Classifier:
 
         return np.array(output)
 
+    def plot_hyper_opt(self, xlog=True, ylog=False):
+        """
+        Plots the hyperparameter optimization history.
+    
+        Args:
+            xlog (boolean): If True the x-axis will be log-scaled.
+                Defaults to True.
+            ylog (boolean): If True the y-axis will be log-scaled.
+                Defaults to False.
+
+        Returns:
+            AxesImage
+        """
+
+        fig = plot_optimization_history(self.optimization_results)
+        if xlog:
+            plt.xscale('log')
+        if ylog:
+            plt.yscale('log')
+        plt.xlabel('Trial #', size=16)
+        plt.ylabel('10-fold CV Accuracy', size=16)
+        plt.title(('Hyperparameter Optimization History'), size=18)
+        #plt.xlim((1,1e4))
+        #plt.ylim((0.9, 0.935))
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
+        plt.legend(prop={'size': 16})
+        plt.show()
+
     def load_bw_model(self):
         """
         Calling this will load the trained Tensorflow model, trained using NDWFS images
@@ -268,7 +305,8 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
         batch_size=32, lr=0.0001, batch_norm=True, momentum=0.9, decay=0.0005, 
         nesterov=False, loss='categorical_crossentropy', activation_conv='relu', 
         activation_dense='tanh', padding='same', dropout_1=0.5, dropout_2=0.5, 
-        pooling=True, maxpool_size=3, maxpool_stride=2, early_stop_callback=None):
+        pooling=True, maxpool_size=3, maxpool_stride=2, early_stop_callback=None, 
+        checkpoint=True):
         """
         The CNN model infrastructure presented by the 2012 ImageNet Large Scale 
         Visual Recognition Challenge, AlexNet. Parameters were adapted for
@@ -334,7 +372,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             maxpool_stride (int, optional): The stride to use in the max pooling layers. Defaults to 2.
             early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
                 to None. Should only be used during optimization, refer to pyBIA.optimization.objective_cnn().
-
+            checkpoint (bool, optional): If False no checkpoint will be saved. Defaults to True.
         Example:
             To use a validation dataset when training the model, the val_X and val_Y
             parameters must be input. The val_X is a 3D matrix containing all the images, and
@@ -448,17 +486,17 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
         model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
         
         path = str(Path.home())+'/'
-        model_checkpoint = ModelCheckpoint(path+'checkpoint.hdf5', monitor='val_accuracy', verbose=0, save_best_only=True, mode='max')
-        callbacks_list = [model_checkpoint]
+        callbacks_list = []
+        if checkpoint:
+            model_checkpoint = ModelCheckpoint(path+'checkpoint.hdf5', monitor='val_accuracy', verbose=2, save_best_only=True, mode='max')
+            callbacks_list.append(model_checkpoint)
         if early_stop_callback is not None:
             callbacks_list.append(early_stop_callback)
 
         if val_X is None:
-            history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=0)
+            history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=2)
         else:
-            ix = np.random.permutation(len(val_X))
-            val_X, val_Y = val_X[ix], val_Y[ix]
-            history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=0)
+            history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=2)
 
         return model, history
 

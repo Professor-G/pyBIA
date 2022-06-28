@@ -102,9 +102,9 @@ class Classifier:
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs)
             return      
 
-        self.best_params, self.optimization_results = hyper_opt(self.blob_data, self.other_data, clf='cnn', metric='val_loss', n_iter=self.n_iter, 
+        self.best_params, self.optimization_results = hyper_opt(self.blob_data, self.other_data, clf='cnn', metric=self.metric, n_iter=self.n_iter, 
             balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, 
-            max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, train_epochs=self.train_epochs, patience=self.patience, metric=self.metric)
+            max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, train_epochs=self.train_epochs, patience=self.patience)
 
         print("Fitting and returning final model...")
         self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,

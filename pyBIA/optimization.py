@@ -86,7 +86,7 @@ class objective_cnn(object):
         elif self.metric == 'accuracy' or self.metric == 'val_accuracy':
             mode = 'max'
             
-        if patience != 0:
+        if self.patience != 0:
             callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience), TFKerasPruningCallback(trial, monitor=self.metric),]
         else:
             callbacks = None

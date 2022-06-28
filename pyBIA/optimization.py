@@ -224,7 +224,7 @@ class objective_rf(object):
 
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, 
     img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000, val_X=None, val_Y=None, 
-    train_epochs=25, metric='val_loss'):
+    train_epochs=25, patience=5, metric='val_loss'):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for
@@ -287,6 +287,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             using tensorflow, see example in the Notes.
         train_epochs (int): Number of epochs used for training. The model accuracy will be
             the validation accuracy at the end of this epoch. 
+        patience (int): Number of epochs without improvement before  the optimization trial
+            is terminated. 
         metric (str): Assesment metric to use when both pruning and scoring the hyperparameter
             optimization trial.
             
@@ -416,7 +418,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
        
     else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
-            val_X=val_X, val_Y=val_Y, train_epochs=train_epochs)
+            val_X=val_X, val_Y=val_Y, train_epochs=train_epochs, patience=patience, metric=metric)
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
         params = study.best_trial.params
 

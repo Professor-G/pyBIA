@@ -64,8 +64,8 @@ class Classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, blob_data=None, other_data=None, optimize=True, metric='val_loss', n_iter=25, img_num_channels=1, normalize=True, min_pixel=638,
-        max_pixel=3000, val_X=None, val_Y=None, epochs=100, train_epochs=25):
+    def __init__(self, blob_data=None, other_data=None, optimize=True, metric='accuracy_loss', n_iter=25, img_num_channels=1, normalize=True, min_pixel=638,
+        max_pixel=3000, val_X=None, val_Y=None, epochs=100, train_epochs=25, patience=5):
         self.blob_data = blob_data
         self.other_data = other_data
         self.optimize = optimize 
@@ -80,6 +80,7 @@ class Classifier:
         self.val_Y = val_Y
         self.epochs = epochs
         self.train_epochs = train_epochs
+        self.patience = patience
 
         self.model = None
         self.history = None 
@@ -103,7 +104,7 @@ class Classifier:
 
         self.best_params, self.optimization_results = hyper_opt(self.blob_data, self.other_data, clf='cnn', metric='val_loss', n_iter=self.n_iter, 
             balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, 
-            max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, train_epochs=self.train_epochs)
+            max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, train_epochs=self.train_epochs, patience=self.patience, metric=self.metric)
 
         print("Fitting and returning final model...")
         self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,

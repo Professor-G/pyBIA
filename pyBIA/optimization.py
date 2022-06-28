@@ -38,12 +38,18 @@ from pyBIA import cnn_model
 class objective_cnn(object):
     """
     Optimization objective function for pyBIA's convolutional neural network. 
-    The Optuna software for hyperparameter optimization was published in 
+    This is passed through the hyper_opt() function when optimizing with
+    Optuna. The Optuna software for hyperparameter optimization was published in 
     2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
+
+    Args:
+        data_x
+        data_y
+        img_num_channels
     """
 
     def __init__(self, data_x, data_y, img_num_channels=1, normalize=True, min_pixel=638,
-        max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='val_loss'):
+        max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=20, metric='val_accuracy'):
         self.data_x = data_x
         self.data_y = data_y
         self.img_num_channels = img_num_channels

@@ -29,13 +29,15 @@ class Classifier:
     also optimize the engine and output visualizations.
 
     Attributes:
-        model (object): The machine learning model that is created
+        model: The machine learning model that is created
         
         load: load model
 
         save: save model
 
         predict: predict new samples
+
+        plot_hyper_opt: Plot hyperparameter optimization history
 
     Args:
         blob_data (ndarray, optional): 2D array of size (n x m), where n is the
@@ -57,13 +59,7 @@ class Classifier:
             algorithm. Defaults to 'KNN'.
         n_iter (int): The maximum number of iterations to perform during 
             the hyperparameter search. Defaults to 25. 
-        boruta_trials (int): The number of trials to run when running Boruta for
-            feature selection. Set to 0 for no feature selection. Defaults to 50.
-        balance (bool, optional): If True, a weights array will be calculated and used
-            when fitting the classifier. This can improve classification when classes
-            are imbalanced. This is only applied if the classification is a binary task. 
-            Defaults to True.        
-        
+
     Returns:
         Trained machine learning model.
 
@@ -163,7 +159,7 @@ class Classifier:
                 np.savetxt(path+'model_val_acc', self.history.history['val_accuracy'])
                 np.savetxt(path+'model_val_loss', self.history.history['val_loss'])
 
-            save_model(model, path+'Keras_Model.h5')
+            save_model(self.model, path+'Keras_Model.h5')
 
         if self.best_params is not None:
             joblib.dump(self.best_params, path+'Best_Params')

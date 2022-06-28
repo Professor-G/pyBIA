@@ -61,10 +61,6 @@ class objective_cnn(object):
         self.train_epochs = train_epochs
         self.patience = patience 
         self.metric = metric 
-        if self.metric == 'loss' or self.metric == 'val_loss':
-            mode='min'
-        elif self.metric == 'accuracy' or self.metric == 'val_accuracy':
-            mode='max'
             
     def __call__(self, trial):
 
@@ -85,8 +81,13 @@ class objective_cnn(object):
         maxpool_size = trial.suggest_int('maxpool_size', 1, 10)
         maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
         
+        if self.metric == 'loss' or self.metric == 'val_loss':
+            mode = 'min'
+        elif self.metric == 'accuracy' or self.metric == 'val_accuracy':
+            mode = 'max'
+            
         if self.val_X is not None:
-            callbacks = [EarlyStopping(monitor=self.metric, mode=mode,patience=self.patience), TFKerasPruningCallback(trial),]
+            callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience), TFKerasPruningCallback(trial),]
         else:
             callbacks = None
 

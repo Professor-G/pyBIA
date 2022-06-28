@@ -49,7 +49,7 @@ class objective_cnn(object):
     """
 
     def __init__(self, data_x, data_y, img_num_channels=1, normalize=True, min_pixel=638,
-        max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=20, metric='val_accuracy'):
+        max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=20, metric='loss'):
         self.data_x = data_x
         self.data_y = data_y
         self.img_num_channels = img_num_channels
@@ -61,7 +61,11 @@ class objective_cnn(object):
         self.train_epochs = train_epochs
         self.patience = patience 
         self.metric = metric 
-
+        if self.metric == 'loss' or self.metric == 'val_loss':
+            mode='min'
+        elif self.metric == 'accuracy' or self.metric == 'val_accuracy':
+            mode='max'
+            
     def __call__(self, trial):
 
         clear_session()
@@ -82,7 +86,7 @@ class objective_cnn(object):
         maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
         
         if self.val_X is not None:
-            callbacks = [EarlyStopping(patience=self.patience), TFKerasPruningCallback(trial, self.metric),]
+            callbacks = [EarlyStopping(patience=self.patience), TFKerasPruningCallback(trial, self.metric, mode=mode),]
         else:
             callbacks = None
 
@@ -224,7 +228,7 @@ class objective_rf(object):
 
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, 
     img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000, val_X=None, val_Y=None, 
-    train_epochs=25, patience=5, metric='val_loss'):
+    train_epochs=25, patience=5, metric='loss'):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for

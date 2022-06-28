@@ -64,7 +64,7 @@ class Classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, blob_data=None, other_data=None, optimize=True, metric='accuracy_loss', n_iter=25, img_num_channels=1, normalize=True, min_pixel=638,
+    def __init__(self, blob_data=None, other_data=None, optimize=True, metric='loss', n_iter=25, img_num_channels=1, normalize=True, min_pixel=638,
         max_pixel=3000, val_X=None, val_Y=None, epochs=100, train_epochs=25, patience=5):
         self.blob_data = blob_data
         self.other_data = other_data

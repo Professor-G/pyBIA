@@ -86,7 +86,7 @@ class objective_cnn(object):
         maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
         
         if self.val_X is not None:
-            callbacks = [EarlyStopping(patience=self.patience), TFKerasPruningCallback(trial, self.metric, mode=mode),]
+            callbacks = [EarlyStopping(monitor=self.metric, mode=mode,patience=self.patience), TFKerasPruningCallback(trial),]
         else:
             callbacks = None
 

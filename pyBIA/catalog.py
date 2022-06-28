@@ -834,7 +834,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
                 continue
             plt.show()
 
-### Function for creating the catalog, subsitute for calling the Catalog class ###
+### Standalone function for creating the catalog ###
 def create_cat(data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0.6, deblend=False, 
     obj_name=None, field_name=None, flag=None, aperture=15, annulus_in=20, annulus_out=35, 
     invert=False, save_file=True, path=None, filename=None):

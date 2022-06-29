@@ -51,6 +51,8 @@ class Classifier:
         optimize (bool): If True the Boruta algorithm will be run to identify the features
             that contain useful information, after which the optimal Random Forest hyperparameters
             will be calculated using Bayesian optimization. 
+        limit_search (bool): If True the CNN optimization will search optimize only three hyperparameters,
+            the batch size, learning rate, and loss function. Defaults to True.
         impute (bool): If False no data imputation will be performed. Defaults to True,
             which will result in two outputs, the classifier and the imputer to save
             for future transformations. 
@@ -64,11 +66,13 @@ class Classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, blob_data=None, other_data=None, optimize=True, metric='loss', n_iter=25, img_num_channels=1, normalize=True, min_pixel=638,
+    def __init__(self, blob_data=None, other_data=None, optimize=True, limit_search=True, metric='loss', n_iter=25, img_num_channels=1, normalize=True, min_pixel=638,
         max_pixel=3000, val_X=None, val_Y=None, epochs=100, train_epochs=25, patience=5):
+
         self.blob_data = blob_data
         self.other_data = other_data
         self.optimize = optimize 
+        self.limit_search = limit_search
         self.metric = metric 
         self.n_iter = n_iter
 
@@ -104,17 +108,22 @@ class Classifier:
 
         self.best_params, self.optimization_results = hyper_opt(self.blob_data, self.other_data, clf='cnn', metric=self.metric, n_iter=self.n_iter, 
             balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, 
-            max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, train_epochs=self.train_epochs, patience=self.patience)
+            max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, train_epochs=self.train_epochs, patience=self.patience, limit_search=self.limit_search)
 
         print("Fitting and returning final model...")
-        self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
-            min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
-            lr=self.best_params['lr'], batch_norm=self.best_params['batch_norm'], momentum=self.best_params['momentum'],
-            decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], loss=self.best_params['loss'],
-            padding=self.best_params['padding'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
-            activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'],
-            maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride']) #params
-        
+        if limit_search:
+            self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
+                lr=self.best_params['lr'], loss=self.best_params['loss'])
+        else:
+            self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
+                lr=self.best_params['lr'], batch_norm=self.best_params['batch_norm'], momentum=self.best_params['momentum'],
+                decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], loss=self.best_params['loss'],
+                padding=self.best_params['padding'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
+                activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'],
+                maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride']) #params
+            
         return 
 
     def save(self, path=None, overwrite=False):

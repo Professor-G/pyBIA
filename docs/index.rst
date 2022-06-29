@@ -6,9 +6,7 @@
 Welcome to pyBIA's documentation!
 ===============================
 
-Lyman-alpha nebulae are extremely rare, to aid in the search for these objects we have created pyBIA, a deep learning classifier for detecting Lyman-alpha blobs using single band imaging. The latest assesment output a false-positive rate of ~4%.
-
-The program tools have been coded for general application, check out this `example <https://pybia.readthedocs.io/en/latest/source/Examples.html>`_ to learn how you can use pyBIA modules to create your own machine learning image classifier. 
+pyBIA is an open-source program for detecting diffuse Lyman-alpha emission in the high redshift universe, using a combination of machine learning ensemble and convolutional neural network algorithms. The program tools have been coded for general application, check out this `example <https://pybia.readthedocs.io/en/latest/source/Examples.html>`_ to learn how you can use pyBIA to create your own machine learning classifier. 
 
    
 Installation
@@ -28,30 +26,29 @@ You can also clone the development version:
     python setup.py install
     pip install -r requirements.txt
 
-
-How did we build pyBIA?
-==================
-Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%20pyBIA.html>`_ to learn more about the training data, as well as the machine learning architecture and latest performance. 
-
-
 Importing pyBIA 
 ==================
 
-We have trained a Convolutional Neural Network using the high-level Keras API. Our model took ~8 days to train to a thousand epochs, and is included in the standard pyBIA installation. This classifier is called 'bw_model' as the DIFFUSE training data sample includes diffuse objects in the blue broadband (see `Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_). More models for different bands will be added in the future.
+We have trained a Convolutional Neural Network using the high-level Keras API. Our model took ~3 days to train to a thousand epochs, and is included in the standard pyBIA installation. This classifier is called 'bw_model' as the DIFFUSE training sample includes diffuse objects in the blue broadband (see `Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_). More models for different bands will be added in the future.
 
 .. code-block:: python
 
     from pyBIA import cnn_model
 
-    model = cnn_model.bw_model()
+    model = cnn_model.Classifier()
+    model.load_bw_model()
 
 With our model loaded, we can classify any 50x50 image using the predict function.
 
 .. code-block:: python
 
-    prediction = models.predict(data, model, normalize=True)
+    prediction = model.predict(data, normalize=True)
 
 The output will either be 'DIFFUSE' or 'OTHER'. The input data can also be a 3-dimensional array containing multiple images.
+
+How did we build pyBIA?
+==================
+Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%20pyBIA.html>`_ to learn more about the training data, as well as the machine learning architecture and latest performance. The latest performance 
 
 
 Pages

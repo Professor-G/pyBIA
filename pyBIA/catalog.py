@@ -177,7 +177,7 @@ class Catalog:
             x, y = DAO(data, fwhm)
             #print('{} objects found!'.format(len(x)))
         """
-        if self.x is None: #Background approximation to create preliminary source positions
+        if self.x is None: #Background approximation 
             length = self.annulus_out*2*2. #The sub-array when padding will be be a square encapsulating the outer annuli
             if Nx < length or Ny < length: #Small image, no need to pad just take robust median
                 if self.bkg is None:

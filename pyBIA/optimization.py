@@ -49,7 +49,9 @@ class objective_cnn(object):
     """
 
     def __init__(self, data_x, data_y, img_num_channels=1, normalize=True, min_pixel=638,
-        max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=20, metric='loss'):
+        max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=20, metric='loss',
+        limit_search=True):
+
         self.data_x = data_x
         self.data_y = data_y
         self.img_num_channels = img_num_channels
@@ -65,48 +67,55 @@ class objective_cnn(object):
     def __call__(self, trial):
 
         clear_session()
-
-        batch_size = trial.suggest_int('batch_size', 2, 50)
-        lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
-        batch_norm = trial.suggest_categorical('batch_norm', [False, True])
-        momentum = trial.suggest_float('momentum', 0, 1, step=0.1)
-        decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
-        nesterov = trial.suggest_categorical('nesterov', [True, False])
-        loss = trial.suggest_categorical('loss', ['categorical_crossentropy', 'squared_hinge'])
-        padding = trial.suggest_categorical('padding', ['same', 'valid'])
-        dropout_1 = trial.suggest_float('dropout_1', 0, 1, step=0.1)
-        dropout_2 = trial.suggest_float('dropout_2', 0, 1, step=0.1)
-        activation_conv = trial.suggest_categorical('activation_conv', ['relu',  'sigmoid', 'tanh'])
-        activation_dense = trial.suggest_categorical('activation_dense', ['relu', 'sigmoid', 'tanh'])
-        maxpool_size = trial.suggest_int('maxpool_size', 1, 10)
-        maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
-        
         if self.metric == 'loss' or self.metric == 'val_loss':
             mode = 'min'
         elif self.metric == 'accuracy' or self.metric == 'val_accuracy':
             mode = 'max'
-            
+
+        if limit_search is False:
+            batch_size = trial.suggest_int('batch_size', 2, 50)
+            lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
+            batch_norm = trial.suggest_categorical('batch_norm', [False, True])
+            momentum = trial.suggest_float('momentum', 0, 1, step=0.1)
+            decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
+            nesterov = trial.suggest_categorical('nesterov', [True, False])
+            loss = trial.suggest_categorical('loss', ['categorical_crossentropy', 'squared_hinge'])
+            padding = trial.suggest_categorical('padding', ['same', 'valid'])
+            dropout_1 = trial.suggest_float('dropout_1', 0, 1, step=0.1)
+            dropout_2 = trial.suggest_float('dropout_2', 0, 1, step=0.1)
+            activation_conv = trial.suggest_categorical('activation_conv', ['relu',  'sigmoid', 'tanh'])
+            activation_dense = trial.suggest_categorical('activation_dense', ['relu', 'sigmoid', 'tanh'])
+            maxpool_size = trial.suggest_int('maxpool_size', 1, 10)
+            maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
+        else:
+            batch_size = trial.suggest_int('batch_size', 2, 50)
+            lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
+            loss = trial.suggest_categorical('loss', ['categorical_crossentropy', 'squared_hinge'])
+                
         if self.patience != 0:
             callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience), TFKerasPruningCallback(trial, monitor=self.metric),]
         else:
             callbacks = None
 
-        try:
+
+        if limit_search:
+            try:
+                model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
+                    batch_size=batch_size, lr=lr, batch_norm=batch_norm, momentum=momentum, decay=decay, nesterov=nesterov, 
+                    loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, padding=padding, dropout_1=dropout_1, 
+                    dropout_2=dropout_2, maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, early_stop_callback=callbacks, checkpoint=False)
+            except: 
+                print("Invalid hyperparameter combination, skipping trial.")
+                return 0.0
+        else:
             model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
-                batch_size=batch_size, lr=lr, batch_norm=batch_norm, momentum=momentum, decay=decay, nesterov=nesterov, 
-                loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, padding=padding, dropout_1=dropout_1, 
-                dropout_2=dropout_2, maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, early_stop_callback=callbacks, checkpoint=False)
-        except: #Invalid combination
-            print("Invalid hyperparameter combination, skipping trial.")
-            return 0.0
+                batch_size=batch_size, lr=lr, loss=loss, early_stop_callback=callbacks, checkpoint=False)
 
-        if self.val_X is not None:
-            final_score = history.history[self.metric][-1]
-        else:
-            final_score = history.history[self.metric][-1]
+        final_score = history.history[self.metric][-1]
 
-        if self.metric == 'val_loss' or self.metric == 'loss':
+        if self.metric == 'loss' or self.metric == 'val_loss':
             final_score = 1 - final_score
 
         return final_score
@@ -229,7 +238,7 @@ class objective_rf(object):
 
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, 
     img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000, val_X=None, val_Y=None, 
-    train_epochs=25, patience=5, metric='loss'):
+    train_epochs=25, patience=5, metric='loss', limit_search=True):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for
@@ -296,6 +305,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             is terminated. 
         metric (str): Assesment metric to use when both pruning and scoring the hyperparameter
             optimization trial.
+        limit_search (bool): If True the CNN optimization will search optimize only three hyperparameters,
+            the batch size, learning rate, and loss function. Defaulse to True.
             
     Returns:
         The first output is the classifier with the optimal hyperparameters.
@@ -424,7 +435,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
     else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
             val_X=val_X, val_Y=val_Y, train_epochs=train_epochs, patience=patience, metric=metric)
-        study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
+        study.optimize(objective, n_trials=n_iter, show_progress_bar=True, limit_search=limit_search)
         params = study.best_trial.params
 
     final_score = study.best_value

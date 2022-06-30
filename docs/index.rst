@@ -9,7 +9,7 @@ Welcome to pyBIA's documentation!
 pyBIA is an open-source program for detecting diffuse Lyman-alpha emission in the high redshift universe, using a combination of machine learning ensemble and convolutional neural network algorithms. The program tools have been coded for general application, check out this `example <https://pybia.readthedocs.io/en/latest/source/Examples.html>`_ to learn how you can use pyBIA to create your own machine learning classifier. 
 
 
-Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%20pyBIA.html>`_ to learn more about the machine learning architecture and latest performance.
+Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%20pyBIA.html>`_ to learn about the image classification architecture.
 
    
 Installation
@@ -66,7 +66,7 @@ If you have a 2D array, creating a catalog is quick and easy:
     cat = catalog.Catalog(data)
     cat.create(save_file=True)
 
-Parameters can be set to control background subtraction, source detection thresholds, and flux calculations. If error map is provided, the output catalog will contain the photometric error. The only accompanying attribute is the plot method, which will output two subplots, the source and the segmentation object:
+Parameters can be set to control background subtraction, source detection thresholds, and flux calculations. If error map is provided, the output catalog will contain the photometric error. The only accompanying method is `plot <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/catalog.html#Catalog.plot>`_, which will output two subplots, the source and the segmentation object. 
 
 .. figure:: _static/segm.png
     :align: center

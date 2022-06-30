@@ -7,10 +7,12 @@ Created on Thu Sep 16 22:40:39 2021
 """
 import os
 import numpy as np
+from pathlib import Path
 import matplotlib.pyplot as plt
 from warnings import warn
+import pkg_resources
 import joblib
-from pathlib import Path
+
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 from optuna.visualization.matplotlib import plot_optimization_history
 from tensorflow.keras.models import Sequential, save_model
@@ -19,6 +21,8 @@ from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.losses import categorical_crossentropy, SquaredHinge
 from tensorflow.keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2D, Flatten, BatchNormalization
 from tensorflow.keras.callbacks import ModelCheckpoint
+from keras.models import load_model
+
 from pyBIA.data_processing import process_class, create_training_set
 from pyBIA.optimization import hyper_opt
 
@@ -199,25 +203,25 @@ class Classifier:
         path += 'pyBIA_cnn_model/'
 
         try:
-            self.model = tf.keras.models.load_model(path+'Keras_Model.h5')
+            self.model = load_model(path+'Keras_Model.h5')
             model = 'model'
         except FileNotFoundError:
             model = ''
             pass
 
         try:
-            self.optimization_results = joblib.load(path+'Optimization_Results')
+            self.optimization_results = joblib.load(path+'HyperOpt_Results')
             optimization_results = 'optimization_results'
         except FileNotFoundError:
             optimization_results = '' 
             pass
 
         try:
-            self.optimization_results = joblib.load(path+'Best_Params')
+            self.best_params = joblib.load(path+'Best_Params')
             best_params = 'best_params'
         except FileNotFoundError:
             best_params = '' 
-            pass
+            pass        
 
         print('Successfully loaded the following class attributes: {}, {}, {}'.format(model, optimization_results, best_params))
         
@@ -305,13 +309,11 @@ class Classifier:
             The pyBIA CNN model used for classifying images in blue broadband surveys.
 
         """
-        import tensorflow as tf
-        from keras.models import load_model
-        import pkg_resources
+
 
         resource_package = __name__
         resource_path = '/'.join(('data', 'Bw_CNN_Model.h5'))
-        self.model = tf.keras.models.load_model(pkg_resources.resource_filename(resource_package, resource_path))
+        self.model = load_model(pkg_resources.resource_filename(resource_package, resource_path))
         print('Bw model successfully loaded.')
         print('Note: Input data when using this model must be 50x50.')
         return 

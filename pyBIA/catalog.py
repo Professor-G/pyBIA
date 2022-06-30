@@ -41,7 +41,7 @@ class Catalog:
             error (ndarray, optional): 2D array containing the rms error map.
             morph_params (bool, optional): If True, image segmentation is performed and
                 morphological parameters are computed. Defaults to True. 
-            kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
+            kernel_size (int): The size length of the square Gaussian filter kernel used to convolve 
                 the data. This length must be odd. Defaults to 21.
             nsig (float): The sigma detection limit. Objects brighter than nsig standard 
                 deviations from the background will be detected during segmentation. Defaults to 0.7.
@@ -82,28 +82,35 @@ class Catalog:
         self.kernel_size = kernel_size
         self.nsig = nsig
         self.deblend = deblend
-        self.obj_name = obj_name
-        self.field_name = field_name
-        self.flag = flag 
         self.aperture = aperture 
         self.annulus_in = annulus_in
         self.annulus_out = annulus_out
         self.kernel_size = kernel_size
         self.invert = invert 
         self.cat = cat
-        if self.cat is not None:
+        if cat is not None:
             try:
-                self.obj_name = np.array(self.cat.cat['obj_name'])
+                self.obj_name = np.array(cat['obj_name'])
             except:
+                self.obj_name = obj_name
                 pass
+
             try:
-                self.field_name = np.array(self.cat.cat['field_name'])
+                self.field_name = np.array(cat['field_name'])
             except:
+                self.field_name = field_name
                 pass
+                
             try:
-                self.flag = np.array(self.cat.cat['flag'])
+                self.flag = np.array(cat['flag'])
             except:
+                self.flag = flag
                 pass
+
+        elif self.cat is None:
+            self.obj_name = obj_name
+            self.field_name = field_name
+            self.flag = flag
 
         if isinstance(self.x, np.ndarray) is False:
             self.x = np.array(self.x)
@@ -231,22 +238,38 @@ class Catalog:
             flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
         return 
 
-    def plot(self, obj_name=None, name=''):
+    def plot(self, obj_name=None, index=None, name=''):
         """
         Outputs two subplots, the image and the segmentation object.
 
         This class method assumes data is background subtracted at this point, otherwise
         uses the plot_segm() function which can subtract the background.
 
+        Note:
+            If obj_name and index are both None, then the whole data array will be plotted.
+
+        Args:
+            obj_name (str, optional): Source name, only works if the dataframe contains an 'obj_name' column, otherwise
+                filter by index. Defaults to None.
+            index (int, optional): Catalog index of the source to plot.
+            name (str, optional): Title of the plot. 
+
+        Returns:
+            AxesImage.
+
         """
             
-        if obj_name is None:
+        if obj_name is None and index is None:
             median_bkg = float(self.cat['median_bkg']) if self.bkg != 0 else 0
             plot_segm(self.data, nsig=self.nsig, kernel_size=self.kernel_size, invert=self.invert, 
                 median_bkg=median_bkg, deblend=self.deblend, name=name)
         else:
             if len(self.cat.shape) == 2:
-                mask = np.where(self.cat['obj_name'] == obj_name)[0]
+                if obj_name is not None:
+                    mask = np.where(self.cat['obj_name'] == obj_name)[0]
+                else:
+                    mask = int(index)
+                    
                 data = self.cat.iloc[mask]
                 xpix, ypix, median_bkg = float(data['xpix']), float(data['ypix']), float(data['median_bkg'])
             else:

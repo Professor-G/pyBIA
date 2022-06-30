@@ -64,7 +64,7 @@ def crop_image(data, x, y, size=50, invert=False):
 
     return out
 
-def concat_channels(channel1, channel2, channel3=None):
+def concat_channels(channel1, channel2, channel3=None, channel4=None, channel5=None, channel6=None):
     """
     This function concatenates three 2D arrays to make a three channel matrix.
     Useful for image classification when using multiple filters.

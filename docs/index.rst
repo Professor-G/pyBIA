@@ -72,11 +72,8 @@ Parameters can be set to control background subtraction, source detection thresh
     :align: center
 |
 
-With a saved catalog, creating a ensemble machine learning engine is also quick and easy
 
-.. code-block:: python
-
-To laern about the engines pyBIA employs, check out the machine learning and the example pages.
+To learn about pyBIA's infrastructure, check out the machine learning and the example pages.
 
 
 Pages

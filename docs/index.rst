@@ -8,6 +8,9 @@ Welcome to pyBIA's documentation!
 
 pyBIA is an open-source program for detecting diffuse Lyman-alpha emission in the high redshift universe, using a combination of machine learning ensemble and convolutional neural network algorithms. The program tools have been coded for general application, check out this `example <https://pybia.readthedocs.io/en/latest/source/Examples.html>`_ to learn how you can use pyBIA to create your own machine learning classifier. 
 
+
+Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%20pyBIA.html>`_ to learn more about the machine learning architecture and latest performance.
+
    
 Installation
 ==================
@@ -29,7 +32,7 @@ You can also clone the development version:
 Importing pyBIA 
 ==================
 
-We have trained a Convolutional Neural Network using the high-level Keras API. Our model took ~3 days to train to a thousand epochs, and is included in the standard pyBIA installation. This classifier is called 'bw_model' as the DIFFUSE training sample includes diffuse objects in the blue broadband (see `Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_). More models for different bands will be added in the future.
+The primary engine pyBIA employs for source detecion is a deep Convolutional Neural Network (CNN), engineered using the high-level Keras API. Our CNN model took ~3 days to train to a thousand epochs, and is included in the standard pyBIA installation. This classifier is called 'bw_model' as the DIFFUSE training sample includes diffuse objects in the blue broadband (see `Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_). More models for different bands will be added in the future.
 
 .. code-block:: python
 
@@ -44,11 +47,36 @@ With our model loaded, we can classify any 50x50 image using the predict functio
 
     prediction = model.predict(data, normalize=True)
 
-The output will either be 'DIFFUSE' or 'OTHER'. The input data can also be a 3-dimensional array containing multiple images.
+The output will either be 'DIFFUSE' or 'OTHER'. The input data can also be a 3-dimensional array containing multiple images. 
 
-How did we build pyBIA?
+Functionality
 ==================
-Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%20pyBIA.html>`_ to learn more about the training data, as well as the machine learning architecture and latest performance. The latest performance 
+The program provides three main functionalities:
+
+-  Creating a catalog of astrophyscal objects
+-  Training a machine learning classifier with image moments
+-  Training a machine learning classifier with multi-band imaging
+
+If you have a 2D array, creating a catalog is quick and easy:
+
+.. code-block:: python
+
+    from pyBIA import catalog
+
+    cat = catalog.Catalog(data)
+    cat.create(save_file=True)
+
+Parameters can be set to control background subtraction, source detection thresholds, and flux calculations. If error map is provided, the output catalog will contain the photometric error. The only accompanying attribute is the plot method, which will output two subplots, the source and the segmentation object:
+
+.. figure:: _static/segm.png
+    :align: center
+|
+
+With a saved catalog, creating a ensemble machine learning engine is also quick and easy
+
+.. code-block:: python
+
+To laern about the engines pyBIA employs, check out the machine learning and the example pages.
 
 
 Pages

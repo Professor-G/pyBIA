@@ -55,9 +55,9 @@ The program provides three main functionalities:
 
 -  Creating a catalog of astrophyscal objects
 -  Training a machine learning classifier with image moments
--  Training a machine learning classifier with multi-band imaging
+-  Training a machine learning classifier with single or multi-band imaging (up to 6 filters!)
 
-If you have a 2D array, creating a catalog is quick and easy:
+If you have a 2D array, but no positions, creating a catalog is quick and easy:
 
 .. code-block:: python
 
@@ -66,7 +66,7 @@ If you have a 2D array, creating a catalog is quick and easy:
     cat = catalog.Catalog(data)
     cat.create(save_file=True)
 
-Parameters can be set to control background subtraction, source detection thresholds, and flux calculations. If error map is provided, the output catalog will contain the photometric error. The only accompanying method is `plot <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/catalog.html#Catalog.plot>`_, which will output two subplots, the source and the segmentation object. 
+X and Y ixel arguments can be input if source locations are known, and optional parameters can be set to control background subtraction, source detection thresholds, and flux calculations. If error map is provided, the output catalog will contain the photometric error. The only accompanying method is `plot <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/catalog.html#Catalog.plot>`_, which will output two subplots, the source and the segmentation of the specified object. 
 
 .. figure:: _static/segm.png
     :align: center

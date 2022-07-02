@@ -112,18 +112,16 @@ class Catalog:
             self.field_name = field_name
             self.flag = flag
 
-        if isinstance(self.x, np.ndarray) is False:
-            self.x = np.array(self.x)
-        if isinstance(self.y, np.ndarray) is False:
-            self.y = np.array(self.y)
-        if isinstance(self.obj_name, np.ndarray) is False:
-            self.obj_name = np.array(self.obj_name)
-        if isinstance(self.field_name, np.ndarray) is False:
-            self.field_name = np.array(self.field_name)
-        if isinstance(self.flag, np.ndarray) is False:
-            self.flag = np.array(self.flag)
-
-        Ny, Nx = self.data.shape
+        if isinstance(x, np.ndarray) is False and x is not None:
+            self.x = np.array(x)
+        if isinstance(y, np.ndarray) is False and y is not None:
+            self.y = np.array(y)
+        if isinstance(obj_name, np.ndarray) is False and obj_name is not None:
+            self.obj_name = np.array(obj_name)
+        if isinstance(field_name, np.ndarray) is False and field_name is not None:
+            self.field_name = np.array(field_name)
+        if isinstance(flag, np.ndarray) is False and flag is not None:
+            self.flag = np.array(flag)
 
     def create(self, save_file=True, path=None, filename=None):
         """
@@ -178,15 +176,13 @@ class Catalog:
                 raise ValueError("The two position arrays (x & y) must be the same size.")
         if self.invert == False:
             print('WARNING: If data is from .fits file you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.')
-        """
-        #Apply DAOFIND (Stetson 1987) to detect sources in the image
-        if x is None: 
-            x, y = DAO(data, fwhm)
-            #print('{} objects found!'.format(len(x)))
-        """
-        if self.x is None: #Background approximation 
+        
+        Ny, Nx = self.data.shape
+
+        if self.x is None: #Background approximation
+            print('Running source detection...')
             length = self.annulus_out*2*2. #The sub-array when padding will be be a square encapsulating the outer annuli
-            if Nx < length or Ny < length: #Small image, no need to pad just take robust median
+            if Nx < length or Ny < length: #Small image, no need to pad, just take robust median
                 if self.bkg is None:
                     self.data -= sigma_clipped_stats(self.data)[1] #Sigma clipped median
             else:
@@ -195,7 +191,11 @@ class Catalog:
 
             segm, convolved_data = segm_find(self.data, nsig=self.nsig, kernel_size=self.kernel_size, deblend=self.deblend)
             props = segmentation.SourceCatalog(self.data, segm, convolved_data=convolved_data)
-            self.x, self.y = props.centroid[0], props.centroid[1]
+            try:
+                self.x, self.y = props.centroid[:,0], props.centroid[:,1]
+            except:
+                self.x, self.y = props.centroid[0], props.centroid[1]
+            print('{} sources detected!'.format(len(self.x)))
          
         positions = []
         for i in range(len(self.x)):
@@ -260,9 +260,8 @@ class Catalog:
         """
             
         if obj_name is None and index is None:
-            median_bkg = float(self.cat['median_bkg']) if self.bkg != 0 else 0
             plot_segm(self.data, nsig=self.nsig, kernel_size=self.kernel_size, invert=self.invert, 
-                median_bkg=median_bkg, deblend=self.deblend, name=name)
+                median_bkg=self.bkg, deblend=self.deblend, name=name)
         else:
             if len(self.cat.shape) == 2:
                 if obj_name is not None:
@@ -275,7 +274,7 @@ class Catalog:
             else:
                 xpix, ypix, median_bkg = float(self.cat['xpix']), float(self.cat['ypix']), float(self.cat['median_bkg'])
 
-            plot_segm(self.data, xpix=xpix, ypix=ypix, median_bkg=median_bkg, nsig=self.nsig, 
+            plot_segm(self.data, xpix=xpix, ypix=ypix, median_bkg=self.bkg, nsig=self.nsig, 
                 kernel_size=self.kernel_size, invert=self.invert, deblend=self.deblend, name=name)
         return
 
@@ -369,7 +368,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=
     progess_bar.finish()
 
     if -999 in prop_list:
-        warn('At least one object could not be detected in segmentation... perhaps the object is too faint. This object is still in the catalog, the morphological features have been set to -999.')
+        print('WARNING: At least one object could not be detected in segmentation... perhaps the object is too faint. This object is still in the catalog, the morphological features have been set to -999.')
     return np.array(prop_list, dtype=object)
 
 def make_table(props):
@@ -394,6 +393,7 @@ def make_table(props):
         'perimeter', 'segment_flux', 'semimajor_sigma', 'semiminor_sigma']
 
     table = []
+    print('Writing catalog...')
     for i in range(len(props)):
         morph_feats = []
         try:
@@ -638,7 +638,7 @@ def subtract_background(data, length=150):
         x,y = positions[i][0], positions[i][1]
         background  = sigma_clipped_stats(padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x])[1] #Sigma clipped median                        
         padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x] -= background
-    
+
     data = padded_matrix[:-int(pad_x),:-int(pad_y)] #Slice away the padding 
     return data
 
@@ -712,7 +712,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
         AxesImage.
 
     """
-    if median_bkg != 0:
+    if median_bkg != 0 and median_bkg is not None:
         if isinstance(median_bkg, np.ndarray) is False:
             median_bkg = np.array(median_bkg)
 
@@ -748,14 +748,15 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
     try:
         len(median_bkg)
     except TypeError:
-        median_bkg = [median_bkg]
-
+        if median_bkg is not None:
+            median_bkg = [median_bkg]
+            
     for i in range(len(xpix)):
         if size == data.shape[1]:
             new_data = data
         else: 
             new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
-        
+        print(median_bkg is None)
         if median_bkg is None: #Hard coding annuli size, inner:25 -> outer:35
             if new_data.shape[0] > 200 and len(xpix) == 1:
                 print('Calculating background in local regions, this will take a while... if data is background subtracted set median_bkg=0.')
@@ -768,7 +769,6 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
             new_data -= median_bkg 
         else:
             new_data -= median_bkg[i]
-        
 
         segm, convolved_data = segm_find(new_data, nsig=nsig, kernel_size=kernel_size, deblend=deblend)
         props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)

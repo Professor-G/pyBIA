@@ -66,16 +66,10 @@ def crop_image(data, x, y, size=50, invert=False):
 
 def concat_channels(channel1, channel2, channel3=None, channel4=None, channel5=None, channel6=None):
     """
-    This function concatenates three 2D arrays to make a three channel matrix.
-    Useful for image classification when using multiple filters.
+    This function concatenates multiple 2D arrays, useful for image classification when using multiple filters.
 
     Can combine SDSS g,r,i for example, to make one 3D image. Order at which
-    they are stacked must be conistent if data is input for classification.
-
-    Note:
-        pyBIA version 1 contains a trained CNN model that made use of
-        only a single band, although it is possible to also train
-        a CNN model using multiple bands if the data availability allows.
+    they are stacked must be conistent when data is input for classification.
     
     Args:
         Channel1 (array): 2D array of the first channel.

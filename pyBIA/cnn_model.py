@@ -316,8 +316,8 @@ class Classifier:
         return 
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
-        min_pixel=638, max_pixel=3000, val_X=None, val_Y=None, epochs=100, 
-        batch_size=32, lr=0.0001, batch_norm=True, momentum=0.9, decay=0.0005, 
+        min_pixel=0, max_pixel=3000, val_X=None, val_Y=None, epochs=100, 
+        batch_size=32, lr=0.001, batch_norm=True, momentum=0.9, decay=0.000083, 
         nesterov=False, loss='categorical_crossentropy', activation_conv='relu', 
         activation_dense='tanh', padding='same', dropout_1=0.5, dropout_2=0.5, 
         pooling=True, maxpool_size=3, maxpool_stride=2, early_stop_callback=None, 
@@ -337,7 +337,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             to be background-subtracted. The max_pixel must be adequately brighter
             than the brighest expected target object. In this example we expected
             the high redshift Lyman-alpha nebulae to appear diffuse and less bright,
-            so anything brighter than max_pixel=2000 can be categorized as too bright 
+            so anything brighter than max_pixel=3000 can be categorized as too bright 
             to be a candidate source.
         
         Args:

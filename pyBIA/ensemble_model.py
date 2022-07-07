@@ -28,7 +28,7 @@ from pyBIA.optimization import hyper_opt, borutashap_opt, KNN_imputation, MissFo
 from xgboost import XGBClassifier
 import scikitplot as skplt
 
-class classifier:
+class Classifier:
     """
     Creates a machine learning classifier object.
     The built-in methods can be used to optimize the engine
@@ -77,7 +77,7 @@ class classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, data_x, data_y, clf='rf', optimize=True, impute=True, imp_method='KNN', 
+    def __init__(self, data_x=None, data_y=None, clf='rf', optimize=True, impute=True, imp_method='KNN', 
         n_iter=25, boruta_trials=50, balance=True):
         self.data_x = data_x
         self.data_y = data_y
@@ -284,8 +284,8 @@ class classifier:
         Returns:
             2D array containing the classes and the corresponding probability prediction
         """
-    
-        classes = np.unique(self.data_y)
+
+        classes = self.model.classes_
         output = []
 
         if self.imputer is None and self.feats_to_use is None:
@@ -305,6 +305,7 @@ class classifier:
                 data = self.imputer.transform(data)
 
             proba = self.model.predict_proba(data)
+
             for i in range(len(proba)):
                 index = np.argmax(proba[i])
                 output.append([classes[index], proba[i][index]])

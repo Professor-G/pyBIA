@@ -246,10 +246,7 @@ class Classifier:
             The class prediction(s), either 'DIFFUSE' or 'OTHER'.
 
         """
-        if data.shape[-1] != 50:
-            raise ValueError('Data size is invalid. Each image must be a 50x50 2D array, resize the array \
-                using the crop_image function in the data_processing module.')
-
+      
         data = process_class(data, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, img_num_channels=self.img_num_channels)
         predictions = self.model.predict(data)
 

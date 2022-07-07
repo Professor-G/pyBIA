@@ -179,24 +179,48 @@ class Catalog:
         
         Ny, Nx = self.data.shape
 
-        if self.x is None: #Background approximation
+        if self.x is None: #Background subtraction and source detection
+            if self.nsig < 1 and self.deblend == False:
+                warn('Low nsig warning, for proper source detection do an initial run with a higher nsig, or set deblend=True.')
             print('Running source detection...')
             length = self.annulus_out*2*2. #The sub-array when padding will be be a square encapsulating the outer annuli
             if Nx < length or Ny < length: #Small image, no need to pad, just take robust median
                 if self.bkg is None:
-                    self.data -= sigma_clipped_stats(self.data)[1] #Sigma clipped median
+                    data = self.data - sigma_clipped_stats(self.data)[1] #Sigma clipped median
             else:
                 if self.bkg is None:
-                    self.data = subtract_background(self.data, length=length)
+                    data = subtract_background(self.data, length=length)
 
-            segm, convolved_data = segm_find(self.data, nsig=self.nsig, kernel_size=self.kernel_size, deblend=self.deblend)
-            props = segmentation.SourceCatalog(self.data, segm, convolved_data=convolved_data)
+            segm, convolved_data = segm_find(data, nsig=self.nsig, kernel_size=self.kernel_size, deblend=self.deblend)
+            props = segmentation.SourceCatalog(data, segm, convolved_data=convolved_data)
             try:
                 self.x, self.y = props.centroid[:,0], props.centroid[:,1]
             except:
                 self.x, self.y = props.centroid[0], props.centroid[1]
             print('{} sources detected!'.format(len(self.x)))
-         
+
+            positions = []
+            for i in range(len(self.x)):
+                positions.append((self.x[i], self.y[i]))
+
+            aper_stats = ApertureStats(self.data, CircularAperture(positions, r=self.aperture), error=self.error)
+            if self.error is None:
+                flux_err = None 
+            else:
+                flux_err = aper_stats.sum_err
+
+            if self.morph_params == True:
+                prop_list = morph_parameters(data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=None, 
+                    invert=self.invert, deblend=self.deblend)
+                tbl = make_table(prop_list)
+                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
+                    flux=aper_stats.sum, flux_err=flux_err, median_bkg=None, save=save_file, path=path, filename=filename)
+                return 
+
+            self.cat = make_dataframe(table=None, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
+                flux=aper_stats.sum, flux_err=flux_err, median_bkg=None, save=save_file, path=path, filename=filename)
+            return 
+
         positions = []
         for i in range(len(self.x)):
             positions.append((self.x[i], self.y[i]))
@@ -227,7 +251,7 @@ class Catalog:
             return 
            
         if self.morph_params == True:
-            prop_list = prop_list = morph_parameters(self.data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
+            prop_list = morph_parameters(self.data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
                     invert=self.invert, deblend=self.deblend)
             tbl = make_table(prop_list)
             self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
@@ -238,7 +262,7 @@ class Catalog:
             flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
         return 
 
-    def plot(self, obj_name=None, index=None, name=''):
+    def plot(self, index=None, obj_name=None, name=''):
         """
         Outputs two subplots, the image and the segmentation object.
 
@@ -249,17 +273,16 @@ class Catalog:
             If obj_name and index are both None, then the whole data array will be plotted.
 
         Args:
+            index (int, optional): Catalog index of the source to plot. Defaults to None.
             obj_name (str, optional): Source name, only works if the dataframe contains an 'obj_name' column, otherwise
                 filter by index. Defaults to None.
-            index (int, optional): Catalog index of the source to plot.
             name (str, optional): Title of the plot. 
 
         Returns:
             AxesImage.
-
         """
             
-        if obj_name is None and index is None:
+        if index is None and obj_name is None:
             plot_segm(self.data, nsig=self.nsig, kernel_size=self.kernel_size, invert=self.invert, 
                 median_bkg=self.bkg, deblend=self.deblend, name=name)
         else:
@@ -270,9 +293,9 @@ class Catalog:
                     mask = int(index)
                     
                 data = self.cat.iloc[mask]
-                xpix, ypix, median_bkg = float(data['xpix']), float(data['ypix']), float(data['median_bkg'])
+                xpix, ypix = float(data['xpix']), float(data['ypix'])
             else:
-                xpix, ypix, median_bkg = float(self.cat['xpix']), float(self.cat['ypix']), float(self.cat['median_bkg'])
+                xpix, ypix = float(self.cat['xpix']), float(self.cat['ypix'])
 
             plot_segm(self.data, xpix=xpix, ypix=ypix, median_bkg=self.bkg, nsig=self.nsig, 
                 kernel_size=self.kernel_size, invert=self.invert, deblend=self.deblend, name=name)
@@ -639,7 +662,7 @@ def subtract_background(data, length=150):
         background  = sigma_clipped_stats(padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x])[1] #Sigma clipped median                        
         padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x] -= background
 
-    data = padded_matrix[:-int(pad_x),:-int(pad_y)] #Slice away the padding 
+    data = padded_matrix[:-int(pad_y),:-int(pad_x)] #Slice away the padding 
     return data
 
 def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, kernel_size=21, invert=False,
@@ -756,7 +779,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
             new_data = data
         else: 
             new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
-        print(median_bkg is None)
+
         if median_bkg is None: #Hard coding annuli size, inner:25 -> outer:35
             if new_data.shape[0] > 200 and len(xpix) == 1:
                 print('Calculating background in local regions, this will take a while... if data is background subtracted set median_bkg=0.')

@@ -71,7 +71,7 @@ class Catalog:
 
     def __init__(self, data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0.7, deblend=False, 
         obj_name=None, field_name=None, flag=None, aperture=15, annulus_in=20, annulus_out=35, kernel_size=21,
-        invert=False, save_file=True, path=None, filename=None, cat=None):
+        invert=False, cat=None):
 
         self.data = data 
         self.x = x

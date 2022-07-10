@@ -187,9 +187,13 @@ class Catalog:
             if Nx < length or Ny < length: #Small image, no need to pad, just take robust median
                 if self.bkg is None:
                     data = self.data - sigma_clipped_stats(self.data)[1] #Sigma clipped median
+                elif self.bkg == 0:
+                    data = self.data
             else:
                 if self.bkg is None:
                     data = subtract_background(self.data, length=length)
+                elif self.bkg == 0:
+                    data = self.data 
 
             segm, convolved_data = segm_find(data, nsig=self.nsig, kernel_size=self.kernel_size, deblend=self.deblend)
             props = segmentation.SourceCatalog(data, segm, convolved_data=convolved_data)

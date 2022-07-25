@@ -63,6 +63,7 @@ class objective_cnn(object):
         self.train_epochs = train_epochs
         self.patience = patience 
         self.metric = metric 
+        self.limit_search = limit_search
             
     def __call__(self, trial):
 
@@ -72,7 +73,7 @@ class objective_cnn(object):
         elif self.metric == 'accuracy' or self.metric == 'val_accuracy':
             mode = 'max'
 
-        if limit_search is False:
+        if self.limit_search is False:
             batch_size = trial.suggest_int('batch_size', 2, 50)
             lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
             batch_norm = trial.suggest_categorical('batch_norm', [False, True])
@@ -89,16 +90,18 @@ class objective_cnn(object):
             maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
         else:
             batch_size = trial.suggest_int('batch_size', 2, 50)
-            lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
-            loss = trial.suggest_categorical('loss', ['categorical_crossentropy', 'squared_hinge'])
-                
+            lr = trial.suggest_float('lr', 1e-5, 0.1, step=0.05)
+            decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
+            loss = trial.suggest_categorical('loss', ['categorical_crossentropy'])
+            maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
+            maxpool_size = trial.suggest_int('maxpool_size', 1, 10)
+
         if self.patience != 0:
             callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience), TFKerasPruningCallback(trial, monitor=self.metric),]
         else:
             callbacks = None
 
-
-        if limit_search:
+        if self.limit_search is False:
             try:
                 model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
@@ -111,7 +114,8 @@ class objective_cnn(object):
         else:
             model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
-                batch_size=batch_size, lr=lr, loss=loss, early_stop_callback=callbacks, checkpoint=False)
+                batch_size=batch_size, lr=lr, decay=decay, loss=loss, maxpool_stride=maxpool_stride, maxpool_size=maxpool_size, early_stop_callback=callbacks, 
+                checkpoint=False)
 
         final_score = history.history[self.metric][-1]
 
@@ -434,8 +438,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
        
     else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
-            val_X=val_X, val_Y=val_Y, train_epochs=train_epochs, patience=patience, metric=metric)
-        study.optimize(objective, n_trials=n_iter, show_progress_bar=True, limit_search=limit_search)
+            val_X=val_X, val_Y=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, limit_search=limit_search)
+        study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
         params = study.best_trial.params
 
     final_score = study.best_value

@@ -6,14 +6,13 @@ Created on Thu Sep 16 22:40:39 2021
 @author: daniel
 """
 import os
-import numpy as np
 from pathlib import Path
-import matplotlib.pyplot as plt
 from warnings import warn
+import matplotlib.pyplot as plt
+import numpy as np
 import pkg_resources
 import joblib
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 from optuna.visualization.matplotlib import plot_optimization_history
 from tensorflow.keras.models import Sequential, save_model
 from tensorflow.keras.initializers import VarianceScaling
@@ -23,8 +22,10 @@ from tensorflow.keras.layers import Activation, Dense, Dropout, Conv2D, MaxPool2
 from tensorflow.keras.callbacks import ModelCheckpoint
 from keras.models import load_model
 
+os.environ['CUDA_VISIBLE_DEVICES'], os.environ['TF_CPP_MIN_LOG_LEVEL']= '-1', '3'
 from pyBIA.data_processing import process_class, create_training_set
 from pyBIA import optimization
+
 
 class Classifier:
     """
@@ -115,10 +116,10 @@ class Classifier:
             max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, train_epochs=self.train_epochs, patience=self.patience, limit_search=self.limit_search)
 
         print("Fitting and returning final model...")
-        if limit_search:
+        if self.limit_search:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
-                lr=self.best_params['lr'], loss=self.best_params['loss'])
+                lr=self.best_params['lr'], decay=self.best_params['decay'], maxpool_stride=self.best_params['maxpool_stride'], loss=self.best_params['loss'])
         else:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
@@ -318,7 +319,7 @@ class Classifier:
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
         min_pixel=0, max_pixel=3000, val_X=None, val_Y=None, epochs=100, 
         batch_size=32, lr=0.001, batch_norm=True, momentum=0.9, decay=0.000083, 
-        nesterov=False, loss='categorical_crossentropy', activation_conv='relu', 
+        nesterov=True, loss='categorical_crossentropy', activation_conv='relu', 
         activation_dense='tanh', padding='same', dropout_1=0.5, dropout_2=0.5, 
         pooling=True, maxpool_size=3, maxpool_stride=2, early_stop_callback=None, 
         checkpoint=True):

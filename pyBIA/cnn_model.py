@@ -26,7 +26,6 @@ os.environ['CUDA_VISIBLE_DEVICES'], os.environ['TF_CPP_MIN_LOG_LEVEL']= '-1', '3
 from pyBIA.data_processing import process_class, create_training_set
 from pyBIA import optimization
 
-
 class Classifier:
     """
     Creates and trains the convolutional neural network. 
@@ -98,11 +97,10 @@ class Classifier:
 
     def create(self):
         """
-        Creates the machine learning engine, current options are either a
-        Random Forest, XGBoost, or a Neural Network classifier. 
+        Creates the CNN machine learning engine.
         
         Returns:
-            Trained and optimized classifier.
+            Trained classifier.
         """
         
         if self.optimize is False:
@@ -123,11 +121,10 @@ class Classifier:
         else:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
-                lr=self.best_params['lr'], batch_norm=self.best_params['batch_norm'], momentum=self.best_params['momentum'],
-                decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], loss=self.best_params['loss'],
-                padding=self.best_params['padding'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
+                lr=self.best_params['lr'], momentum=self.best_params['momentum'], decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], 
+                loss=self.best_params['loss'], padding=self.best_params['padding'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
                 activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'],
-                maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride']) #params
+                maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride']) 
             
         return 
 
@@ -308,7 +305,6 @@ class Classifier:
 
         """
 
-
         resource_package = __name__
         resource_path = '/'.join(('data', 'Bw_CNN_Model.h5'))
         self.model = load_model(pkg_resources.resource_filename(resource_package, resource_path))
@@ -318,11 +314,10 @@ class Classifier:
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
         min_pixel=0, max_pixel=3000, val_X=None, val_Y=None, epochs=100, 
-        batch_size=32, lr=0.001, batch_norm=True, momentum=0.9, decay=0.000083, 
-        nesterov=True, loss='categorical_crossentropy', activation_conv='relu', 
-        activation_dense='tanh', padding='same', dropout_1=0.5, dropout_2=0.5, 
-        pooling=True, maxpool_size=3, maxpool_stride=2, early_stop_callback=None, 
-        checkpoint=True):
+        batch_size=32, lr=0.001, momentum=0.9, decay=0.000083, nesterov=True, 
+        loss='categorical_crossentropy', activation_conv='relu', activation_dense='tanh', 
+        padding='same', dropout_1=0.5, dropout_2=0.5, pooling=True, maxpool_size=3, 
+        maxpool_stride=2, early_stop_callback=None, checkpoint=True):
         """
         The CNN model infrastructure presented by the 2012 ImageNet Large Scale 
         Visual Recognition Challenge, AlexNet. Parameters were adapted for
@@ -361,9 +356,6 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             batch_size (int): The size of each sub-sample used during the training
                 epoch. Large batches are likely to get stuck in local minima. Defaults to 32.
             lr (float): Learning rate, the rate at which the model updates the gradient. Defaults to 0.0001
-            batch_norm (bool): If False, batch normalization after each max pooling layer
-                is disabled. Defaults to True.
-                Note: If set to True it might be best also set dropout=0. See: https://arxiv.org/abs/1502.03167
             momentum (float): Momentum is a float greater than 0 that accelerates gradient descent. Defaults to 0.9.
             decay (float): The rate of learning rate decay applied after each epoch. Defaults to 0.0005. It is recommended
                 to set decay to the learning rate divded by the total number of epochs.
@@ -377,10 +369,8 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
                 zero-value padding around the boundary, ensuring even convolutional steps across each dimension.
             dropout_1 (float): Droupout rate after the first dense layer. This is the percentage of dense neurons
                 that are turned off at each epoch. This prevents inter-neuron depedency, and thus overfitting. 
-                Note: If batch_norm=True, it might be best to disable droput. See: https://arxiv.org/abs/1502.03167
             dropout_2 (float): Droupout rate after the second dense layer. This is the percentage of dense neurons
                 that are turned off at each epoch. This prevents inter-neuron depedency, and thus overfitting. 
-                Note: If batch_norm=True, it might be best to disable droput. See: https://arxiv.org/abs/1502.03167
             pooling (bool): True to enable max pooling, false to disable. 
                 Note: Max pooling can result in loss of positional information, it computation allows
                 setting pooling=False may yield more robust accuracy.
@@ -389,6 +379,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
                 to None. Should only be used during optimization, refer to pyBIA.optimization.objective_cnn().
             checkpoint (bool, optional): If False no checkpoint will be saved. Defaults to True.
+
         Example:
             To use a validation dataset when training the model, the val_X and val_Y
             parameters must be input. The val_X is a 3D matrix containing all the images, and
@@ -434,7 +425,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             if len(val_X) != len(val_Y):
                 raise ValueError("Size of validation data and validation labels must be the same.")
         if batch_size < 16:
-            warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate, otherwise set batch_norm=False.", stacklevel=2)
+            warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.", stacklevel=2)
         
         img_width = blob_data[0].shape[0]
         img_height = blob_data[0].shape[1]
@@ -467,15 +458,13 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
                          padding=padding, kernel_initializer=uniform_scaling))
         if pooling:
             model.add(MaxPool2D(pool_size=maxpool_size, strides=maxpool_stride, padding=padding))
-        if batch_norm:
-            model.add(BatchNormalization())
+        model.add(BatchNormalization())
 
         model.add(Conv2D(256, 5, activation=activation_conv, padding=padding,
                          kernel_initializer=uniform_scaling))
         if pooling:
             model.add(MaxPool2D(pool_size=maxpool_size, strides=maxpool_stride, padding=padding))
-        if batch_norm:
-            model.add(BatchNormalization())
+        model.add(BatchNormalization())
 
         model.add(Conv2D(384, 3, activation=activation_conv, padding=padding,
                          kernel_initializer=uniform_scaling))
@@ -485,8 +474,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
                          kernel_initializer=uniform_scaling))
         if pooling:
             model.add(MaxPool2D(pool_size=maxpool_size, strides=maxpool_stride, padding=padding))
-        if batch_norm:
-            model.add(BatchNormalization())
+        model.add(BatchNormalization())
 
         model.add(Flatten())
         model.add(Dense(4096, activation=activation_dense,

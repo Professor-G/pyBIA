@@ -76,7 +76,6 @@ class objective_cnn(object):
         if self.limit_search is False:
             batch_size = trial.suggest_int('batch_size', 2, 50)
             lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
-            batch_norm = trial.suggest_categorical('batch_norm', [False, True])
             momentum = trial.suggest_float('momentum', 0, 1, step=0.1)
             decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
             nesterov = trial.suggest_categorical('nesterov', [True, False])
@@ -105,16 +104,16 @@ class objective_cnn(object):
             try:
                 model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
-                    batch_size=batch_size, lr=lr, batch_norm=batch_norm, momentum=momentum, decay=decay, nesterov=nesterov, 
-                    loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, padding=padding, dropout_1=dropout_1, 
-                    dropout_2=dropout_2, maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, early_stop_callback=callbacks, checkpoint=False)
+                    batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, loss=loss, activation_conv=activation_conv, 
+                    activation_dense=activation_dense, padding=padding, dropout_1=dropout_1, dropout_2=dropout_2, maxpool_size=maxpool_size, 
+                    maxpool_stride=maxpool_stride, early_stop_callback=callbacks, checkpoint=False)
             except: 
                 print("Invalid hyperparameter combination, skipping trial.")
                 return 0.0
         else:
             model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
-                batch_size=batch_size, lr=lr, decay=decay, loss=loss, maxpool_stride=maxpool_stride, maxpool_size=maxpool_size, early_stop_callback=callbacks, 
+                batch_size=batch_size, lr=lr, decay=decay, loss=loss, maxpool_stride=maxpool_stride, early_stop_callback=callbacks, 
                 checkpoint=False)
 
         final_score = history.history[self.metric][-1]
@@ -337,7 +336,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
     elif clf == 'cnn':
         pass 
     else:
-        raise ValueError('clf argument must either be "rf", "nn", or "xgb".')
+        raise ValueError('clf argument must either be "rf", "nn", or "xgb", or "cnn".')
 
     if clf != 'cnn':
         cv = cross_validate(model_0, data_x, data_y, cv=3)

@@ -502,9 +502,9 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             callbacks_list.append(early_stop_callback)
 
         if val_X is None:
-            history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=2)
+            history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=1)
         else:
-            history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=2)
+            history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=1)
 
         return model, history
 

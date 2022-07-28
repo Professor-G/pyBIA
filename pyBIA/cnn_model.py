@@ -117,14 +117,14 @@ class Classifier:
         if self.limit_search:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
-                lr=self.best_params['lr'], decay=self.best_params['decay'], maxpool_stride=self.best_params['maxpool_stride'], loss=self.best_params['loss'])
+                lr=self.best_params['lr'], decay=self.best_params['decay'], maxpool_stride=self.best_params['maxpool_stride'], loss=self.best_params['loss'], 
+                padding=self.best_params['padding'])
         else:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
                 lr=self.best_params['lr'], momentum=self.best_params['momentum'], decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], 
-                loss=self.best_params['loss'], padding=self.best_params['padding'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
-                activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'],
-                maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride']) 
+                loss=self.best_params['loss'], padding=self.best_params['padding'], dropout=self.best_params['dropout'], activation_conv=self.best_params['activation_conv'], 
+                activation_dense=self.best_params['activation_dense'], maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride']) 
             
         return 
 
@@ -315,9 +315,9 @@ class Classifier:
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
         min_pixel=0, max_pixel=3000, val_X=None, val_Y=None, epochs=100, 
         batch_size=32, lr=0.001, momentum=0.9, decay=0.000083, nesterov=True, 
-        loss='categorical_crossentropy', activation_conv='relu', activation_dense='tanh', 
-        padding='same', dropout_1=0.5, dropout_2=0.5, pooling=True, maxpool_size=3, 
-        maxpool_stride=2, early_stop_callback=None, checkpoint=True):
+        loss='categorical_crossentropy', activation_conv='relu', activation_dense='relu', 
+        padding='same', dropout=0.5, pooling=True, maxpool_size=3, maxpool_stride=2, 
+        early_stop_callback=None, checkpoint=True):
         """
         The CNN model infrastructure presented by the 2012 ImageNet Large Scale 
         Visual Recognition Challenge, AlexNet. Parameters were adapted for
@@ -367,9 +367,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             padding (str): Either 'same' or 'valid'. When set to 'valid', the dimensions reduce as the boundary 
                 that doesn't make it within even convolutions get cuts off. Defaults to 'same', which applies
                 zero-value padding around the boundary, ensuring even convolutional steps across each dimension.
-            dropout_1 (float): Droupout rate after the first dense layer. This is the percentage of dense neurons
-                that are turned off at each epoch. This prevents inter-neuron depedency, and thus overfitting. 
-            dropout_2 (float): Droupout rate after the second dense layer. This is the percentage of dense neurons
+            dropout (float): Droupout rate after the dense layers. This is the percentage of dense neurons
                 that are turned off at each epoch. This prevents inter-neuron depedency, and thus overfitting. 
             pooling (bool): True to enable max pooling, false to disable. 
                 Note: Max pooling can result in loss of positional information, it computation allows
@@ -454,6 +452,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
         # Model configuration
         model = Sequential()
 
+        #Convolutional layers
         model.add(Conv2D(96, 11, strides=4, activation=activation_conv, input_shape=input_shape,
                          padding=padding, kernel_initializer=uniform_scaling))
         if pooling:
@@ -468,21 +467,26 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
 
         model.add(Conv2D(384, 3, activation=activation_conv, padding=padding,
                          kernel_initializer=uniform_scaling))
+        model.add(BatchNormalization())
         model.add(Conv2D(384, 3, activation=activation_conv, padding=padding,
                          kernel_initializer=uniform_scaling))
+        model.add(BatchNormalization())
         model.add(Conv2D(256, 3, activation=activation_conv, padding=padding,
                          kernel_initializer=uniform_scaling))
         if pooling:
             model.add(MaxPool2D(pool_size=maxpool_size, strides=maxpool_stride, padding=padding))
         model.add(BatchNormalization())
 
+        #FCC
         model.add(Flatten())
         model.add(Dense(4096, activation=activation_dense,
                         kernel_initializer='TruncatedNormal'))
-        model.add(Dropout(dropout_1))
+        model.add(Dropout(dropout))
         model.add(Dense(4096, activation=activation_dense,
                         kernel_initializer='TruncatedNormal'))
-        model.add(Dropout(dropout_2))
+        model.add(Dropout(dropout))
+
+        #Output layer
         model.add(Dense(num_classes, activation='softmax',
                         kernel_initializer='TruncatedNormal'))
 

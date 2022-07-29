@@ -80,19 +80,40 @@ class objective_cnn(object):
             decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
             nesterov = trial.suggest_categorical('nesterov', [True, False])
             loss = trial.suggest_categorical('loss', ['categorical_crossentropy', 'squared_hinge'])
-            padding = trial.suggest_categorical('padding', ['same', 'valid'])
-            dropout = trial.suggest_float('dropout', 0, 1, step=0.1)
+            dropout = trial.suggest_float('dropout', 0, 0.5, step=0.05)
             activation_conv = trial.suggest_categorical('activation_conv', ['relu',  'sigmoid', 'tanh'])
             activation_dense = trial.suggest_categorical('activation_dense', ['relu', 'sigmoid', 'tanh'])
-            maxpool_size = trial.suggest_int('maxpool_size', 1, 10)
-            maxpool_stride = trial.suggest_int('maxpool_stride', 1, 5)
+            maxpool_size = trial.suggest_int('maxpool_size', 3, 10)
+            maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
+            filter_1 = trial.suggest_int('filter_1', 12, 408, step=12)
+            filter_size_1 = trial.suggest_int('filter_size_1', 1, 11, step=2)
+            strides_1 = trial.suggest_int('strides_1', 1, 10)
+            filter_2 = trial.suggest_int('filter_2', 12, 408, step=12)
+            filter_size_2 = trial.suggest_int('filter_size_2', 1, 11, step=2)
+            filter_3 = trial.suggest_int('filter_3', 12, 408, step=12)
+            filter_size_3 = trial.suggest_int('filter_size_3', 1, 11, step=2)
+            filter_4 = trial.suggest_int('filter_4', 12, 408, step=12)
+            filter_size_4 = trial.suggest_int('filter_size_4', 1, 11, step=2)
+            filter_5 = trial.suggest_int('filter_5', 12, 408, step=12)
+            filter_size_5 = trial.suggest_int('filter_size_5', 1, 11, step=2)
+
         else:
-            batch_size = trial.suggest_int('batch_size', 2, 100)
-            lr = trial.suggest_float('lr', 1e-5, 0.1, step=0.05)
+            batch_size = trial.suggest_int('batch_size', 16, 100)
+            lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
             decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
-            loss = trial.suggest_categorical('loss', ['categorical_crossentropy'])
-            maxpool_stride = trial.suggest_int('maxpool_stride', 1, 5)
-            padding = trial.suggest_categorical('padding', ['same', 'valid'])
+            maxpool_size = trial.suggest_int('maxpool_size', 3, 10)
+            maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
+            filter_1 = trial.suggest_int('filter_1', 12, 408, step=12)
+            filter_size_1 = trial.suggest_int('filter_size_1', 1, 11, step=2)
+            strides_1 = trial.suggest_int('strides_1', 1, 10)
+            filter_2 = trial.suggest_int('filter_2', 12, 408, step=12)
+            filter_size_2 = trial.suggest_int('filter_size_2', 1, 11, step=2)
+            filter_3 = trial.suggest_int('filter_3', 12, 408, step=12)
+            filter_size_3 = trial.suggest_int('filter_size_3', 1, 11, step=2)
+            filter_4 = trial.suggest_int('filter_4', 12, 408, step=12)
+            filter_size_4 = trial.suggest_int('filter_size_4', 1, 11, step=2)
+            filter_5 = trial.suggest_int('filter_5', 12, 408, step=12)
+            filter_size_5 = trial.suggest_int('filter_size_5', 1, 11, step=2)
 
         if self.patience != 0:
             callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience), TFKerasPruningCallback(trial, monitor=self.metric),]
@@ -104,16 +125,18 @@ class objective_cnn(object):
                 model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
                     batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, loss=loss, activation_conv=activation_conv, 
-                    activation_dense=activation_dense, padding=padding, dropout=dropout, maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, 
-                    early_stop_callback=callbacks, checkpoint=False)
+                    activation_dense=activation_dense, dropout=dropout, maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, filter_1=filter_1,
+                    filter_size_1=filter_size_1, strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, filter_3=filter_3, filter_size_3=filter_size_3,
+                    filter_4=filter_4, filter_size_4=filter_size_4, filter_5=filter_5, filter_size_5=filter_size_5, early_stop_callback=callbacks, checkpoint=False)
             except: 
                 print("Invalid hyperparameter combination, skipping trial.")
                 return 0.0
         else:
             model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
-                batch_size=batch_size, lr=lr, decay=decay, loss=loss, maxpool_stride=maxpool_stride, padding=padding, early_stop_callback=callbacks, 
-                checkpoint=False)
+                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, batch_size=batch_size, 
+                lr=lr, decay=decay,  maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, 
+                filter_2=filter_2, filter_size_2=filter_size_2, filter_3=filter_3, filter_size_3=filter_size_3, filter_4=filter_4, filter_size_4=filter_size_4, 
+                filter_5=filter_5, filter_size_5=filter_size_5, early_stop_callback=callbacks, checkpoint=False)
 
         final_score = history.history[self.metric][-1]
 

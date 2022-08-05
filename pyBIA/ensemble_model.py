@@ -547,7 +547,7 @@ class Classifier:
         if ylog:
             plt.yscale('log')
         plt.xlabel('Trial #', size=16)
-        plt.ylabel('10-fold CV Accuracy', size=16)
+        plt.ylabel('3-fold CV Accuracy', size=16)
         plt.title(('Hyperparameter Optimization History'), size=18)
         plt.xlim((1,1e4))
         plt.ylim((0.9, 0.935))

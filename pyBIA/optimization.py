@@ -74,7 +74,7 @@ class objective_cnn(object):
             mode = 'max'
 
         if self.limit_search is False:
-            batch_size = trial.suggest_int('batch_size', 2, 50)
+            batch_size = trial.suggest_int('batch_size', 2, 64)
             lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
             momentum = trial.suggest_float('momentum', 0, 1, step=0.1)
             decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
@@ -98,7 +98,7 @@ class objective_cnn(object):
             filter_size_5 = trial.suggest_int('filter_size_5', 1, 11, step=2)
 
         else:
-            batch_size = trial.suggest_int('batch_size', 16, 100)
+            batch_size = trial.suggest_int('batch_size', 16, 64)
             lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
             decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
             maxpool_size = trial.suggest_int('maxpool_size', 3, 10)
@@ -114,6 +114,8 @@ class objective_cnn(object):
             filter_size_4 = trial.suggest_int('filter_size_4', 1, 11, step=2)
             filter_5 = trial.suggest_int('filter_5', 12, 408, step=12)
             filter_size_5 = trial.suggest_int('filter_size_5', 1, 11, step=2)
+            print(batch_size, lr, decay, maxpool_size, maxpool_stride, filter_1, filter_size_1, strides_1)
+            print(filter_2, filter_size_2, filter_3, filter_size_3, filter_4, filter_size_4, filter_5, filter_size_5)
 
         if self.patience != 0:
             callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience), TFKerasPruningCallback(trial, monitor=self.metric),]
@@ -132,11 +134,15 @@ class objective_cnn(object):
                 print("Invalid hyperparameter combination, skipping trial.")
                 return 0.0
         else:
-            model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, batch_size=batch_size, 
-                lr=lr, decay=decay,  maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, 
-                filter_2=filter_2, filter_size_2=filter_size_2, filter_3=filter_3, filter_size_3=filter_size_3, filter_4=filter_4, filter_size_4=filter_size_4, 
-                filter_5=filter_5, filter_size_5=filter_size_5, early_stop_callback=callbacks, checkpoint=False)
+            try:
+                model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, batch_size=batch_size, 
+                    lr=lr, decay=decay,  maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, 
+                    filter_2=filter_2, filter_size_2=filter_size_2, filter_3=filter_3, filter_size_3=filter_size_3, filter_4=filter_4, filter_size_4=filter_size_4, 
+                    filter_5=filter_5, filter_size_5=filter_size_5, early_stop_callback=callbacks, checkpoint=False)
+            except:
+                print("Memory allocation issue, probably due to large batch size, skipping trial.")
+                return 0.0
 
         final_score = history.history[self.metric][-1]
 
@@ -158,34 +164,40 @@ class objective_xgb(object):
 
     def __call__(self, trial):
         booster = trial.suggest_categorical('booster', ['gbtree', 'dart'])
-        reg_lambda = trial.suggest_loguniform('reg_lambda', 1e-8, 1)
-        reg_alpha = trial.suggest_loguniform('reg_alpha', 1e-8, 1)
+        n_estimators = trial.suggest_int('n_estimators', 100, 3000)
+        colsample_bytree = trial.suggest_float('colsample_bytree', 0.5, 1)
+        reg_lambda = trial.suggest_float('reg_lambda', 0, 1)
+        reg_alpha = trial.suggest_int('reg_alpha', 0, 100)
         max_depth = trial.suggest_int('max_depth', 2, 25)
-        eta = trial.suggest_loguniform('eta', 1e-8, 1)
-        gamma = trial.suggest_loguniform('gamma', 1e-8, 1)
+        eta = trial.suggest_float('eta', 1e-8, 1)
+        gamma = trial.suggest_int('gamma', 1, 100)
         grow_policy = trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
+        min_child_weight = trial.suggest_int('min_child_weight', 1, 100)
+        max_delta_step = trial.suggest_int('max_delta_step', 1, 100)
+        subsample = trial.suggest_float('subsample', 0.5, 1.0)
 
         if booster == "dart":
             sample_type = trial.suggest_categorical('sample_type', ['uniform', 'weighted'])
             normalize_type = trial.suggest_categorical('normalize_type', ['tree', 'forest'])
-            rate_drop = trial.suggest_loguniform('rate_drop', 1e-8, 1)
-            skip_drop = trial.suggest_loguniform('skip_drop', 1e-8, 1)
-            try:
-                clf = XGBClassifier(booster=booster, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
-                    gamma=gamma, grow_policy=grow_policy, sample_type=sample_type, normalize_type=normalize_type,rate_drop=rate_drop, 
+            rate_drop = trial.suggest_float('rate_drop', 1e-8, 1)
+            skip_drop = trial.suggest_float('skip_drop', 1e-8, 1)
+            #try:
+            clf = XGBClassifier(booster=booster, n_estimators=n_estimators, colsample_bytree=colsample_bytree, reg_lambda=reg_lambda, 
+                    reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, gamma=gamma, grow_policy=grow_policy, min_child_weight=min_child_weight, 
+                    max_delta_step=max_delta_step, subsample=subsample, sample_type=sample_type, normalize_type=normalize_type, rate_drop=rate_drop, 
                     skip_drop=skip_drop)
-            except:
-                print("Invalid hyerparameter combination, skipping trial.")
-                return 0.0
+            #except:
+            #    print("Invalid hyerparameter combination, skipping trial.")
+            #    return 0.0
 
         elif booster == 'gbtree':
-            subsample = trial.suggest_loguniform('subsample', 1e-6, 1.0)
-            try:
-                clf = XGBClassifier(booster=booster, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
-                    gamma=gamma, grow_policy=grow_policy, subsample=subsample)
-            except:
-                print("Invalid hyerparameter combination, skipping trial.")
-                return 0.0
+            #try:
+            clf = XGBClassifier(booster=booster, n_estimators=n_estimators, colsample_bytree=colsample_bytree,  reg_lambda=reg_lambda, 
+                    reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, gamma=gamma, grow_policy=grow_policy, min_child_weight=min_child_weight,
+                    max_delta_step=max_delta_step, subsample=subsample)
+            #except:
+            #   print("Invalid hyerparameter combination, skipping trial.")
+            #   return 0.0
 
         cv = cross_validate(clf, self.data_x, self.data_y, cv=3)
         final_score = np.round(np.mean(cv['test_score']), 6)
@@ -448,14 +460,16 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
         params = study.best_trial.params
         if params['booster'] == 'dart':
-            model = XGBClassifier(booster=params['booster'], reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], 
-                max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], grow_policy=params['grow_policy'],
-                sample_type=params['sample_type'], normalize_type=params['normalize_type'],rate_drop=params['rate_drop'], 
-                skip_drop=params['skip_drop'], scale_pos_weight=sample_weight)
+            model = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'], 
+                reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
+                grow_policy=params['grow_policy'], sample_type=params['sample_type'], normalize_type=params['normalize_type'],rate_drop=params['rate_drop'], 
+                skip_drop=params['skip_drop'], min_child_weight=params['min_child_weight'], max_delta_step=params['max_delta_step'], subsample=params['subsample'],
+                scale_pos_weight=sample_weight)
         elif params['booster'] == 'gbtree':
-            model = XGBClassifier(booster=params['booster'], reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], 
-                max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], grow_policy=params['grow_policy'],
-                subsample=params['subsample'], scale_pos_weight=sample_weight)
+            model = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'], 
+                reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
+                grow_policy=params['grow_policy'], subsample=params['subsample'], min_child_weight=params['min_child_weight'], max_delta_step=params['max_delta_step'],
+                scale_pos_weight=sample_weight)
        
     else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 

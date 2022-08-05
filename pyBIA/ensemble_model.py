@@ -25,6 +25,7 @@ from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.manifold import TSNE
 
 from pyBIA.optimization import hyper_opt, borutashap_opt, KNN_imputation, MissForest_imputation
+from optuna.visualization.matplotlib import plot_optimization_history
 from xgboost import XGBClassifier
 import scikitplot as skplt
 
@@ -527,7 +528,7 @@ class Classifier:
         plt.title(label=title,fontsize=18)
         plt.show()
 
-    def plot_hyper_opt(xlog=True, ylog=False):
+    def plot_hyper_opt(self, xlog=True, ylog=False):
         """
         Plots the hyperparameter optimization history.
     
@@ -541,7 +542,7 @@ class Classifier:
             AxesImage
         """
 
-        fig = optuna.visualization.matplotlib.plot_optimization_history(self.optimization_results)
+        fig = plot_optimization_history(self.optimization_results)
         if xlog:
             plt.xscale('log')
         if ylog:
@@ -557,7 +558,7 @@ class Classifier:
         plt.legend(prop={'size': 16})
         plt.show()
 
-    def plot_feature_opt(feats='all'):
+    def plot_feature_opt(self, feats='all'):
         """
         Returns whisker plot displaying the z-score distribution of each feature
         across all trials.

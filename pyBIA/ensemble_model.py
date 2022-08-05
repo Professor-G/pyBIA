@@ -96,6 +96,7 @@ class Classifier:
 
         self.feature_history = None  
         self.optimization_results = None 
+        self.best_params = None 
 
     def create(self):
         """
@@ -167,7 +168,7 @@ class Classifier:
         else: 
             self.data_x = self.data_x[:,self.feats_to_use]
 
-        self.model, best_params, self.optimization_results = hyper_opt(self.data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, 
+        self.model, self.best_params, self.optimization_results = hyper_opt(self.data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, 
             balance=self.balance, return_study=True)
         print("Fitting and returning final model...")
         self.model.fit(self.data_x, self.data_y)

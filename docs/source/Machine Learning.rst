@@ -25,21 +25,21 @@ These methods are enabled by default, but can be turned off when creating our cl
 
 	from pyBIA import ensemble_model
 
-	model = ensemble_model.classifier(data_x, data_y, clf='xgb', impute=False, optimize=False)
+	model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=False, optimize=False)
 	model.create()
 
 If our training data contains invalid values such as NaN or inf, we can impute the missing values using several imputation algorithms. If we impute our data, the imputer is stored as object attribute as it will be needed to transform new data if it contains invalid values. We can set impute=True to perform the imputation:
 
 .. code-block:: python
 
-	model = ensemble_model.classifier(data_x, data_y, clf='xgb', impute=True, optimize=False)
+	model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True, optimize=False)
 	model.create()
 
 We can also set optimize=True, which will perform Bayesian hyperparameter optimization to identify the features that are useful. If we do this the attribute model.feats_to_use will contain an array of indices which with to index the feature columns.
 
 .. code-block:: python
 
-	model = ensemble_model.classifier(data_x, data_y, clf='xgb', impute=True, optimize=True)
+	model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True, optimize=True)
 	model.create()
 
 To avoid overfitting during the optimization procedure, 3-fold cross-validation is performed to assess performance at the end of each trial, therefore the hyperparameter optimization can take a long time depending on the size of the training set and the algorithm being optimized. 
@@ -48,14 +48,14 @@ Note that pyBIA currently supports three machine learning algorithms: Random For
 
 .. code-block:: python
 
-   model = ensemble_model.classifier(data_x, data_y, clf='nn', n_iter=100)
+   model = ensemble_model.Classifier(data_x, data_y, clf='nn', n_iter=100)
    model.create()
 
 The Random Forest was the first algorithm we explored, which yielded accuracy shy of that provided by the XGB implementation. To make a Random Forest classifier we just set the `clf` argument to 'rf':
 
 .. code-block:: python
 
-   model = ensemble_model.classifier(data_x, data_y, clf='rf')
+   model = ensemble_model.Classifier(data_x, data_y, clf='rf')
    model.create()
 
 `For details please refer to the function documentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_models/index.html#pyBIA.ensemble_models.create>`_.

@@ -66,12 +66,13 @@ If you have a 2D array, but no positions, creating a catalog is quick and easy:
     cat = catalog.Catalog(data)
     cat.create(save_file=True)
 
-X and Y ixel arguments can be input if source locations are known, and optional parameters can be set to control background subtraction, source detection thresholds, and flux calculations. If error map is provided, the output catalog will contain the photometric error. The only accompanying method is `plot <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/catalog.html#Catalog.plot>`_, which will output two subplots, the source and the segmentation of the specified object. 
+X and Y pixel arguments can be input if source locations are known, and optional parameters can be set to control background subtraction, source detection thresholds, and flux calculations. If error map is provided, the output catalog will contain the photometric error. The only accompanying method is `plot <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/catalog.html#Catalog.plot>`_, which will output two subplots, the source and the segmentation of the specified object. 
 
 .. figure:: _static/segm.png
     :align: center
+    :class: with-shadow with-border
+    :width: 600px
 |
-
 
 To learn about pyBIA's infrastructure, check out the machine learning and the example pages.
 

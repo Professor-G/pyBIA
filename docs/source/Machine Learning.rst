@@ -97,29 +97,11 @@ We can load the diffuse_catalog and other_catalog files and create a Random Fore
 	import numpy as np
 	from pyBIA import ensemble_model
 
-	blob = pandas.read_csv('diffuse_catalog')
-	other = pandas.read_csv('other_catalog')
-	cols = other.columns.values[8:] #Remove columns that don't include morphological features
+	training_data = pandas.read_csv('training_set')
+	data_y = np.array(training_data['flag'])
+	data_x = np.array(training_data.drop('flag', axis=1))
 
-	blob = blob[cols]
-	other = other[cols]
-
-	mask = np.where(other.area != -999)[0] #-999 are saved when source is a non-detection
-	other = other.iloc[mask]
-
-	#Index a random number of OTHER objects, equal to the size of the blob sample
-	rand_inx = [int(i) for i in random.sample(range(0, len(mask)), len(blob))] 
-	other = other.iloc[rand_inx]
-
-	#Create 2D training data array 
-	data_x = np.concatenate((blob, other))
-
-	#Create 1D class label array
-	labels_blob = np.array(['DIFFUSE']*len(blob))
-	labels_other = np.array(['OTHER']*len(other))
-	data_y = np.r_[labels_blob, labels_other]
-
-	model = ensemble_model.classifier(data_x, data_y, clf='rf', impute=True, optimize=True)
+	model = ensemble_model.Classifier(data_x, data_y, clf='rf', impute=True, optimize=True, boruta_trials=1000, n_iter=10000)
 	model.create()
 	
 Finally, we can make predictions using our optimized model:

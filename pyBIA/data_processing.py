@@ -64,7 +64,7 @@ def crop_image(data, x, y, size=50, invert=False):
 
     return out
 
-def concat_channels(channel1, channel2, channel3=None, channel4=None, channel5=None, channel6=None):
+def concat_channels(channel1, channel2, channel3=None):
     """
     This function concatenates multiple 2D arrays, useful for image classification when using multiple filters.
 
@@ -89,7 +89,7 @@ def concat_channels(channel1, channel2, channel3=None, channel4=None, channel5=N
     return np.concatenate(colorized, axis=-1)
 
 
-def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
+def normalize_pixels(channel, min_pixel=0, max_pixel=100):
     """
     This function will apply min-max normalization. 
 
@@ -101,9 +101,9 @@ def normalize_pixels(channel, min_pixel=638, max_pixel=3000):
 
     Args:
         channel (array): 2D array for one image, 3D array for multiple images.
-        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
+        min_pixel (int, optional): The minimum pixel count, defaults to 0. 
             Pixels with counts below this threshold will be set to this limit.
-        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
+        max_pixel (int, optional): The maximum pixel count, defaults to 100. 
             Pixels with counts above this threshold will be set to this limit.
 
     Returns:      
@@ -148,7 +148,6 @@ def process_class(channel, img_num_channels=1, label=None, normalize=True, min_p
 
     Returns:      
         Reshaped data and label arrays.
-
     """
 
     if normalize is True:
@@ -195,6 +194,20 @@ def create_training_set(blob_data, other_data, img_num_channels=1, normalize=Tru
     Combines image data of known class to create a training set.
     This is used for training the machine learning models. 
 
+    Note: 
+        This function is for binary classification only, the manual procedure for multiclass
+        training set creation looks as follows:
+
+        >>> from pyBIA.data_processing import process_class
+        >>> import numpy as np 
+
+        >>> class1_data, class1_label = process_class(data1, label=0)
+        >>> class2_data, class2_label = process_class(data2, label=1)
+        >>> class3_data, class3_label = process_class(data3, label=2)
+
+        >>> training_data = np.r_[class1_data, class2_data, class3_data]
+        >>> training_labels = np.r_[class1_label class2_label, class3_label]
+
     Args:
         blob_data (array): 3D array containing more than one image of diffuse objects.
         other_data (array): 3D array containing more than one image of non-diffuse objects.
@@ -207,7 +220,6 @@ def create_training_set(blob_data, other_data, img_num_channels=1, normalize=Tru
     
     Returns:      
         Reshaped data and label arrays.
-
     """
 
     gb_data, gb_label = process_class(blob_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)

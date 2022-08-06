@@ -30,43 +30,43 @@ class Catalog:
     Creates catalog object.
 
     Args:
-            data (ndarray): 2D array.
-            x (ndarray, optional): 1D array or list containing the x-pixel position.
-                Can contain one position or multiple samples.
-            y (ndarray, optional): 1D array or list containing the y-pixel position.
-                Can contain one position or multiple samples.
-            bkg (None, optional): If bkg=0 the data is assumed to be background-subtracted.
-                The other optional is bkg=None, in which case the background will be
-                automatically calculated for local regions.
-            error (ndarray, optional): 2D array containing the rms error map.
-            morph_params (bool, optional): If True, image segmentation is performed and
-                morphological parameters are computed. Defaults to True. 
-            kernel_size (int): The size length of the square Gaussian filter kernel used to convolve 
-                the data. This length must be odd. Defaults to 21.
-            nsig (float): The sigma detection limit. Objects brighter than nsig standard 
-                deviations from the background will be detected during segmentation. Defaults to 0.7.
-            deblend (bool, optional): If True, the objects are deblended during the segmentation
-                procedure, thus deblending the objects before the morphological features
-                are computed. Defaults to False so as to keep blobs as one segmentation object.
-            obj_name (ndarray, str, optional): 1D array containing the name of each object
-                corresponding to the x & y position. This will be appended to the first
-                column of the output catalog. Defaults to None.
-            field_name (ndarray, str, optional): 1D array containing the field name of each object
-                corresponding to the x & y positions. This will be appended to the first
-                column of the output catalog. Defaults to None.
-            flag (ndarray, optional): 1D array containing a flag value for each object corresponding
-                to the x & y positions. Defaults to None. 
-            aperture (int): The radius of the photometric aperture. Defaults to 15.
-            annulus_in (int): The inner radius of the circular aperture
-                that will be used to calculate the background. Defaults to 20.
-            annulus_out (int): The outer radius of the circular aperture
-                    that will be used to calculate the background. Defaults to 35.
-            invert (bool, optional): If True, the x & y coordinates will be switched
-                when cropping out the object during the image segmentation step. For
-                more information see the morph_parameters function. Defaults to False.
-            cat (Dataframe): Pandas dataframe, use if the catalog has been creted. The objects
-                in this catalog must reside within the data array, therefore if subfields
-                need individual class instance. Defaults to None.
+        data (ndarray): 2D array.
+        x (ndarray, optional): 1D array or list containing the x-pixel position.
+            Can contain one position or multiple samples.
+        y (ndarray, optional): 1D array or list containing the y-pixel position.
+            Can contain one position or multiple samples.
+        bkg (None, optional): If bkg=0 the data is assumed to be background-subtracted.
+            The other optional is bkg=None, in which case the background will be
+            automatically calculated for local regions.
+        error (ndarray, optional): 2D array containing the rms error map.
+        morph_params (bool, optional): If True, image segmentation is performed and
+            morphological parameters are computed. Defaults to True. 
+        kernel_size (int): The size length of the square Gaussian filter kernel used to convolve 
+            the data. This length must be odd. Defaults to 21.
+        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
+            deviations from the background will be detected during segmentation. Defaults to 0.7.
+        deblend (bool, optional): If True, the objects are deblended during the segmentation
+            procedure, thus deblending the objects before the morphological features
+            are computed. Defaults to False so as to keep blobs as one segmentation object.
+        obj_name (ndarray, str, optional): 1D array containing the name of each object
+            corresponding to the x & y position. This will be appended to the first
+            column of the output catalog. Defaults to None.
+        field_name (ndarray, str, optional): 1D array containing the field name of each object
+            corresponding to the x & y positions. This will be appended to the first
+            column of the output catalog. Defaults to None.
+        flag (ndarray, optional): 1D array containing a flag value for each object corresponding
+            to the x & y positions. Defaults to None. 
+        aperture (int): The radius of the photometric aperture. Defaults to 15.
+        annulus_in (int): The inner radius of the circular aperture
+            that will be used to calculate the background. Defaults to 20.
+        annulus_out (int): The outer radius of the circular aperture
+                that will be used to calculate the background. Defaults to 35.
+        invert (bool, optional): If True, the x & y coordinates will be switched
+            when cropping out the object during the image segmentation step. For
+            more information see the morph_parameters function. Defaults to False.
+        cat (Dataframe): Pandas dataframe, use if the catalog has been creted. The objects
+            in this catalog must reside within the data array, therefore if subfields
+            need individual class instance. Defaults to None.
     """
 
     def __init__(self, data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0.7, deblend=False, 

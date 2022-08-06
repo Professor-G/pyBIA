@@ -136,7 +136,7 @@ class Classifier:
     def save(self, path=None, overwrite=False):
         """
         Saves the trained classifier in a new directory named 'pyBIA_models', 
-        as well as the imputer and the features to use attributes, if not None.
+        as well as the imputer and the features to use, if applicable.
         
         Args:
             path (str): Absolute path where the data folder will be saved
@@ -146,6 +146,7 @@ class Classifier:
                 function creates in the specified path will be deleted if it exists
                 and created anew to avoid duplicate files. 
         """
+
         if self.model is None:
             raise ValueError('The models have not been created! Run classifier.create() first.')
 
@@ -247,7 +248,6 @@ class Classifier:
                 which there is an 'OTHER' class. Defaults to 'DIFFUSE'. 
         Returns:
             The class prediction(s), either 'DIFFUSE' or 'OTHER'.
-
         """
       
         data = process_class(data, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, img_num_channels=self.img_num_channels)
@@ -328,7 +328,7 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
         """
         The CNN model infrastructure presented by the 2012 ImageNet Large Scale 
         Visual Recognition Challenge, AlexNet. Parameters were adapted for
-        our astronomy case of detecting diffuse objects.
+        our astronomy case of detecting diffuse emission.
 
         Note:
             To avoid exploding gradients we need to normalize our pixels to be 

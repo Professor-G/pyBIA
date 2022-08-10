@@ -78,12 +78,14 @@ class Classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, data_x=None, data_y=None, clf='rf', optimize=True, impute=True, imp_method='KNN', 
+    def __init__(self, data_x=None, data_y=None, clf='rf', optimize=True, limit_search=True, impute=True, imp_method='KNN', 
         n_iter=25, boruta_trials=50, balance=True):
+
         self.data_x = data_x
         self.data_y = data_y
         self.clf = clf
         self.optimize = optimize 
+        self.limit_search = limit_search
         self.impute = impute
         self.imp_method = imp_method
         self.n_iter = n_iter
@@ -169,7 +171,7 @@ class Classifier:
             self.data_x = self.data_x[:,self.feats_to_use]
 
         self.model, self.best_params, self.optimization_results = hyper_opt(self.data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, 
-            balance=self.balance, return_study=True)
+            balance=self.balance, return_study=True, limit_search=self.limit_search)
         print("Fitting and returning final model...")
         self.model.fit(self.data_x, self.data_y)
         

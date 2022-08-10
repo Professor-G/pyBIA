@@ -283,8 +283,20 @@ class Classifier:
             plt.xscale('log')
         if ylog:
             plt.yscale('log')
+
+        if self.metric == 'val_accuracy':
+            ylabel = 'Validation Accuracy'
+        elif self.metric == 'accuracy':
+            ylabel = 'Training Accuracy'
+        elif self.metric == 'val_loss':
+            ylabel = 'Validation Loss'
+        elif self.metric == 'loss':
+            ylabel = 'Training Loss'
+        else:
+            ylabel = 'Optimization Metric'
+
         plt.xlabel('Trial #', size=16)
-        plt.ylabel('10-fold CV Accuracy', size=16)
+        plt.ylabel(ylabel, size=16)
         plt.title(('Hyperparameter Optimization History'), size=18)
         #plt.xlim((1,1e4))
         #plt.ylim((0.9, 0.935))
@@ -319,7 +331,7 @@ class Classifier:
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
         min_pixel=0, max_pixel=3000, val_X=None, val_Y=None, epochs=100, 
-        batch_size=32, lr=0.001, momentum=0.9, decay=0.000083, nesterov=True, 
+        batch_size=32, lr=0.0001, momentum=0.9, decay=0.0, nesterov=False, 
         loss='categorical_crossentropy', activation_conv='relu', activation_dense='relu', 
         padding='same', dropout=0.5, pooling=True, maxpool_size=3, maxpool_stride=2, 
         filter_1=96, filter_size_1=11, strides_1=4, filter_2=256, filter_size_2=5, 

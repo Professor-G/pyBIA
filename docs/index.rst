@@ -11,6 +11,13 @@ pyBIA is an open-source program for detecting diffuse Lyman-alpha emission in th
 
 Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%20pyBIA.html>`_ to learn about the image classification architecture.
 
+.. figure:: _static/me_full.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 1600px
+
+    Figure 3: Convolutional neural network architecture pyBIA uses for detecting diffuse emission; modeled after AlexNet.
+
    
 Installation
 ==================

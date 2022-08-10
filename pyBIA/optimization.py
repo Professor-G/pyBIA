@@ -75,7 +75,7 @@ class objective_cnn(object):
 
         if self.limit_search is False:
             batch_size = trial.suggest_int('batch_size', 2, 64)
-            lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
+            lr = trial.suggest_float('lr', 1e-5, 0.1, step=0.05)
             momentum = trial.suggest_float('momentum', 0, 1, step=0.1)
             decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
             nesterov = trial.suggest_categorical('nesterov', [True, False])
@@ -99,7 +99,7 @@ class objective_cnn(object):
 
         else:
             batch_size = trial.suggest_int('batch_size', 16, 64)
-            lr = trial.suggest_float('lr', 1e-4, 0.1, step=0.05)
+            lr = trial.suggest_float('lr', 1e-5, 0.1, step=0.05)
             decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
             maxpool_size = trial.suggest_int('maxpool_size', 3, 10)
             maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
@@ -151,6 +151,7 @@ class objective_cnn(object):
 
         return final_score
 
+
 class objective_xgb(object):
     """
     Optimization objective function for the tree-based XGBoost classifier. 
@@ -158,11 +159,43 @@ class objective_xgb(object):
     2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
     """
 
-    def __init__(self, data_x, data_y):
+    def __init__(self, data_x, data_y, limit_search=True):
         self.data_x = data_x
         self.data_y = data_y
+        self.limit_search = limit_search
 
     def __call__(self, trial):
+
+        if self.limit_search:
+            n_estimators = trial.suggest_int('n_estimators', 100, 3000)
+            booster = trial.suggest_categorical('booster', ['gbtree', 'dart'])
+            reg_lambda = trial.suggest_loguniform('reg_lambda', 1e-8, 1)
+            reg_alpha = trial.suggest_loguniform('reg_alpha', 1e-8, 1)
+            max_depth = trial.suggest_int('max_depth', 2, 25)
+            eta = trial.suggest_loguniform('eta', 1e-8, 1)
+            gamma = trial.suggest_loguniform('gamma', 1e-8, 1)
+            grow_policy = trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
+
+            if booster == "dart":
+                sample_type = trial.suggest_categorical('sample_type', ['uniform', 'weighted'])
+                normalize_type = trial.suggest_categorical('normalize_type', ['tree', 'forest'])
+                rate_drop = trial.suggest_loguniform('rate_drop', 1e-8, 1)
+                skip_drop = trial.suggest_loguniform('skip_drop', 1e-8, 1)
+
+                clf = XGBClassifier(booster=booster, n_estimators=n_estimators, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
+                    gamma=gamma, grow_policy=grow_policy, sample_type=sample_type, normalize_type=normalize_type,rate_drop=rate_drop, 
+                    skip_drop=skip_drop)
+            
+            elif booster == 'gbtree':
+                subsample = trial.suggest_loguniform('subsample', 1e-6, 1.0)
+                clf = XGBClassifier(booster=booster, n_estimators=n_estimators, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
+                    gamma=gamma, grow_policy=grow_policy, subsample=subsample)
+
+            cv = cross_validate(clf, self.data_x, self.data_y, cv=3)
+            final_score = np.round(np.mean(cv['test_score']), 6)
+
+            return final_score
+
         booster = trial.suggest_categorical('booster', ['gbtree', 'dart'])
         n_estimators = trial.suggest_int('n_estimators', 100, 3000)
         colsample_bytree = trial.suggest_float('colsample_bytree', 0.5, 1)
@@ -181,28 +214,22 @@ class objective_xgb(object):
             normalize_type = trial.suggest_categorical('normalize_type', ['tree', 'forest'])
             rate_drop = trial.suggest_float('rate_drop', 1e-8, 1)
             skip_drop = trial.suggest_float('skip_drop', 1e-8, 1)
-            #try:
+
             clf = XGBClassifier(booster=booster, n_estimators=n_estimators, colsample_bytree=colsample_bytree, reg_lambda=reg_lambda, 
-                    reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, gamma=gamma, grow_policy=grow_policy, min_child_weight=min_child_weight, 
-                    max_delta_step=max_delta_step, subsample=subsample, sample_type=sample_type, normalize_type=normalize_type, rate_drop=rate_drop, 
-                    skip_drop=skip_drop)
-            #except:
-            #    print("Invalid hyerparameter combination, skipping trial.")
-            #    return 0.0
+                reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, gamma=gamma, grow_policy=grow_policy, min_child_weight=min_child_weight, 
+                max_delta_step=max_delta_step, subsample=subsample, sample_type=sample_type, normalize_type=normalize_type, rate_drop=rate_drop, 
+                skip_drop=skip_drop)
 
         elif booster == 'gbtree':
-            #try:
             clf = XGBClassifier(booster=booster, n_estimators=n_estimators, colsample_bytree=colsample_bytree,  reg_lambda=reg_lambda, 
-                    reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, gamma=gamma, grow_policy=grow_policy, min_child_weight=min_child_weight,
-                    max_delta_step=max_delta_step, subsample=subsample)
-            #except:
-            #   print("Invalid hyerparameter combination, skipping trial.")
-            #   return 0.0
+                reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, gamma=gamma, grow_policy=grow_policy, min_child_weight=min_child_weight,
+                max_delta_step=max_delta_step, subsample=subsample)
 
         cv = cross_validate(clf, self.data_x, self.data_y, cv=3)
         final_score = np.round(np.mean(cv['test_score']), 6)
 
         return final_score
+
 
 class objective_nn(object):
     """
@@ -216,7 +243,7 @@ class objective_nn(object):
         self.data_y = data_y
 
     def __call__(self, trial):
-        learning_rate_init= trial.suggest_float('learning_rate_init', 1e-4, 0.1, step=0.05)
+        learning_rate_init= trial.suggest_float('learning_rate_init', 1e-5, 0.1, step=0.05)
         solver = trial.suggest_categorical("solver", ["sgd", "adam"]) #"lbfgs"
         activation = trial.suggest_categorical("activation", ["logistic", "tanh", "relu"])
         learning_rate = trial.suggest_categorical("learning_rate", ["constant", "invscaling", "adaptive"])
@@ -226,7 +253,7 @@ class objective_nn(object):
         n_layers = trial.suggest_int('hidden_layer_sizes', 1, 10)
         layers = []
         for i in range(n_layers):
-            layers.append(trial.suggest_int(f'n_units_{i}', 100, 1000))
+            layers.append(trial.suggest_int(f'n_units_{i}', 100, 5000))
 
         try:
             clf = MLPClassifier(hidden_layer_sizes=tuple(layers),learning_rate_init=learning_rate_init, 
@@ -342,8 +369,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             is terminated. 
         metric (str): Assesment metric to use when both pruning and scoring the hyperparameter
             optimization trial.
-        limit_search (bool): If True the CNN optimization will search optimize only three hyperparameters,
-            the batch size, learning rate, and loss function. Defaulse to True.
+        limit_search (bool): If True the CNN or XGB optimization search space will be limited,
+            for computational and time purposes. Defaults to True.
             
     Returns:
         The first output is the classifier with the optimal hyperparameters.
@@ -456,20 +483,33 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             return gs.best_estimator_, gs.best_params_
           
     elif clf == 'xgb':
-        objective = objective_xgb(data_x, data_y)
+        objective = objective_xgb(data_x, data_y, limit_search=limit_search)
+        if limit_search:
+            print('Note: To expand hyperparameter search space, set limit_search=False, although this will increase the optimization time significantly.')
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
         params = study.best_trial.params
-        if params['booster'] == 'dart':
-            model = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'], 
-                reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
-                grow_policy=params['grow_policy'], sample_type=params['sample_type'], normalize_type=params['normalize_type'],rate_drop=params['rate_drop'], 
-                skip_drop=params['skip_drop'], min_child_weight=params['min_child_weight'], max_delta_step=params['max_delta_step'], subsample=params['subsample'],
-                scale_pos_weight=sample_weight)
-        elif params['booster'] == 'gbtree':
-            model = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'], 
-                reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
-                grow_policy=params['grow_policy'], subsample=params['subsample'], min_child_weight=params['min_child_weight'], max_delta_step=params['max_delta_step'],
-                scale_pos_weight=sample_weight)
+        if limit_search:
+            if params['booster'] == 'dart':
+                model = XGBClassifier(booster=params['booster'],  n_estimators=params['n_estimators'], reg_lambda=params['reg_lambda'], 
+                    reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
+                    grow_policy=params['grow_policy'], sample_type=params['sample_type'], normalize_type=params['normalize_type'],
+                    rate_drop=params['rate_drop'], skip_drop=params['skip_drop'], sample_weight=sample_weight)
+            elif params['booster'] == 'gbtree':
+                model = XGBClassifier(booster=params['booster'],  n_estimators=params['n_estimators'], reg_lambda=params['reg_lambda'], 
+                    reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
+                    grow_policy=params['grow_policy'], subsample=params['subsample'], sample_weight=sample_weight)
+        else:
+            if params['booster'] == 'dart':
+                model = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'], 
+                    reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
+                    grow_policy=params['grow_policy'], sample_type=params['sample_type'], normalize_type=params['normalize_type'],rate_drop=params['rate_drop'], 
+                    skip_drop=params['skip_drop'], min_child_weight=params['min_child_weight'], max_delta_step=params['max_delta_step'], subsample=params['subsample'],
+                    scale_pos_weight=sample_weight)
+            elif params['booster'] == 'gbtree':
+                model = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'], 
+                    reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
+                    grow_policy=params['grow_policy'], subsample=params['subsample'], min_child_weight=params['min_child_weight'], max_delta_step=params['max_delta_step'],
+                    scale_pos_weight=sample_weight)
        
     else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
@@ -481,9 +521,9 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
 
     if clf != 'cnn':
         if initial_score > final_score:
-            print('Hyperparameter optimization complete! 3-fold CV accuracy of {} is lower than the base accuracy of {}, try increasing the value of n_iter and run again.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
+            print('Hyperparameter optimization complete! 3-fold CV accuracy of {} is LOWER than the base accuracy of {}, try increasing the value of n_iter and run again.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
         else:
-            print('Hyperparameter optimization complete! 3-fold CV accuracy of {} is higher than the base accuracy of {}.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
+            print('Hyperparameter optimization complete! 3-fold CV accuracy of {} is HIGHER than the base accuracy of {}.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
         if return_study:
             return model, params, study
         return model, params

@@ -16,7 +16,7 @@ Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%
     :class: with-shadow with-border
     :width: 1600px
 
-    Figure 3: Convolutional neural network architecture pyBIA uses for detecting diffuse emission; modeled after AlexNet.
+    Figure 1: Convolutional neural network architecture pyBIA uses for detecting diffuse emission; modeled after AlexNet.
 
    
 Installation

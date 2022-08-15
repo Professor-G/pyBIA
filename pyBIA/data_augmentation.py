@@ -14,6 +14,9 @@ import random
 from pyBIA.data_processing import crop_image
 from warnings import warn
 
+import numpy as np
+from keras.utils import Sequence, to_categorical
+
 
 def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5, height_shift=5, 
     horizontal=True, vertical=True, rotation=360, fill='nearest', image_size=50):
@@ -21,10 +24,16 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
     This function takes in one image and applies data augmentation techniques.
     Shifts and rotations occur at random, for example, if width_shift is set
     to 10, then an image shift between -10 and 10 pixels will be chosen from a 
-    random uniform distribution.
+    random uniform distribution. Rotation angle is also chosen from a random uniform 
+    distribution, between zero and the rotation argument. 
 
-    Rotation angle is also chosen from a random uniform distribution, between
-    zero and the rotation argument. 
+    Note:
+        This function is used for offline data augmentation! In practice,
+        online augmentation is more often performed as that exposes the
+        CNN to significantly more samples. If multiple channels are input,
+        this method will save the seeds from the augmentation of the first 
+        channel, after which the seeds will be applied to the remaining channels,
+        thus ensuring the same augmentation procedure is applied across all filters.
 
     Args:
         channel1 (ndarray): 2D array of containing a single image, or a 3D array containing

@@ -201,7 +201,7 @@ class Classifier:
         except FileExistsError:
             if overwrite:
                 try:
-                    os.rmdir(path+'pyBIA_models')
+                    os.rmdir(path+'pyBIA_ensemble_model')
                 except OSError:
                     for file in os.listdir(path+'pyBIA_ensemble_model'):
                         os.remove(path+'pyBIA_ensemble_model/'+file)
@@ -239,7 +239,7 @@ class Classifier:
         if path[-1] != '/':
             path+='/'
 
-        path += 'pyBIA_models/'
+        path += 'pyBIA_ensemble_model/'
 
         try:
             self.model = joblib.load(path+'Model')

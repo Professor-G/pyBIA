@@ -50,7 +50,7 @@ class objective_cnn(object):
 
     def __init__(self, data_x, data_y, img_num_channels=1, normalize=True, min_pixel=638,
         max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=20, metric='loss',
-        limit_search=True):
+        limit_search=True, opt_aug=True):
 
         self.data_x = data_x
         self.data_y = data_y
@@ -64,6 +64,9 @@ class objective_cnn(object):
         self.patience = patience 
         self.metric = metric 
         self.limit_search = limit_search
+        if self.metric == 'val_loss' or self.metric == 'val_accuracy':
+            if self.val_X is None or self.val_Y is None:
+                raise ValueError('No validation data input, change the metric to either "loss" or "accuracy".')
             
     def __call__(self, trial):
 
@@ -167,7 +170,7 @@ class objective_xgb(object):
     def __call__(self, trial):
 
         if self.limit_search:
-            n_estimators = trial.suggest_int('n_estimators', 100, 3000)
+            n_estimators = trial.suggest_int('n_estimators', 100, 500)
             booster = trial.suggest_categorical('booster', ['gbtree', 'dart'])
             reg_lambda = trial.suggest_loguniform('reg_lambda', 1e-8, 1)
             reg_alpha = trial.suggest_loguniform('reg_alpha', 1e-8, 1)
@@ -184,12 +187,12 @@ class objective_xgb(object):
 
                 clf = XGBClassifier(booster=booster, n_estimators=n_estimators, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
                     gamma=gamma, grow_policy=grow_policy, sample_type=sample_type, normalize_type=normalize_type,rate_drop=rate_drop, 
-                    skip_drop=skip_drop)
+                    skip_drop=skip_drop)#, tree_method='hist')
             
             elif booster == 'gbtree':
                 subsample = trial.suggest_loguniform('subsample', 1e-6, 1.0)
                 clf = XGBClassifier(booster=booster, n_estimators=n_estimators, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
-                    gamma=gamma, grow_policy=grow_policy, subsample=subsample)
+                    gamma=gamma, grow_policy=grow_policy, subsample=subsample)#, tree_method='hist')
 
             cv = cross_validate(clf, self.data_x, self.data_y, cv=3)
             final_score = np.round(np.mean(cv['test_score']), 6)
@@ -197,16 +200,16 @@ class objective_xgb(object):
             return final_score
 
         booster = trial.suggest_categorical('booster', ['gbtree', 'dart'])
-        n_estimators = trial.suggest_int('n_estimators', 100, 3000)
+        n_estimators = trial.suggest_int('n_estimators', 100, 500)
         colsample_bytree = trial.suggest_float('colsample_bytree', 0.5, 1)
-        reg_lambda = trial.suggest_float('reg_lambda', 0, 1)
-        reg_alpha = trial.suggest_int('reg_alpha', 0, 100)
+        reg_lambda = trial.suggest_float('reg_lambda', 0, 10)
+        reg_alpha = trial.suggest_int('reg_alpha', 0, 10)
         max_depth = trial.suggest_int('max_depth', 2, 25)
         eta = trial.suggest_float('eta', 1e-8, 1)
-        gamma = trial.suggest_int('gamma', 1, 100)
+        gamma = trial.suggest_int('gamma', 1, 10)
         grow_policy = trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
-        min_child_weight = trial.suggest_int('min_child_weight', 1, 100)
-        max_delta_step = trial.suggest_int('max_delta_step', 1, 100)
+        min_child_weight = trial.suggest_int('min_child_weight', 1, 10)
+        max_delta_step = trial.suggest_int('max_delta_step', 1, 10)
         subsample = trial.suggest_float('subsample', 0.5, 1.0)
 
         if booster == "dart":
@@ -218,12 +221,12 @@ class objective_xgb(object):
             clf = XGBClassifier(booster=booster, n_estimators=n_estimators, colsample_bytree=colsample_bytree, reg_lambda=reg_lambda, 
                 reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, gamma=gamma, grow_policy=grow_policy, min_child_weight=min_child_weight, 
                 max_delta_step=max_delta_step, subsample=subsample, sample_type=sample_type, normalize_type=normalize_type, rate_drop=rate_drop, 
-                skip_drop=skip_drop)
+                skip_drop=skip_drop)#, tree_method='hist')
 
         elif booster == 'gbtree':
             clf = XGBClassifier(booster=booster, n_estimators=n_estimators, colsample_bytree=colsample_bytree,  reg_lambda=reg_lambda, 
                 reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, gamma=gamma, grow_policy=grow_policy, min_child_weight=min_child_weight,
-                max_delta_step=max_delta_step, subsample=subsample)
+                max_delta_step=max_delta_step, subsample=subsample)#, tree_method='hist')
 
         cv = cross_validate(clf, self.data_x, self.data_y, cv=3)
         final_score = np.round(np.mean(cv['test_score']), 6)
@@ -436,7 +439,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             model = RandomForestClassifier(n_estimators=params['n_estimators'], criterion=params['criterion'], 
                 max_depth=params['max_depth'], min_samples_split=params['min_samples_split'], 
                 min_samples_leaf=params['min_samples_leaf'], max_features=params['max_features'], 
-                bootstrap=params['bootstrap'], sample_weight=sample_weight)
+                bootstrap=params['bootstrap'], class_weight=sample_weight)
         except:
             print('Failed to optimize with Optuna, switching over to BayesSearchCV...')
             params = {
@@ -485,7 +488,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
     elif clf == 'xgb':
         objective = objective_xgb(data_x, data_y, limit_search=limit_search)
         if limit_search:
-            print('Note: To expand hyperparameter search space, set limit_search=False, although this will increase the optimization time significantly.')
+            print('NOTE: To expand hyperparameter search space, set limit_search=False, although this will increase the optimization time significantly.')
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
         params = study.best_trial.params
         if limit_search:
@@ -493,11 +496,11 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
                 model = XGBClassifier(booster=params['booster'],  n_estimators=params['n_estimators'], reg_lambda=params['reg_lambda'], 
                     reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
                     grow_policy=params['grow_policy'], sample_type=params['sample_type'], normalize_type=params['normalize_type'],
-                    rate_drop=params['rate_drop'], skip_drop=params['skip_drop'], sample_weight=sample_weight)
+                    rate_drop=params['rate_drop'], skip_drop=params['skip_drop'], scale_pos_weight=sample_weight)
             elif params['booster'] == 'gbtree':
                 model = XGBClassifier(booster=params['booster'],  n_estimators=params['n_estimators'], reg_lambda=params['reg_lambda'], 
                     reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
-                    grow_policy=params['grow_policy'], subsample=params['subsample'], sample_weight=sample_weight)
+                    grow_policy=params['grow_policy'], subsample=params['subsample'], scale_pos_weight=sample_weight)
         else:
             if params['booster'] == 'dart':
                 model = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'], 
@@ -514,6 +517,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
     else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
             val_X=val_X, val_Y=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, limit_search=limit_search)
+        if limit_search:
+            print('NOTE: To expand hyperparameter search space, set limit_search=False, although this will increase the optimization time significantly.')
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
         params = study.best_trial.params
 
@@ -559,7 +564,7 @@ def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
     """
     
     if boruta_trials == 0:
-        return np.arange(data_x.shape[1])
+        return np.arange(data_x.shape[1]), None
 
     if boruta_trials < 20:
         print('Results are unstable if boruta_trials is too low!')

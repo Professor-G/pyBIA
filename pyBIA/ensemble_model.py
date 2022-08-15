@@ -126,7 +126,7 @@ class Classifier:
                 print('________________________________')
                 y = np.zeros(len(self.data_y))
                 for i in range(len(np.unique(self.data_y))):
-                    print(str(np.unique(data_y)[i]).ljust(10)+'  ------------->     '+str(i))
+                    print(str(np.unique(self.data_y)[i]).ljust(10)+'  ------------->     '+str(i))
                     index = np.where(self.data_y == np.unique(self.data_y)[i])[0]
                     y[index] = i
                 self.data_y = y 

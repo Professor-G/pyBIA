@@ -34,6 +34,7 @@ from BorutaShap import BorutaShap
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 from xgboost import XGBClassifier
 from pyBIA import cnn_model 
+from pyBIA.data_augmentation import augmentation, resize
 
 class objective_cnn(object):
     """
@@ -64,10 +65,12 @@ class objective_cnn(object):
         self.patience = patience 
         self.metric = metric 
         self.limit_search = limit_search
+        self.opt_aug = opt_aug
+    
         if self.metric == 'val_loss' or self.metric == 'val_accuracy':
             if self.val_X is None or self.val_Y is None:
                 raise ValueError('No validation data input, change the metric to either "loss" or "accuracy".')
-            
+
     def __call__(self, trial):
 
         clear_session()
@@ -75,6 +78,28 @@ class objective_cnn(object):
             mode = 'min'
         elif self.metric == 'accuracy' or self.metric == 'val_accuracy':
             mode = 'max'
+
+        if self.opt_aug:
+            channel1 = blob_bw
+            channel2 = blob_r
+            channel3 = None
+            batch = trial.suggest_int('batch', 10, 250, step=10)
+            shift = trial.suggest_int('shift', 0, 25)
+            horizontal = trial.suggest_categorical('horizontal', [True, False])
+            vertical = trial.suggest_categorical('vertical', [True, False])
+            rotation = trial.suggest_int('rotation', 0, 360, step=360)
+            image_size = trial.suggest_int('image_size', 50, 100, step=5)
+            blob_bw, blob_r = augmentation(channel1=blob_bw, channel2=blob_r, channel3=channel3, batch=batch, width_shift=shift, height_shift=shift, horizontal=horizontal, vertical=vertical, rotation=rotation, image_size=image_size)
+
+            blobs=[]
+            for i in range(len(blob_bw)):
+                stacked = data_processing.concat_channels(blob_bw[i], blob_r[i])
+                blobs.append(stacked)
+
+            blobs = np.array(blobs)
+
+
+
 
         if self.limit_search is False:
             batch_size = trial.suggest_int('batch_size', 2, 64)
@@ -194,22 +219,22 @@ class objective_xgb(object):
                 clf = XGBClassifier(booster=booster, n_estimators=n_estimators, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
                     gamma=gamma, grow_policy=grow_policy, subsample=subsample)#, tree_method='hist')
 
-            cv = cross_validate(clf, self.data_x, self.data_y, cv=3)
-            final_score = np.round(np.mean(cv['test_score']), 6)
+            cv = cross_validate(clf, self.data_x, self.data_y, cv=10)
+            final_score = np.round(np.mean(cv['test_score']), 10)
 
             return final_score
 
         booster = trial.suggest_categorical('booster', ['gbtree', 'dart'])
         n_estimators = trial.suggest_int('n_estimators', 100, 500)
         colsample_bytree = trial.suggest_float('colsample_bytree', 0.5, 1)
-        reg_lambda = trial.suggest_float('reg_lambda', 0, 10)
-        reg_alpha = trial.suggest_int('reg_alpha', 0, 10)
+        reg_lambda = trial.suggest_float('reg_lambda', 0, 100)
+        reg_alpha = trial.suggest_int('reg_alpha', 0, 100)
         max_depth = trial.suggest_int('max_depth', 2, 25)
         eta = trial.suggest_float('eta', 1e-8, 1)
-        gamma = trial.suggest_int('gamma', 1, 10)
+        gamma = trial.suggest_int('gamma', 1, 100)
         grow_policy = trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
-        min_child_weight = trial.suggest_int('min_child_weight', 1, 10)
-        max_delta_step = trial.suggest_int('max_delta_step', 1, 10)
+        min_child_weight = trial.suggest_int('min_child_weight', 1, 100)
+        max_delta_step = trial.suggest_int('max_delta_step', 1, 100)
         subsample = trial.suggest_float('subsample', 0.5, 1.0)
 
         if booster == "dart":
@@ -228,8 +253,8 @@ class objective_xgb(object):
                 reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, gamma=gamma, grow_policy=grow_policy, min_child_weight=min_child_weight,
                 max_delta_step=max_delta_step, subsample=subsample)#, tree_method='hist')
 
-        cv = cross_validate(clf, self.data_x, self.data_y, cv=3)
-        final_score = np.round(np.mean(cv['test_score']), 6)
+        cv = cross_validate(clf, self.data_x, self.data_y, cv=10)
+        final_score = np.round(np.mean(cv['test_score']), 10)
 
         return final_score
 

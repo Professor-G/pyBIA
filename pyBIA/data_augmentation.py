@@ -14,9 +14,6 @@ import random
 from pyBIA.data_processing import crop_image
 from warnings import warn
 
-import numpy as np
-from keras.utils import Sequence, to_categorical
-
 
 def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5, height_shift=5, 
     horizontal=True, vertical=True, rotation=360, fill='nearest', image_size=50):
@@ -29,8 +26,8 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
 
     Note:
         This function is used for offline data augmentation! In practice,
-        online augmentation is more often performed as that exposes the
-        CNN to significantly more samples. If multiple channels are input,
+        online augmentation may be preferred as that exposes the CNN
+        to significantly more samples. If multiple channels are input,
         this method will save the seeds from the augmentation of the first 
         channel, after which the seeds will be applied to the remaining channels,
         thus ensuring the same augmentation procedure is applied across all filters.

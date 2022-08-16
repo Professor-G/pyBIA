@@ -100,6 +100,10 @@ class Classifier:
         self.optimization_results = None 
         self.best_params = None 
 
+        if self.data_x is None or self.data_y is None:
+            print('NOTE: data_x and data_y parameters are required to output visualizations')
+           
+
     def create(self):
         """
         Creates the machine learning engine, current options are either a
@@ -263,7 +267,7 @@ class Classifier:
             pass
 
         try:
-            self.optimization_results = joblib.load(path+'Optimization_Results')
+            self.optimization_results = joblib.load(path+'HyperOpt_Results')
             optimization_results = 'optimization_results'
         except FileNotFoundError:
             optimization_results = '' 
@@ -408,6 +412,7 @@ class Classifier:
         Returns:
             AxesImage.
         """
+        
         classes = [str(label) for label in np.unique(self.data_y)]
         if np.any(np.isnan(self.data_x)):
             print('Automatically imputing NaN values with KNN imputation.')

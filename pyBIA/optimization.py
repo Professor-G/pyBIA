@@ -43,18 +43,39 @@ class objective_cnn(object):
     Optuna. The Optuna software for hyperparameter optimization was published in 
     2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
 
+    Unlike the objective functions for the ensemble algorithms, this takes as input
+    the two classes directly, instead of the traditional data (data_x) and accompanying
+    label array (data_y). This is because the cnn_model.pyBIA_model() function takes as input the two
+    classes directly, after which it automatically assigns the 0 and 1 label, accordingly. 
+
+    Note:
+        If opt_aug is enabled, then the class1 sample will be the data that will augmented!
+        It is best to keep both class sizes the same after augmentation, therefore balance=True
+        by default, which will truncate the class2 sample to meet the augmented class1 size.
+
+        For example, if class1 contains only 100 images, opt_aug will identify the ideal number 
+        of augmentations to perform. If this ideal quantity is 10, then each of the 100 class1 images will 
+        be augmented 10 times, and thus only the first 1000 images in the class2 sample will be used so
+        as to keep the final sample sizes the same. 
+
+        Since the maximum number of augmentations allowed is 250 per sample, in practice class2 
+        should contain 250 times the size of class1. During the optimization procedure, if an 
+        augmentation batch size of 10 is assesed, then only 100*10=1000 augmented images will be created, 
+        and therefore during that particular trial only the first 1000 images from class2 will be used, and so forth. 
+        To use the entire class2 sample regardless of the number augmentations performed, set balance=False.
+
     Args:
         data_x
         data_y
         img_num_channels
     """
 
-    def __init__(self, data_x, data_y, img_num_channels=1, normalize=True, min_pixel=638,
+    def __init__(self, class1, class2, img_num_channels=1, normalize=True, min_pixel=638,
         max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=20, metric='loss',
-        limit_search=True, opt_aug=True):
+        limit_search=True, opt_aug=True, balance=True, channel1, channel2=None, channel3=None):
 
-        self.data_x = data_x
-        self.data_y = data_y
+        self.class1 = class1
+        self.class2 = class2
         self.img_num_channels = img_num_channels
         self.normalize = normalize 
         self.min_pixel = min_pixel
@@ -66,6 +87,16 @@ class objective_cnn(object):
         self.metric = metric 
         self.limit_search = limit_search
         self.opt_aug = opt_aug
+
+        if self.opt_aug:
+            if len(self.class1) == 1:
+                channel1, channel2, channel3 = class1, None, None 
+            elif len(self.class1) == 2:
+                channel1, channel2, channel3 = class1[0], class1[1], None 
+            elif len(self.class1) == 3:
+                channel1, channel2, channel3 = class1[0], class1[1], class1[2]
+            else:
+                raise ValueError('Only three filters are supported!')
     
         if self.metric == 'val_loss' or self.metric == 'val_accuracy':
             if self.val_X is None or self.val_Y is None:
@@ -80,26 +111,36 @@ class objective_cnn(object):
             mode = 'max'
 
         if self.opt_aug:
-            channel1 = blob_bw
-            channel2 = blob_r
-            channel3 = None
             batch = trial.suggest_int('batch', 10, 250, step=10)
             shift = trial.suggest_int('shift', 0, 25)
             horizontal = trial.suggest_categorical('horizontal', [True, False])
             vertical = trial.suggest_categorical('vertical', [True, False])
             rotation = trial.suggest_int('rotation', 0, 360, step=360)
             image_size = trial.suggest_int('image_size', 50, 100, step=5)
-            blob_bw, blob_r = augmentation(channel1=blob_bw, channel2=blob_r, channel3=channel3, batch=batch, width_shift=shift, height_shift=shift, horizontal=horizontal, vertical=vertical, rotation=rotation, image_size=image_size)
 
-            blobs=[]
-            for i in range(len(blob_bw)):
-                stacked = data_processing.concat_channels(blob_bw[i], blob_r[i])
-                blobs.append(stacked)
+            augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=batch, 
+                width_shift=shift, height_shift=shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
+                image_size=image_size)
 
-            blobs = np.array(blobs)
+            if len(augmented_images) > 1:
+                stacked=[]
+                if len(augmented_images) == 2:
+                    for i in range(len(blob_bw)):
+                        stacked.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i]))
+                else:
+                    for i in range(len(blob_bw)):
+                        stacked.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
+                stacked = np.array(stacked)
+            elif len(augmented_images) == 1:
+                stacked = augmented_images
 
-
-
+            class_1 = stacked 
+            if self.balance:
+                class_2 = self.class2[:len(class_1)]   
+            else:
+                class_2 = self.class2   
+        else:
+            class_1, class_2 = self.class1, self.class2
 
         if self.limit_search is False:
             batch_size = trial.suggest_int('batch_size', 2, 64)
@@ -152,7 +193,7 @@ class objective_cnn(object):
 
         if self.limit_search is False:
             try:
-                model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                model, history = cnn_model.pyBIA_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
                     batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, loss=loss, activation_conv=activation_conv, 
                     activation_dense=activation_dense, dropout=dropout, maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, filter_1=filter_1,
@@ -163,7 +204,7 @@ class objective_cnn(object):
                 return 0.0
         else:
             try:
-                model, history = cnn_model.pyBIA_model(self.data_x, self.data_y, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                model, history = cnn_model.pyBIA_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, batch_size=batch_size, 
                     lr=lr, decay=decay,  maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, 
                     filter_2=filter_2, filter_size_2=filter_size_2, filter_3=filter_3, filter_size_3=filter_size_3, filter_4=filter_4, filter_size_4=filter_size_4, 

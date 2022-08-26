@@ -58,21 +58,22 @@ class objective_cnn(object):
         be augmented 10 times, and thus only the first 1000 images in the class2 sample will be used so
         as to keep the final sample sizes the same. 
 
-        Since the maximum number of augmentations allowed is 250 per sample, in practice class2 
-        should contain 250 times the size of class1. During the optimization procedure, if an 
+        Since the maximum number of augmentations allowed is batch_max per each sample, in practice class2 
+        should contain batch_max times the size of class1. During the optimization procedure, if an 
         augmentation batch size of 10 is assesed, then only 100*10=1000 augmented images will be created, 
         and therefore during that particular trial only the first 1000 images from class2 will be used, and so forth. 
         To use the entire class2 sample regardless of the number augmentations performed, set balance=False.
 
     Args:
-        data_x
-        data_y
+        class1
+        class2
         img_num_channels
     """
 
     def __init__(self, class1, class2, img_num_channels=1, normalize=True, min_pixel=638,
         max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=20, metric='loss',
-        limit_search=True, opt_aug=True, balance=True, channel1, channel2=None, channel3=None):
+        limit_search=True, opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100,
+         balance=True):
 
         self.class1 = class1
         self.class2 = class2
@@ -90,14 +91,15 @@ class objective_cnn(object):
 
         if self.opt_aug:
             if len(self.class1) == 1:
-                channel1, channel2, channel3 = class1, None, None 
+                channel1, channel2, channel3 = self.class1, None, None 
             elif len(self.class1) == 2:
-                channel1, channel2, channel3 = class1[0], class1[1], None 
+                channel1, channel2, channel3 = self.class1[0], self.class1[1], None 
             elif len(self.class1) == 3:
-                channel1, channel2, channel3 = class1[0], class1[1], class1[2]
+                channel1, channel2, channel3 = self.class1[0], self.class1[1], self.class1[2]
             else:
                 raise ValueError('Only three filters are supported!')
-    
+
+
         if self.metric == 'val_loss' or self.metric == 'val_accuracy':
             if self.val_X is None or self.val_Y is None:
                 raise ValueError('No validation data input, change the metric to either "loss" or "accuracy".')
@@ -111,30 +113,29 @@ class objective_cnn(object):
             mode = 'max'
 
         if self.opt_aug:
-            batch = trial.suggest_int('batch', 10, 250, step=10)
+            batch = trial.suggest_int('batch', batch_min, batch_max, step=10)
+            image_size = trial.suggest_int('image_size', image_size_min, image_size_max, step=5)
             shift = trial.suggest_int('shift', 0, 25)
             horizontal = trial.suggest_categorical('horizontal', [True, False])
             vertical = trial.suggest_categorical('vertical', [True, False])
             rotation = trial.suggest_int('rotation', 0, 360, step=360)
-            image_size = trial.suggest_int('image_size', 50, 100, step=5)
-
+            print('rotation: '+str(rotation))
             augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=batch, 
                 width_shift=shift, height_shift=shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
                 image_size=image_size)
 
             if len(augmented_images) > 1:
-                stacked=[]
+                class_1=[]
                 if len(augmented_images) == 2:
-                    for i in range(len(blob_bw)):
-                        stacked.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i]))
+                    for i in range(len(augmented_images[0])):
+                        class_1.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i]))
                 else:
-                    for i in range(len(blob_bw)):
-                        stacked.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
-                stacked = np.array(stacked)
-            elif len(augmented_images) == 1:
-                stacked = augmented_images
+                    for i in range(len(augmented_images[0])):
+                        class_1.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
+                class_1 = np.array(class_1)
+            else:
+                class_1 = augmented_images
 
-            class_1 = stacked 
             if self.balance:
                 class_2 = self.class2[:len(class_1)]   
             else:
@@ -142,49 +143,37 @@ class objective_cnn(object):
         else:
             class_1, class_2 = self.class1, self.class2
 
+        batch_size = trial.suggest_int('batch_size', 16, 64)
+        lr = trial.suggest_float('lr', 1e-6, 0.1, step=0.05)
+        decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
+        maxpool_size_1 = trial.suggest_int('maxpool_size_1', 2, 25)
+        maxpool_stride_1 = trial.suggest_int('maxpool_stride_1', 1, 15)
+        maxpool_size_2 = trial.suggest_int('maxpool_size_2', 2, 25)
+        maxpool_stride_2 = trial.suggest_int('maxpool_stride_2', 1, 15)
+        maxpool_size_3 = trial.suggest_int('maxpool_size_3', 2, 25)
+        maxpool_stride_3 = trial.suggest_int('maxpool_stride_3', 1, 15)
+        filter_1 = trial.suggest_int('filter_1', 12, 408, step=12)
+        filter_size_1 = trial.suggest_int('filter_size_1', 1, 11, step=2)
+        strides_1 = trial.suggest_int('strides_1', 1, 15)
+        filter_2 = trial.suggest_int('filter_2', 12, 408, step=12)
+        filter_size_2 = trial.suggest_int('filter_size_2', 1, 11, step=2)
+        strides_2 = trial.suggest_int('strides_2', 1, 15)
+        filter_3 = trial.suggest_int('filter_3', 12, 408, step=12)
+        filter_size_3 = trial.suggest_int('filter_size_3', 1, 11, step=2)
+        strides_3 = trial.suggest_int('strides_3', 1, 15)
+        filter_4 = trial.suggest_int('filter_4', 12, 408, step=12)
+        filter_size_4 = trial.suggest_int('filter_size_4', 1, 11, step=2)
+        strides_4 = trial.suggest_int('strides_4', 1, 15)
+        filter_5 = trial.suggest_int('filter_5', 12, 408, step=12)
+        filter_size_5 = trial.suggest_int('filter_size_5', 1, 11, step=2)
+        strides_5 = trial.suggest_int('strides_5', 1, 15)
+
         if self.limit_search is False:
-            batch_size = trial.suggest_int('batch_size', 2, 64)
-            lr = trial.suggest_float('lr', 1e-5, 0.1, step=0.05)
-            momentum = trial.suggest_float('momentum', 0, 1, step=0.1)
-            decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
+            momentum = trial.suggest_float('momentum', 0.0, 1.0, step=0.05)
             nesterov = trial.suggest_categorical('nesterov', [True, False])
-            loss = trial.suggest_categorical('loss', ['categorical_crossentropy', 'squared_hinge'])
             dropout = trial.suggest_float('dropout', 0, 0.5, step=0.05)
             activation_conv = trial.suggest_categorical('activation_conv', ['relu',  'sigmoid', 'tanh'])
             activation_dense = trial.suggest_categorical('activation_dense', ['relu', 'sigmoid', 'tanh'])
-            maxpool_size = trial.suggest_int('maxpool_size', 3, 10)
-            maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
-            filter_1 = trial.suggest_int('filter_1', 12, 408, step=12)
-            filter_size_1 = trial.suggest_int('filter_size_1', 1, 11, step=2)
-            strides_1 = trial.suggest_int('strides_1', 1, 10)
-            filter_2 = trial.suggest_int('filter_2', 12, 408, step=12)
-            filter_size_2 = trial.suggest_int('filter_size_2', 1, 11, step=2)
-            filter_3 = trial.suggest_int('filter_3', 12, 408, step=12)
-            filter_size_3 = trial.suggest_int('filter_size_3', 1, 11, step=2)
-            filter_4 = trial.suggest_int('filter_4', 12, 408, step=12)
-            filter_size_4 = trial.suggest_int('filter_size_4', 1, 11, step=2)
-            filter_5 = trial.suggest_int('filter_5', 12, 408, step=12)
-            filter_size_5 = trial.suggest_int('filter_size_5', 1, 11, step=2)
-
-        else:
-            batch_size = trial.suggest_int('batch_size', 16, 64)
-            lr = trial.suggest_float('lr', 1e-5, 0.1, step=0.05)
-            decay = trial.suggest_float('decay', 0, 0.1, step=0.001)
-            maxpool_size = trial.suggest_int('maxpool_size', 3, 10)
-            maxpool_stride = trial.suggest_int('maxpool_stride', 1, 10)
-            filter_1 = trial.suggest_int('filter_1', 12, 408, step=12)
-            filter_size_1 = trial.suggest_int('filter_size_1', 1, 11, step=2)
-            strides_1 = trial.suggest_int('strides_1', 1, 10)
-            filter_2 = trial.suggest_int('filter_2', 12, 408, step=12)
-            filter_size_2 = trial.suggest_int('filter_size_2', 1, 11, step=2)
-            filter_3 = trial.suggest_int('filter_3', 12, 408, step=12)
-            filter_size_3 = trial.suggest_int('filter_size_3', 1, 11, step=2)
-            filter_4 = trial.suggest_int('filter_4', 12, 408, step=12)
-            filter_size_4 = trial.suggest_int('filter_size_4', 1, 11, step=2)
-            filter_5 = trial.suggest_int('filter_5', 12, 408, step=12)
-            filter_size_5 = trial.suggest_int('filter_size_5', 1, 11, step=2)
-            print(batch_size, lr, decay, maxpool_size, maxpool_stride, filter_1, filter_size_1, strides_1)
-            print(filter_2, filter_size_2, filter_3, filter_size_3, filter_4, filter_size_4, filter_5, filter_size_5)
 
         if self.patience != 0:
             callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience), TFKerasPruningCallback(trial, monitor=self.metric),]
@@ -195,10 +184,12 @@ class objective_cnn(object):
             try:
                 model, history = cnn_model.pyBIA_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
-                    batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, loss=loss, activation_conv=activation_conv, 
-                    activation_dense=activation_dense, dropout=dropout, maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, filter_1=filter_1,
-                    filter_size_1=filter_size_1, strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, filter_3=filter_3, filter_size_3=filter_size_3,
-                    filter_4=filter_4, filter_size_4=filter_size_4, filter_5=filter_5, filter_size_5=filter_size_5, early_stop_callback=callbacks, checkpoint=False)
+                    batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
+                    activation_dense=activation_dense, dropout=dropout, maxpool_size_1=maxpool_size_1, maxpool_stride_1=maxpool_stride_1, 
+                    maxpool_size_2=maxpool_size_2, maxpool_stride_2=maxpool_stride_2, maxpool_size_3=maxpool_size_3, maxpool_stride_3=maxpool_stride_3, 
+                    filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2,
+                    filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_4,
+                    filter_5=filter_5, filter_size_5=filter_size_5, strides_5=strides_5, early_stop_callback=callbacks, checkpoint=False)
             except: 
                 print("Invalid hyperparameter combination, skipping trial.")
                 return 0.0
@@ -206,9 +197,11 @@ class objective_cnn(object):
             try:
                 model, history = cnn_model.pyBIA_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, batch_size=batch_size, 
-                    lr=lr, decay=decay,  maxpool_size=maxpool_size, maxpool_stride=maxpool_stride, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, 
-                    filter_2=filter_2, filter_size_2=filter_size_2, filter_3=filter_3, filter_size_3=filter_size_3, filter_4=filter_4, filter_size_4=filter_size_4, 
-                    filter_5=filter_5, filter_size_5=filter_size_5, early_stop_callback=callbacks, checkpoint=False)
+                    lr=lr, decay=decay,  maxpool_size_1=maxpool_size_1, maxpool_stride_1=maxpool_stride_1, maxpool_size_2=maxpool_size_2, maxpool_stride_2=maxpool_stride_2, 
+                    maxpool_size_3=maxpool_size_3, maxpool_stride_3=maxpool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, 
+                    filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, 
+                    filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, strides_5=strides_5, 
+                    early_stop_callback=callbacks, checkpoint=False)
             except:
                 print("Memory allocation issue, probably due to large batch size, skipping trial.")
                 return 0.0
@@ -406,11 +399,15 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         
     Args:
         data_x (ndarray): 2D array of size (n x m), where n is the
-            number of samples, and m the number of features.
+            number of samples, and m the number of features. In the case of 
+            CNN, the samples for the first class should be passed, which will
+            automatically be assigned the label '0'.
         data_y (ndarray, str): 1D array containing the corresponing labels.
         clf (str): The machine learning classifier to optimize. Can either be
             'rf' for Random Forest, 'nn' for Neural Network, 'xgb' for eXtreme Gradient Boosting,
             or 'cnn' for Convolutional Neural Network. Defaults to 'rf'.
+            In the case of CNN, the samples for the second class should be passed, which will
+            automatically be assigned the label '1'.
         n_iter (int, optional): The maximum number of iterations to perform during 
             the hyperparameter search. Defaults to 25.
         return_study (bool, optional): If True the Optuna study object will be returned. This
@@ -466,7 +463,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
     elif clf == 'cnn':
         pass 
     else:
-        raise ValueError('clf argument must either be "rf", "nn", or "xgb", or "cnn".')
+        raise ValueError('clf argument must either be "rf", "xgb", "nn", or "cnn".')
 
     if clf != 'cnn':
         cv = cross_validate(model_0, data_x, data_y, cv=3)
@@ -584,7 +581,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
             val_X=val_X, val_Y=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, limit_search=limit_search)
         if limit_search:
-            print('NOTE: To expand hyperparameter search space, set limit_search=False, although this will increase the optimization time significantly.')
+            print('NOTE: To expand hyperparameter search space, set limit_search=False, although this may increase the optimization time significantly.')
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
         params = study.best_trial.params
 

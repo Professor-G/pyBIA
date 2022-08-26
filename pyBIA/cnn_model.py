@@ -128,12 +128,12 @@ class Classifier:
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
                 lr=self.best_params['lr'], momentum=self.best_params['momentum'], decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], 
                 dropout=self.best_params['dropout'], activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'], 
-                maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride'], filter_1=self.best_params['filter_1'], 
-                filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'], filter_2=self.best_params['filter_2'], 
-                filter_size_2=self.best_params['filter_size_2'], strides_2=self.best_params['strides_2'], filter_3=self.best_params['filter_3'], 
-                filter_size_3=self.best_params['filter_size_3'], strides_3=self.best_params['strides_3'], filter_4=self.best_params['filter_4'], 
-                filter_size_4=self.best_params['filter_size_4'], strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], 
-                filter_size_5=self.best_params['filter_size_5'],  strides_5=self.best_params['strides_5'])
+                maxpool_size_1=self.best_params['maxpool_size_1'], maxpool_stride_1=self.best_params['maxpool_stride_1'], maxpool_size_2=self.best_params['maxpool_size_2'], 
+                maxpool_stride_2=self.best_params['maxpool_stride_2'], maxpool_size_3=self.best_params['maxpool_size_3'], maxpool_stride_3=self.best_params['maxpool_stride_3'],
+                filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'], filter_2=self.best_params['filter_2'], 
+                filter_size_2=self.best_params['filter_size_2'], strides_2=self.best_params['strides_2'], filter_3=self.best_params['filter_3'], filter_size_3=self.best_params['filter_size_3'], 
+                strides_3=self.best_params['strides_3'], filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], strides_4=self.best_params['strides_4'], 
+                filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'],  strides_5=self.best_params['strides_5'])
             
         return 
 

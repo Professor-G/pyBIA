@@ -70,7 +70,7 @@ class Classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, blob_data=None, other_data=None, optimize=True, limit_search=True, metric='loss', n_iter=25, img_num_channels=1, normalize=True, min_pixel=638,
+    def __init__(self, blob_data=None, other_data=None, img_num_channels=1, optimize=True, limit_search=True, metric='loss', n_iter=25, normalize=True, min_pixel=638,
         max_pixel=3000, val_X=None, val_Y=None, epochs=100, train_epochs=25, patience=5):
 
         self.blob_data = blob_data
@@ -117,19 +117,23 @@ class Classifier:
         if self.limit_search:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
-                lr=self.best_params['lr'], decay=self.best_params['decay'], maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride'],
-                filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'],
-                filter_2=self.best_params['filter_2'], filter_size_2=self.best_params['filter_size_2'], filter_3=self.best_params['filter_3'], filter_size_3=self.best_params['filter_size_3'],
-                filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'])
+                lr=self.best_params['lr'], decay=self.best_params['decay'], maxpool_size_1=self.best_params['maxpool_size_1'], maxpool_stride_1=self.best_params['maxpool_stride_1'],
+                maxpool_size_2=self.best_params['maxpool_size_2'], maxpool_stride_2=self.best_params['maxpool_stride_2'], maxpool_size_3=self.best_params['maxpool_size_3'], 
+                maxpool_stride_3=self.best_params['maxpool_stride_3'], filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'],
+                filter_2=self.best_params['filter_2'], filter_size_2=self.best_params['filter_size_2'], strides_2=self.best_params['strides_2'], filter_3=self.best_params['filter_3'], 
+                filter_size_3=self.best_params['filter_size_3'],  strides_3=self.best_params['strides_3'], filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], 
+                strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'],  strides_5=self.best_params['strides_5'])
         else:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
                 lr=self.best_params['lr'], momentum=self.best_params['momentum'], decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], 
-                loss=self.best_params['loss'], dropout=self.best_params['dropout'], activation_conv=self.best_params['activation_conv'], 
-                activation_dense=self.best_params['activation_dense'], maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride'],
-                filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'],
-                filter_2=self.best_params['filter_2'], filter_size_2=self.best_params['filter_size_2'], filter_3=self.best_params['filter_3'], filter_size_3=self.best_params['filter_size_3'],
-                filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5']) 
+                dropout=self.best_params['dropout'], activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'], 
+                maxpool_size=self.best_params['maxpool_size'], maxpool_stride=self.best_params['maxpool_stride'], filter_1=self.best_params['filter_1'], 
+                filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'], filter_2=self.best_params['filter_2'], 
+                filter_size_2=self.best_params['filter_size_2'], strides_2=self.best_params['strides_2'], filter_3=self.best_params['filter_3'], 
+                filter_size_3=self.best_params['filter_size_3'], strides_3=self.best_params['strides_3'], filter_4=self.best_params['filter_4'], 
+                filter_size_4=self.best_params['filter_size_4'], strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], 
+                filter_size_5=self.best_params['filter_size_5'],  strides_5=self.best_params['strides_5'])
             
         return 
 
@@ -330,13 +334,14 @@ class Classifier:
         return 
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
-        min_pixel=0, max_pixel=3000, val_X=None, val_Y=None, epochs=100, 
+        min_pixel=0, max_pixel=100, val_X=None, val_Y=None, epochs=100, 
         batch_size=32, lr=0.0001, momentum=0.9, decay=0.0, nesterov=False, 
         loss='categorical_crossentropy', activation_conv='relu', activation_dense='relu', 
-        padding='same', dropout=0.5, pooling=True, maxpool_size=3, maxpool_stride=2, 
-        filter_1=96, filter_size_1=11, strides_1=4, filter_2=256, filter_size_2=5, 
-        filter_3=384, filter_size_3=3, filter_4=384, filter_size_4=3, filter_5=256, filter_size_5=3, 
-        early_stop_callback=None, checkpoint=True):
+        padding='same', dropout=0.5, pooling=True, maxpool_size_1=3, maxpool_stride_1=2,
+        maxpool_size_2=3, maxpool_stride_2=2, maxpool_size_3=3, maxpool_stride_3=2, 
+        filter_1=96, filter_size_1=11, strides_1=4, filter_2=256, filter_size_2=5, strides_2=1,
+        filter_3=384, filter_size_3=3, strides_3=1, filter_4=384, filter_size_4=3, strides_4=1,
+        filter_5=256, filter_size_5=3, strides_5=1, early_stop_callback=None, checkpoint=True):
         """
         The CNN model infrastructure presented by the 2012 ImageNet Large Scale 
         Visual Recognition Challenge, AlexNet. Parameters were adapted for
@@ -475,25 +480,25 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
         model.add(Conv2D(filter_1, filter_size_1, strides=strides_1, activation=activation_conv, input_shape=input_shape,
                          padding=padding, kernel_initializer=uniform_scaling))
         if pooling:
-            model.add(MaxPool2D(pool_size=maxpool_size, strides=maxpool_stride, padding=padding))
+            model.add(MaxPool2D(pool_size=maxpool_size_1, strides=maxpool_stride_1, padding=padding))
         model.add(BatchNormalization())
 
-        model.add(Conv2D(filter_2, filter_size_2, activation=activation_conv, padding=padding,
+        model.add(Conv2D(filter_2, filter_size_2, strides=strides_2, activation=activation_conv, padding=padding,
                          kernel_initializer=uniform_scaling))
         if pooling:
-            model.add(MaxPool2D(pool_size=maxpool_size, strides=maxpool_stride, padding=padding))
+            model.add(MaxPool2D(pool_size=maxpool_size_2, strides=maxpool_stride_2, padding=padding))
         model.add(BatchNormalization())
 
-        model.add(Conv2D(filter_3, filter_size_3, activation=activation_conv, padding=padding,
+        model.add(Conv2D(filter_3, filter_size_3, strides=strides_3, activation=activation_conv, padding=padding,
                          kernel_initializer=uniform_scaling))
         model.add(BatchNormalization())
-        model.add(Conv2D(filter_4, filter_size_4, activation=activation_conv, padding=padding,
+        model.add(Conv2D(filter_4, filter_size_4, strides=strides_4, activation=activation_conv, padding=padding,
                          kernel_initializer=uniform_scaling))
         model.add(BatchNormalization())
-        model.add(Conv2D(filter_5, filter_size_5, activation=activation_conv, padding=padding,
+        model.add(Conv2D(filter_5, filter_size_5, strides=strides_5, activation=activation_conv, padding=padding,
                          kernel_initializer=uniform_scaling))
         if pooling:
-            model.add(MaxPool2D(pool_size=maxpool_size, strides=maxpool_stride, padding=padding))
+            model.add(MaxPool2D(pool_size=maxpool_size_3, strides=maxpool_stride_3, padding=padding))
         model.add(BatchNormalization())
 
         #FCC

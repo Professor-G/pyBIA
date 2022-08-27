@@ -71,7 +71,7 @@ class Classifier:
 
     """
     def __init__(self, blob_data=None, other_data=None, img_num_channels=1, optimize=True, limit_search=True, metric='loss', n_iter=25, normalize=True, min_pixel=638,
-        max_pixel=3000, val_X=None, val_Y=None, epochs=100, train_epochs=25, patience=5):
+        max_pixel=3000, val_blob=None, val_other=None, epochs=100, train_epochs=25, patience=5):
 
         self.blob_data = blob_data
         self.other_data = other_data
@@ -84,8 +84,8 @@ class Classifier:
         self.normalize = normalize 
         self.min_pixel = min_pixel
         self.max_pixel = max_pixel
-        self.val_X = val_X
-        self.val_Y = val_Y
+        self.val_blob = val_blob
+        self.val_other = val_other
         self.epochs = epochs
         self.train_epochs = train_epochs
         self.patience = patience
@@ -106,17 +106,17 @@ class Classifier:
         if self.optimize is False:
             print("Returning base model...")
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs)
+                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, epochs=self.epochs)
             return      
 
         self.best_params, self.optimization_results = optimization.hyper_opt(self.blob_data, self.other_data, clf='cnn', metric=self.metric, n_iter=self.n_iter, 
             balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, 
-            max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, train_epochs=self.train_epochs, patience=self.patience, limit_search=self.limit_search)
+            max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, train_epochs=self.train_epochs, patience=self.patience, limit_search=self.limit_search)
 
         print("Fitting and returning final model...")
         if self.limit_search:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
+                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, epochs=self.epochs, batch_size=self.best_params['batch_size'],
                 lr=self.best_params['lr'], decay=self.best_params['decay'], maxpool_size_1=self.best_params['maxpool_size_1'], maxpool_stride_1=self.best_params['maxpool_stride_1'],
                 maxpool_size_2=self.best_params['maxpool_size_2'], maxpool_stride_2=self.best_params['maxpool_stride_2'], maxpool_size_3=self.best_params['maxpool_size_3'], 
                 maxpool_stride_3=self.best_params['maxpool_stride_3'], filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'],
@@ -125,7 +125,7 @@ class Classifier:
                 strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'],  strides_5=self.best_params['strides_5'])
         else:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.epochs, batch_size=self.best_params['batch_size'],
+                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, epochs=self.epochs, batch_size=self.best_params['batch_size'],
                 lr=self.best_params['lr'], momentum=self.best_params['momentum'], decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], 
                 dropout=self.best_params['dropout'], activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'], 
                 maxpool_size_1=self.best_params['maxpool_size_1'], maxpool_stride_1=self.best_params['maxpool_stride_1'], maxpool_size_2=self.best_params['maxpool_size_2'], 
@@ -177,7 +177,7 @@ class Classifier:
         if self.model is not None:      
             np.savetxt(path+'model_acc', self.history.history['accuracy'])
             np.savetxt(path+'model_loss', self.history.history['loss'])
-            if self.val_X is not None:
+            if self.val_blob is not None:
                 np.savetxt(path+'model_val_acc', self.history.history['val_accuracy'])
                 np.savetxt(path+'model_val_loss', self.history.history['val_loss'])
 
@@ -334,7 +334,7 @@ class Classifier:
         return 
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
-        min_pixel=0, max_pixel=100, val_X=None, val_Y=None, epochs=100, 
+        min_pixel=0, max_pixel=100, val_blob=None, val_other=None, epochs=100, 
         batch_size=32, lr=0.0001, momentum=0.9, decay=0.0, nesterov=False, 
         loss='categorical_crossentropy', activation_conv='relu', activation_dense='relu', 
         padding='same', dropout=0.5, pooling=True, maxpool_size_1=3, maxpool_stride_1=2,
@@ -371,11 +371,10 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
                 Pixels with counts below this threshold will be set to this limit.
             max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
                 Pixels with counts above this threshold will be set to this limit.
-            val_X (array, optional): 3D matrix containing the 2D arrays (images)
-                to be used for validation.
-            val_Y (array, optional): A binary class matrix containing the labels of the
-                corresponding validation data. This binary matrix representation can be created
-                using tensorflow, see example in the Notes.
+            val_blob (array, optional): 3D matrix containing the 2D arrays (images)
+                to be used for validationm, for the blob class. Defaults to None.
+            val_other (array, optional): 3D matrix containing the 2D arrays (images)
+                to be used for validationm, for the blob class. Defaults to None.
             epochs (int): Number of epochs used for training. 
             batch_size (int): The size of each sub-sample used during the training
                 epoch. Large batches are likely to get stuck in local minima. Defaults to 32.
@@ -401,35 +400,6 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
             early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
                 to None. Should only be used during optimization, refer to pyBIA.optimization.objective_cnn().
             checkpoint (bool, optional): If False no checkpoint will be saved. Defaults to True.
-
-        Example:
-            To use a validation dataset when training the model, the val_X and val_Y
-            parameters must be input. The val_X is a 3D matrix containing all the images, and
-            the val_Y is another matrix containing their class label (0 for DIFFUSE, 1 for OTHER).
-
-            If you have validation data of blobs and others, we can use the pyBIA data_processing module to
-            properly process our data and costruct validation arguments of appropriate shape. 
-
-                >>> blob_x, blob_y = pyBIA.data_processing.process_class(blob_val, label=0, normalize=False)
-                >>> other_x, other_x = pyBIA.data_processing.process_class(other_val, label=1, normalize=False)
-        
-                >>> val_X = np.r_[blob_x, other_x]
-                >>> val_Y = np.r_[blob_y, other_y]
-
-                >>> model = create(blob_train, other_train, val_X=val_X, val_Y=val_Y)
-
-            The process_class function will reshape our data and label array, as per the CNN requirements.
-
-            If need-be, this reshaped data array can be constructed manually as follows:
-
-                >>> data = channel.reshape(axis, img_width, img_height, img_num_channels)
-
-            The label array is also a special binary form: you can set this up manually by converting your 1D label arrays 
-            into a binary matrix representation. For example, if you have a channel with 100 DIFFUSE samples (label=0), 
-            you can create a corresponding label array using numpy and keras:
-
-                >>> label_array = numpy.expand_dims(np.array([0]*len(channel)), axis=1)
-                >>> label_array = tensorflow.keras.utils.to_categorical(label, 2)
             
         Returns:
             The trained CNN model.
@@ -437,18 +407,22 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
         
         if len(blob_data.shape) != len(other_data.shape):
             raise ValueError("Shape of blob and other data must be the same.")
-        if val_X is not None:
-            if val_Y is None:
-                raise ValueError("Need to input validation data labels (val_Y).")
-        if val_Y is not None:
-            if val_X is None:
-                raise ValueError("Need to input validation data (val_X).")
-        if val_X is not None:
-            if len(val_X) != len(val_Y):
-                raise ValueError("Size of validation data and validation labels must be the same.")
         if batch_size < 16:
             warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.", stacklevel=2)
-        
+        if val_blob is not None:
+            val_X1, val_Y1 = data_processing.process_class(val_blob, label=0, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+            if val_other is None:
+                val_X, val_Y = val_X1, val_Y1
+            else:
+                val_X2, val_Y2 = data_processing.process_class(val_other, label=1, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+                val_X, val_Y = np.r_[val_X1, val_X2], np.r_[val_Y1, val_Y2]
+        else:
+            if val_other is None:
+                val_X, val_Y = None, None
+            else:
+                val_X2, val_Y2 = data_processing.process_class(val_other, label=1, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+                val_X, val_Y = val_X2, val_Y2
+
         img_width = blob_data[0].shape[0]
         img_height = blob_data[0].shape[1]
         #decay = lr / epochs

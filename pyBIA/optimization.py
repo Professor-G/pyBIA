@@ -33,8 +33,9 @@ from boruta import BorutaPy
 from BorutaShap import BorutaShap
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 from xgboost import XGBClassifier
-from pyBIA import cnn_model 
 from pyBIA.data_augmentation import augmentation, resize
+from pyBIA import data_processing, cnn_model
+
 
 class objective_cnn(object):
     """
@@ -71,9 +72,9 @@ class objective_cnn(object):
     """
 
     def __init__(self, class1, class2, img_num_channels=1, normalize=True, min_pixel=638,
-        max_pixel=3000, val_X=None, val_Y=None, train_epochs=25, patience=20, metric='loss',
-        limit_search=True, opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100,
-         balance=True):
+        max_pixel=3000, val_blob=None, val_other=None, train_epochs=25, patience=20, limit_search=True, 
+        opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, 
+        balance=True, metric='loss'):
 
         self.class1 = class1
         self.class2 = class2
@@ -81,8 +82,8 @@ class objective_cnn(object):
         self.normalize = normalize 
         self.min_pixel = min_pixel
         self.max_pixel = max_pixel
-        self.val_X = val_X
-        self.val_Y = val_Y
+        self.val_blob = val_blob
+        self.val_other = val_other
         self.train_epochs = train_epochs
         self.patience = patience 
         self.metric = metric 
@@ -90,18 +91,17 @@ class objective_cnn(object):
         self.opt_aug = opt_aug
 
         if self.opt_aug:
-            if len(self.class1) == 1:
+            if self.img_num_channels == 1:
                 channel1, channel2, channel3 = self.class1, None, None 
-            elif len(self.class1) == 2:
-                channel1, channel2, channel3 = self.class1[0], self.class1[1], None 
-            elif len(self.class1) == 3:
-                channel1, channel2, channel3 = self.class1[0], self.class1[1], self.class1[2]
+            elif self.img_num_channels == 2:
+                channel1, channel2, channel3 = self.class1[:,:,:,0], self.class1[:,:,:,1], None 
+            elif self.img_num_channels == 3:
+                channel1, channel2, channel3 = self.class1[:,:,:,0], self.class1[:,:,:,1], self.class1[:,:,:,2]
             else:
                 raise ValueError('Only three filters are supported!')
 
-
         if self.metric == 'val_loss' or self.metric == 'val_accuracy':
-            if self.val_X is None or self.val_Y is None:
+            if self.val_blob is None and self.val_other is None:
                 raise ValueError('No validation data input, change the metric to either "loss" or "accuracy".')
 
     def __call__(self, trial):
@@ -124,9 +124,9 @@ class objective_cnn(object):
                 width_shift=shift, height_shift=shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
                 image_size=image_size)
 
-            if len(augmented_images) > 1:
+            if self.img_num_channels > 1:
                 class_1=[]
-                if len(augmented_images) == 2:
+                if self.img_num_channels == 2:
                     for i in range(len(augmented_images[0])):
                         class_1.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i]))
                 else:
@@ -140,8 +140,38 @@ class objective_cnn(object):
                 class_2 = self.class2[:len(class_1)]   
             else:
                 class_2 = self.class2   
+
+            #Need to also crop the validation images
+            if self.val_blob is not None:
+                if self.img_num_channels == 1:
+                    val_class_1 = resize(self.val_blob, size=image_size)
+                else:
+                    val_channel1 = resize(self.val_blob[:,:,:,0], resize=image_size)
+                    val_channel2 = resize(self.val_blob[:,:,:,1], resize=image_size)
+                    if self.img_num_channels == 2:
+                        val_class_1 = data_processing.concat_channels(val_channel1, val_channel2)
+                    else:
+                        val_channel3 = resize(self.val_blob[:,:,:,2], resize=image_size)
+                        val_class_1 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
+            else:
+                val_class_1 = None 
+
+            if self.val_other is not None:
+                if self.img_num_channels == 1:
+                    val_class_2 = resize(self.val_other, size=image_size)
+                elif self.img_num_channels > 1:
+                    val_channel1 = resize(self.val_other[:,:,:,0], resize=image_size)
+                    val_channel2 = resize(self.val_other[:,:,:,1], resize=image_size)
+                    if self.img_num_channels == 2:
+                        val_class_2 = data_processing.concat_channels(val_channel1, val_channel2)
+                    else:
+                        val_channel3 = resize(self.val_other[:,:,:,2], resize=image_size)
+                        val_class_2 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
+            else:
+                val_class_2 = None 
         else:
             class_1, class_2 = self.class1, self.class2
+            val_class_1, val_class_2 = self.val_blob, self.val_other
 
         batch_size = trial.suggest_int('batch_size', 16, 64)
         lr = trial.suggest_float('lr', 1e-6, 0.1, step=0.05)
@@ -183,7 +213,7 @@ class objective_cnn(object):
         if self.limit_search is False:
             try:
                 model, history = cnn_model.pyBIA_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, 
+                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
                     batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
                     activation_dense=activation_dense, dropout=dropout, maxpool_size_1=maxpool_size_1, maxpool_stride_1=maxpool_stride_1, 
                     maxpool_size_2=maxpool_size_2, maxpool_stride_2=maxpool_stride_2, maxpool_size_3=maxpool_size_3, maxpool_stride_3=maxpool_stride_3, 
@@ -196,7 +226,7 @@ class objective_cnn(object):
         else:
             try:
                 model, history = cnn_model.pyBIA_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_X=self.val_X, val_Y=self.val_Y, epochs=self.train_epochs, batch_size=batch_size, 
+                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, batch_size=batch_size, 
                     lr=lr, decay=decay,  maxpool_size_1=maxpool_size_1, maxpool_stride_1=maxpool_stride_1, maxpool_size_2=maxpool_size_2, maxpool_stride_2=maxpool_stride_2, 
                     maxpool_size_3=maxpool_size_3, maxpool_stride_3=maxpool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, 
                     filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, 
@@ -363,12 +393,16 @@ class objective_rf(object):
         return final_score
 
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, 
-    img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000, val_X=None, val_Y=None, 
+    img_num_channels=1, normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, 
     train_epochs=25, patience=5, metric='loss', limit_search=True):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for
     optimizing the scikit-learn implementation of the Random Forest Classifier.
+
+    **IMPORTANT** If optimizing a CNN model, val_X corresponds to the images of the first class, 
+    and val_Y the images of the second class. These will be automatically processed
+    with class labels of 0 and 1, respectively.
     
     Note:
         If save_study=True, the Optuna study object will be the third output. This
@@ -420,9 +454,9 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             has been trained with only blue broadband data. Only used when clf = 'cnn'.
         normalize (bool, optional): If True the data will be min-max normalized using the 
             input min and max pixels. Defaults to True. Only used when clf = 'cnn'.
-        min_pixel (int, optional): The minimum pixel count, defaults to 638. Pixels with counts 
+        min_pixel (int, optional): The minimum pixel count, defaults to 0. Pixels with counts 
             below this threshold will be set to this limit. Only used when clf = 'cnn'.
-        max_pixel (int, optional): The maximum pixel count, defaults to 3000. Pixels with counts 
+        max_pixel (int, optional): The maximum pixel count, defaults to 100. Pixels with counts 
             above this threshold will be set to this limit. Only used when clf = 'cnn'.
         val_X (array, optional): 3D matrix containing the 2D arrays (images)
             to be used for validation.
@@ -579,7 +613,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
        
     else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
-            val_X=val_X, val_Y=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, limit_search=limit_search)
+            val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, limit_search=limit_search)
         if limit_search:
             print('NOTE: To expand hyperparameter search space, set limit_search=False, although this may increase the optimization time significantly.')
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)

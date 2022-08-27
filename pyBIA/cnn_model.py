@@ -119,7 +119,7 @@ class Classifier:
 
         self.best_params, self.optimization_results = optimization.hyper_opt(self.blob_data, self.other_data, clf='cnn', metric=self.metric, n_iter=self.n_iter, 
             balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, 
-            max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, train_epochs=self.train_epochs, patience=self.patience, limit_search=self.limit_search,
+            max_pixel=self.max_pixel, val_X=self.val_blob, val_Y=self.val_other, train_epochs=self.train_epochs, patience=self.patience, limit_search=self.limit_search,
             opt_aug=self.opt_aug, batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val)
 
         print("Fitting and returning final model...")

@@ -76,7 +76,7 @@ class objective_cnn(object):
     def __init__(self, class1, class2, img_num_channels=1, normalize=True, min_pixel=638,
         max_pixel=3000, val_blob=None, val_other=None, train_epochs=25, patience=20, limit_search=True, 
         opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, 
-        balance=True, metric='loss'):
+        balance_val=True, metric='loss'):
 
         self.class1 = class1
         self.class2 = class2
@@ -94,7 +94,7 @@ class objective_cnn(object):
         self.batch_max = batch_max 
         self.image_size_min = image_size_min
         self.image_size_max = image_size_max
-        self.balance = balance 
+        self.balance_val = balance_val
         self.metric = metric 
 
         if self.opt_aug:
@@ -143,7 +143,7 @@ class objective_cnn(object):
             else:
                 class_1 = augmented_images
 
-            if self.balance:
+            if self.balance_val:
                 class_2 = self.class2[:len(class_1)]   
             else:
                 class_2 = self.class2   
@@ -401,7 +401,7 @@ class objective_rf(object):
 
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, img_num_channels=1, 
     normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='loss', 
-    limit_search=True, opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance=True):
+    limit_search=True, opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance_val=True):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for
@@ -620,7 +620,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
        
     else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
-            val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, limit_search=limit_search)
+            val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, limit_search=limit_search, opt_aug=opt_aug, 
+            batch_min=batch_min, batch_max=batch_max, image_size_min=image_size_min, image_size_max=image_size_max, balance_val=balance_val)
         if limit_search:
             print('NOTE: To expand hyperparameter search space, set limit_search=False, although this may increase the optimization time significantly.')
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)

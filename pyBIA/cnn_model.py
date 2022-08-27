@@ -72,7 +72,7 @@ class Classifier:
     """
     def __init__(self, blob_data=None, other_data=None, img_num_channels=1, optimize=True, limit_search=True, metric='loss',
         n_iter=25, normalize=True, min_pixel=638, max_pixel=3000, val_blob=None, val_other=None, epochs=100, train_epochs=25, 
-        patience=5, opt_aug=True, batch_min=10, batch_max=150, image_size_min=50, image_size_max=90, balance=True):
+        patience=5, opt_aug=True, batch_min=10, batch_max=150, image_size_min=50, image_size_max=90, balance_val=True):
 
         self.blob_data = blob_data
         self.other_data = other_data
@@ -96,7 +96,7 @@ class Classifier:
         self.batch_max = batch_max 
         self.image_size_min = image_size_min
         self.image_size_max = image_size_max
-        self.balance = balance 
+        self.balance_val = balance_val
 
         self.model = None
         self.history = None 
@@ -120,7 +120,7 @@ class Classifier:
         self.best_params, self.optimization_results = optimization.hyper_opt(self.blob_data, self.other_data, clf='cnn', metric=self.metric, n_iter=self.n_iter, 
             balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, 
             max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, train_epochs=self.train_epochs, patience=self.patience, limit_search=self.limit_search,
-            opt_aug=self.opt_aug, batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance=self.balance)
+            opt_aug=self.opt_aug, batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val)
 
         print("Fitting and returning final model...")
         if self.limit_search:

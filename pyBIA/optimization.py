@@ -114,7 +114,7 @@ class objective_cnn(object):
                 raise ValueError('Only three filters are supported!')
 
         clear_session()
-        
+
         if self.metric == 'loss' or self.metric == 'val_loss':
             mode = 'min'
         elif self.metric == 'accuracy' or self.metric == 'val_accuracy':
@@ -154,12 +154,12 @@ class objective_cnn(object):
                 if self.img_num_channels == 1:
                     val_class_1 = resize(self.val_blob, size=image_size)
                 else:
-                    val_channel1 = resize(self.val_blob[:,:,:,0], resize=image_size)
-                    val_channel2 = resize(self.val_blob[:,:,:,1], resize=image_size)
+                    val_channel1 = resize(self.val_blob[:,:,:,0], size=image_size)
+                    val_channel2 = resize(self.val_blob[:,:,:,1], size=image_size)
                     if self.img_num_channels == 2:
                         val_class_1 = data_processing.concat_channels(val_channel1, val_channel2)
                     else:
-                        val_channel3 = resize(self.val_blob[:,:,:,2], resize=image_size)
+                        val_channel3 = resize(self.val_blob[:,:,:,2], size=image_size)
                         val_class_1 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
             else:
                 val_class_1 = None 
@@ -168,12 +168,12 @@ class objective_cnn(object):
                 if self.img_num_channels == 1:
                     val_class_2 = resize(self.val_other, size=image_size)
                 elif self.img_num_channels > 1:
-                    val_channel1 = resize(self.val_other[:,:,:,0], resize=image_size)
-                    val_channel2 = resize(self.val_other[:,:,:,1], resize=image_size)
+                    val_channel1 = resize(self.val_other[:,:,:,0], size=image_size)
+                    val_channel2 = resize(self.val_other[:,:,:,1], size=image_size)
                     if self.img_num_channels == 2:
                         val_class_2 = data_processing.concat_channels(val_channel1, val_channel2)
                     else:
-                        val_channel3 = resize(self.val_other[:,:,:,2], resize=image_size)
+                        val_channel3 = resize(self.val_other[:,:,:,2], size=image_size)
                         val_class_2 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
             else:
                 val_class_2 = None 

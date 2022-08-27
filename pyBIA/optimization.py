@@ -50,7 +50,7 @@ class objective_cnn(object):
     classes directly, after which it automatically assigns the 0 and 1 label, accordingly. 
 
     Note:
-        If opt_aug is enabled, then the class1 sample will be the data that will augmented!
+        If opt_aug is enabled, then the class1 sample will be the data that will augmented.
         It is best to keep both class sizes the same after augmentation, therefore balance=True
         by default, which will truncate the class2 sample to meet the augmented class1 size.
 
@@ -61,8 +61,10 @@ class objective_cnn(object):
 
         Since the maximum number of augmentations allowed is batch_max per each sample, in practice class2 
         should contain batch_max times the size of class1. During the optimization procedure, if an 
-        augmentation batch size of 10 is assesed, then only 100*10=1000 augmented images will be created, 
-        and therefore during that particular trial only the first 1000 images from class2 will be used, and so forth. 
+        augmentation batch size of 200 is assesed, then 100*200=20000 augmented images will be created, 
+        and therefore during that particular trial 20000 images from class2 will be used, and so forth. 
+        If class2 does not contain 20000 samples, then all will be used.
+
         To use the entire class2 sample regardless of the number augmentations performed, set balance=False.
 
     Args:
@@ -86,9 +88,14 @@ class objective_cnn(object):
         self.val_other = val_other
         self.train_epochs = train_epochs
         self.patience = patience 
-        self.metric = metric 
         self.limit_search = limit_search
         self.opt_aug = opt_aug
+        self.batch_min = batch_min 
+        self.batch_max = batch_max 
+        self.image_size_min = image_size_min
+        self.image_size_max = image_size_max
+        self.balance = balance 
+        self.metric = metric 
 
         if self.opt_aug:
             if self.img_num_channels == 1:
@@ -113,8 +120,8 @@ class objective_cnn(object):
             mode = 'max'
 
         if self.opt_aug:
-            batch = trial.suggest_int('batch', batch_min, batch_max, step=10)
-            image_size = trial.suggest_int('image_size', image_size_min, image_size_max, step=5)
+            batch = trial.suggest_int('batch', self.batch_min, self.batch_max, step=10)
+            image_size = trial.suggest_int('image_size', self.image_size_min, self.image_size_max, step=5)
             shift = trial.suggest_int('shift', 0, 25)
             horizontal = trial.suggest_categorical('horizontal', [True, False])
             vertical = trial.suggest_categorical('vertical', [True, False])
@@ -392,9 +399,9 @@ class objective_rf(object):
 
         return final_score
 
-def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, 
-    img_num_channels=1, normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, 
-    train_epochs=25, patience=5, metric='loss', limit_search=True):
+def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, img_num_channels=1, 
+    normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='loss', 
+    limit_search=True, opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance=True):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for

@@ -97,6 +97,12 @@ class objective_cnn(object):
         self.balance_val = balance_val
         self.metric = metric 
 
+        if self.metric == 'val_loss' or self.metric == 'val_accuracy':
+            if self.val_blob is None and self.val_other is None:
+                raise ValueError('No validation data input, change the metric to either "loss" or "accuracy".')
+
+    def __call__(self, trial):
+
         if self.opt_aug:
             if self.img_num_channels == 1:
                 channel1, channel2, channel3 = self.class1, None, None 
@@ -107,13 +113,8 @@ class objective_cnn(object):
             else:
                 raise ValueError('Only three filters are supported!')
 
-        if self.metric == 'val_loss' or self.metric == 'val_accuracy':
-            if self.val_blob is None and self.val_other is None:
-                raise ValueError('No validation data input, change the metric to either "loss" or "accuracy".')
-
-    def __call__(self, trial):
-
         clear_session()
+        
         if self.metric == 'loss' or self.metric == 'val_loss':
             mode = 'min'
         elif self.metric == 'accuracy' or self.metric == 'val_accuracy':

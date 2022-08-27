@@ -419,17 +419,17 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
         if batch_size < 16:
             warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.", stacklevel=2)
         if val_blob is not None:
-            val_X1, val_Y1 = data_processing.process_class(val_blob, label=0, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+            val_X1, val_Y1 = process_class(val_blob, label=0, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
             if val_other is None:
                 val_X, val_Y = val_X1, val_Y1
             else:
-                val_X2, val_Y2 = data_processing.process_class(val_other, label=1, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+                val_X2, val_Y2 = process_class(val_other, label=1, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
                 val_X, val_Y = np.r_[val_X1, val_X2], np.r_[val_Y1, val_Y2]
         else:
             if val_other is None:
                 val_X, val_Y = None, None
             else:
-                val_X2, val_Y2 = data_processing.process_class(val_other, label=1, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+                val_X2, val_Y2 = process_class(val_other, label=1, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
                 val_X, val_Y = val_X2, val_Y2
 
         img_width = blob_data[0].shape[0]

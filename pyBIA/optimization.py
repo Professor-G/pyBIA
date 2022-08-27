@@ -241,8 +241,15 @@ class objective_cnn(object):
                     filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, strides_5=strides_5, 
                     early_stop_callback=callbacks, checkpoint=False)
             except:
+                model, history = cnn_model.pyBIA_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, batch_size=batch_size, 
+                    lr=lr, decay=decay,  maxpool_size_1=maxpool_size_1, maxpool_stride_1=maxpool_stride_1, maxpool_size_2=maxpool_size_2, maxpool_stride_2=maxpool_stride_2, 
+                    maxpool_size_3=maxpool_size_3, maxpool_stride_3=maxpool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, 
+                    filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, 
+                    filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, strides_5=strides_5, 
+                    early_stop_callback=callbacks, checkpoint=False)
                 print("Memory allocation issue, probably due to large batch size, skipping trial.")
-                return 0.0
+                #return 0.0
 
         final_score = history.history[self.metric][-1]
 

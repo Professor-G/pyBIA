@@ -73,10 +73,10 @@ class objective_cnn(object):
         img_num_channels
     """
 
-    def __init__(self, class1, class2, img_num_channels=1, normalize=True, min_pixel=638,
-        max_pixel=3000, val_blob=None, val_other=None, train_epochs=25, patience=20, limit_search=True, 
-        opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, 
-        balance_val=True, metric='loss'):
+    def __init__(self, class1, class2, img_num_channels=1, normalize=True, min_pixel=0,
+        max_pixel=100, val_blob=None, val_other=None, train_epochs=25, patience=20, limit_search=True, 
+        opt_aug=False, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, 
+        balance_val=True, opt_min_pix=None, opt_max_pix=None, metric='loss'):
 
         self.class1 = class1
         self.class2 = class2
@@ -95,11 +95,21 @@ class objective_cnn(object):
         self.image_size_min = image_size_min
         self.image_size_max = image_size_max
         self.balance_val = balance_val
+        self.opt_min_pix = opt_min_pix
+        self.opt_max_pix = opt_max_pix
         self.metric = metric 
 
         if self.metric == 'val_loss' or self.metric == 'val_accuracy':
             if self.val_blob is None and self.val_other is None:
                 raise ValueError('No validation data input, change the metric to either "loss" or "accuracy".')
+
+        if self.opt_min_pix is not None:
+            if self.opt_max_pix is None:
+                raise ValueError('To optimize min/max normalization pixel value, both opt_min_pix and opt_max_pix must be input')
+
+        if self.opt_max_pix is not None:
+            if self.opt_min_pix is None:
+                raise ValueError('To optimize min/max normalization pixel value, both opt_min_pix and opt_max_pix must be input')
 
     def __call__(self, trial):
 
@@ -127,7 +137,7 @@ class objective_cnn(object):
             horizontal = trial.suggest_categorical('horizontal', [True, False])
             vertical = trial.suggest_categorical('vertical', [True, False])
             rotation = trial.suggest_int('rotation', 0, 360, step=360)
-            print('rotation: '+str(rotation))
+
             augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=batch, 
                 width_shift=shift, height_shift=shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
                 image_size=image_size)
@@ -148,6 +158,20 @@ class objective_cnn(object):
                 class_2 = self.class2[:len(class_1)]   
             else:
                 class_2 = self.class2   
+
+            if self.img_num_channels == 1:
+                class_2 = resize(class_2, size=image_size)
+            else:
+                channel1 = resize(class_2[:,:,:,0], size=image_size)
+                channel2 = resize(class_2[:,:,:,1], size=image_size)
+                if self.img_num_channels == 2:
+                    class_2 = data_processing.concat_channels(channel1, channel2)
+                else:
+                    channel3 = resize(class_2[:,:,:,2], size=image_size)
+                    class_2 = data_processing.concat_channels(channel1, channel2, channel3)
+
+            print("class_2 shape "+str(class_2.shape))
+            print("class_1 shape "+str(class_1.shape))
 
             #Need to also crop the validation images
             if self.val_blob is not None:
@@ -177,9 +201,19 @@ class objective_cnn(object):
                         val_class_2 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
             else:
                 val_class_2 = None 
+
+            print("class_val_2 shape "+str(val_class_2.shape))
+            print("class_val_1 shape "+str(val_class_1.shape))
+
         else:
             class_1, class_2 = self.class1, self.class2
             val_class_1, val_class_2 = self.val_blob, self.val_other
+
+        if self.opt_min_pix is not None:
+            min_pix = trial.suggest_int('min_pixel', self.opt_min_pix, self.opt_max_pix, step=1)
+            max_pix = trial.suggest_int('max_pixel', self.opt_min_pix, self.opt_max_pix, step=1)
+        else:
+            min_pix, max_pix = self.min_pixel, self.max_pixel
 
         batch_size = trial.suggest_int('batch_size', 16, 64)
         lr = trial.suggest_float('lr', 1e-6, 0.1, step=0.05)
@@ -221,7 +255,7 @@ class objective_cnn(object):
         if self.limit_search is False:
             try:
                 model, history = cnn_model.pyBIA_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
+                    min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
                     batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
                     activation_dense=activation_dense, dropout=dropout, maxpool_size_1=maxpool_size_1, maxpool_stride_1=maxpool_stride_1, 
                     maxpool_size_2=maxpool_size_2, maxpool_stride_2=maxpool_stride_2, maxpool_size_3=maxpool_size_3, maxpool_stride_3=maxpool_stride_3, 
@@ -234,22 +268,15 @@ class objective_cnn(object):
         else:
             try:
                 model, history = cnn_model.pyBIA_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, batch_size=batch_size, 
+                    min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, batch_size=batch_size, 
                     lr=lr, decay=decay,  maxpool_size_1=maxpool_size_1, maxpool_stride_1=maxpool_stride_1, maxpool_size_2=maxpool_size_2, maxpool_stride_2=maxpool_stride_2, 
                     maxpool_size_3=maxpool_size_3, maxpool_stride_3=maxpool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, 
                     filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, 
                     filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, strides_5=strides_5, 
                     early_stop_callback=callbacks, checkpoint=False)
             except:
-                model, history = cnn_model.pyBIA_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, batch_size=batch_size, 
-                    lr=lr, decay=decay,  maxpool_size_1=maxpool_size_1, maxpool_stride_1=maxpool_stride_1, maxpool_size_2=maxpool_size_2, maxpool_stride_2=maxpool_stride_2, 
-                    maxpool_size_3=maxpool_size_3, maxpool_stride_3=maxpool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, 
-                    filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, 
-                    filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, strides_5=strides_5, 
-                    early_stop_callback=callbacks, checkpoint=False)
                 print("Memory allocation issue, probably due to large batch size, skipping trial.")
-                #return 0.0
+                return 0.0
 
         final_score = history.history[self.metric][-1]
 
@@ -257,7 +284,6 @@ class objective_cnn(object):
             final_score = 1 - final_score
 
         return final_score
-
 
 class objective_xgb(object):
     """
@@ -409,7 +435,8 @@ class objective_rf(object):
 
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, img_num_channels=1, 
     normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='loss', 
-    limit_search=True, opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance_val=True):
+    limit_search=True, opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance_val=True,
+    opt_min_pix=None, opt_max_pix=None):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
     This function uses Bayesian Optimizattion and should only be used for
@@ -629,7 +656,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
     else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
             val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, limit_search=limit_search, opt_aug=opt_aug, 
-            batch_min=batch_min, batch_max=batch_max, image_size_min=image_size_min, image_size_max=image_size_max, balance_val=balance_val)
+            batch_min=batch_min, batch_max=batch_max, image_size_min=image_size_min, image_size_max=image_size_max, balance_val=balance_val,
+            opt_min_pix=opt_min_pix, opt_max_pix=opt_min_pix)
         if limit_search:
             print('NOTE: To expand hyperparameter search space, set limit_search=False, although this may increase the optimization time significantly.')
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)

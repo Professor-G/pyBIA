@@ -101,8 +101,19 @@ class Classifier:
         self.best_params = None 
 
         if self.data_x is None or self.data_y is None:
-            print('NOTE: data_x and data_y parameters are required to output visualizations')
-           
+            print('NOTE: data_x and data_y parameters are required if you wish to output visualizations.')
+        
+        if self.clf == 'xgb':
+            if all(isinstance(val, (int, str)) for val in self.data_y):
+                print('XGBoost classifier requires numerical class labels! Converting class labels as follows:')
+                print('________________________________')
+                y = np.zeros(len(self.data_y))
+                for i in range(len(np.unique(self.data_y))):
+                    print(str(np.unique(self.data_y)[i]).ljust(10)+'  ------------->     '+str(i))
+                    index = np.where(self.data_y == np.unique(self.data_y)[i])[0]
+                    y[index] = i
+                self.data_y = y 
+                print('________________________________')
 
     def create(self):
         """
@@ -134,7 +145,7 @@ class Classifier:
                     index = np.where(self.data_y == np.unique(self.data_y)[i])[0]
                     y[index] = i
                 self.data_y = y 
-                print('--------------------------------')
+                print('________________________________')
 
         else:
             raise ValueError('clf argument must either be "rf", "nn", or "xgb".')
@@ -223,6 +234,8 @@ class Classifier:
             joblib.dump(self.feats_to_use, path+'Feats_Index')
         if self.optimization_results is not None:
             joblib.dump(self.optimization_results, path+'HyperOpt_Results')
+        if self.best_params is not None:
+            joblib.dump(self.best_params, path+'Best_Params')
         print('Files saved in: {}'.format(path))
         return 
 

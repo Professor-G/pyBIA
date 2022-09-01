@@ -72,7 +72,8 @@ class Classifier:
     """
     def __init__(self, blob_data=None, other_data=None, img_num_channels=1, optimize=True, limit_search=True, metric='loss',
         n_iter=25, normalize=True, min_pixel=638, max_pixel=3000, val_blob=None, val_other=None, epochs=100, train_epochs=25, 
-        patience=5, opt_aug=True, batch_min=10, batch_max=150, image_size_min=50, image_size_max=90, balance_val=True):
+        patience=5, opt_aug=True, batch_min=10, batch_max=150, image_size_min=50, image_size_max=90, balance_val=True,
+        opt_min_pix=None, opt_max_pix=None):
 
         self.blob_data = blob_data
         self.other_data = other_data
@@ -97,6 +98,8 @@ class Classifier:
         self.image_size_min = image_size_min
         self.image_size_max = image_size_max
         self.balance_val = balance_val
+        self.opt_min_pix = opt_min_pix
+        self.opt_max_pix = opt_max_pix
 
         self.model = None
         self.history = None 
@@ -120,12 +123,18 @@ class Classifier:
         self.best_params, self.optimization_results = optimization.hyper_opt(self.blob_data, self.other_data, clf='cnn', metric=self.metric, n_iter=self.n_iter, 
             balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, 
             max_pixel=self.max_pixel, val_X=self.val_blob, val_Y=self.val_other, train_epochs=self.train_epochs, patience=self.patience, limit_search=self.limit_search,
-            opt_aug=self.opt_aug, batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val)
+            opt_aug=self.opt_aug, batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val,
+            opt_min_pix=self.opt_min_pix, opt_max_pix=self.opt_max_pix)
 
         print("Fitting and returning final model...")
+        if self.opt_min_pix is not None:
+            min_pix, max_pix = self.best_params['min_pix'], self.best_params['max_pix']
+        else:
+            min_pix, max_pix = self.min_pixel, self.max_pixel
+
         if self.limit_search:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, epochs=self.epochs, batch_size=self.best_params['batch_size'],
+                min_pixel=min_pix, max_pixel=max_pix, val_blob=self.val_blob, val_other=self.val_other, epochs=self.epochs, batch_size=self.best_params['batch_size'],
                 lr=self.best_params['lr'], decay=self.best_params['decay'], maxpool_size_1=self.best_params['maxpool_size_1'], maxpool_stride_1=self.best_params['maxpool_stride_1'],
                 maxpool_size_2=self.best_params['maxpool_size_2'], maxpool_stride_2=self.best_params['maxpool_stride_2'], maxpool_size_3=self.best_params['maxpool_size_3'], 
                 maxpool_stride_3=self.best_params['maxpool_stride_3'], filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'],
@@ -134,7 +143,7 @@ class Classifier:
                 strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'],  strides_5=self.best_params['strides_5'])
         else:
             self.model, self.history = pyBIA_model(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, epochs=self.epochs, batch_size=self.best_params['batch_size'],
+                min_pixel=min_pix, max_pixel=max_pix, val_blob=self.val_blob, val_other=self.val_other, epochs=self.epochs, batch_size=self.best_params['batch_size'],
                 lr=self.best_params['lr'], momentum=self.best_params['momentum'], decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], 
                 dropout=self.best_params['dropout'], activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'], 
                 maxpool_size_1=self.best_params['maxpool_size_1'], maxpool_stride_1=self.best_params['maxpool_stride_1'], maxpool_size_2=self.best_params['maxpool_size_2'], 

@@ -156,7 +156,7 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
 def resize(data, size=50):
     """
     Resizes the data by cropping out the outer boundaries outside the size x size limit.
-    Can be either 2D for one sample, or 3D for multiple samples.
+    Can be either a 2D array containing one sample, or a 3D array for multiple samples.
 
     Args:
         data (array): 2D array
@@ -209,7 +209,7 @@ def plot(data, cmap='gray', title=''):
     Args:
         data (array): 2D array for single image, or 3D array with stacked channels.
         cmap (str): Colormap to use when generating the image.
-            title (str, optional): Title displayed above the image. 
+        title (str, optional): Title displayed above the image. 
 
     Returns:
         AxesImage.

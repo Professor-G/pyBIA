@@ -328,28 +328,28 @@ class Classifier:
         plt.legend(prop={'size': 16})
         plt.show()
 
-    def load_bw_model(self):
-        """
-        Calling this will load the trained Tensorflow model, trained using NDWFS images
-        in the blue broadband.
-        
-        Note:
-            Training new models with 1000 epochs can take over a week, this Bw model
-            was trained using NDWFS blue broadband images of the Bootes field. The 
-            corresponding .h5 file is located in the data folder inside the pyBIA directory 
-            in the Python path. 
+    #def load_bw_model(self):
+    #    """
+    #    Calling this will load the trained Tensorflow model, trained using NDWFS images
+    #    in the blue broadband.
+    #    
+    #    Note:
+    #        Training new models with 1000 epochs can take over a week, this Bw model
+    #        was trained using NDWFS blue broadband images of the Bootes field. The 
+    #        corresponding .h5 file is located in the data folder inside the pyBIA directory 
+    #       in the Python path. 
+    #
+    #    Returns:
+    #        The pyBIA CNN model used for classifying images in blue broadband surveys.
 
-        Returns:
-            The pyBIA CNN model used for classifying images in blue broadband surveys.
+    #  """
 
-        """
-
-        resource_package = __name__
-        resource_path = '/'.join(('data', 'Bw_CNN_Model.h5'))
-        self.model = load_model(pkg_resources.resource_filename(resource_package, resource_path))
-        print('Bw model successfully loaded.')
-        print('Note: Input data when using this model must be 50x50.')
-        return 
+    #   resource_package = __name__
+    #   resource_path = '/'.join(('data', 'Bw_CNN_Model.h5'))
+    #   self.model = load_model(pkg_resources.resource_filename(resource_package, resource_path))
+    #   print('Bw model successfully loaded.')
+    #   print('Note: Input data when using this model must be 50x50.')
+    #   return 
 
 def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True, 
         min_pixel=0, max_pixel=100, val_blob=None, val_other=None, epochs=100, 

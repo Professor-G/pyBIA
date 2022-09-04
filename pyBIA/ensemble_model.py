@@ -699,10 +699,10 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
     plt.colorbar()
 
     tick_marks = np.arange(len(classes))
-    #plt.xticks(tick_marks, classes, rotation=45, fontsize=14)
-    #plt.yticks(tick_marks, classes, fontsize=14)
-    plt.xticks(tick_marks, ['DIFFUSE','OTHER'], rotation=45, fontsize=14)
-    plt.yticks(tick_marks, ['DIFFUSE','OTHER'], fontsize=14)
+    plt.xticks(tick_marks, classes, rotation=45, fontsize=14)
+    plt.yticks(tick_marks, classes, fontsize=14)
+    #plt.xticks(tick_marks, ['DIFFUSE','OTHER'], rotation=45, fontsize=14)
+    #plt.yticks(tick_marks, ['DIFFUSE','OTHER'], fontsize=14)
 
     fmt = '.2f' if normalize is True else 'd'
     thresh = conf_matrix.max() / 2.

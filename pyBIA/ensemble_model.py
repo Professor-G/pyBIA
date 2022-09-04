@@ -342,7 +342,8 @@ class Classifier:
             
         return np.array(output)
 
-    def plot_tsne(self, norm=True, pca=False, title='Feature Parameter Space', savefig=False):
+    def plot_tsne(self, norm=True, pca=False, title='Feature Parameter Space', 
+        savefig=False):
         """
         Plots a t-SNE projection using the sklearn.manifold.TSNE() method.
 
@@ -392,7 +393,7 @@ class Classifier:
             mask = np.where(self.data_y == feat)[0]
             plt.scatter(x[mask], y[mask], marker=markers[count], label=str(feat), alpha=0.7)
 
-        plt.legend(loc='upper right', prop={'size': 16})
+        plt.legend(prop={'size': 16})
         plt.title(title, size=18)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)

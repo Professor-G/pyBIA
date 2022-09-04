@@ -342,7 +342,7 @@ class Classifier:
             
         return np.array(output)
 
-    def plot_tsne(self, norm=True, pca=False, title='Feature Parameter Space'):
+    def plot_tsne(self, norm=True, pca=False, title='Feature Parameter Space', savefig=False):
         """
         Plots a t-SNE projection using the sklearn.manifold.TSNE() method.
 
@@ -396,9 +396,14 @@ class Classifier:
         plt.title(title, size=18)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
-        plt.show()
+        if savefig:
+            plt.savefig('tSNE_Projection.png', bbox_inches='tight', dpi=300)
+            plt.clf()
+        else:
+            plt.show()
 
-    def plot_conf_matrix(self, norm=True, pca=False, k_fold=10, normalize=True, title='Confusion matrix'):
+    def plot_conf_matrix(self, norm=True, pca=False, k_fold=10, normalize=True, 
+        title='Confusion Matrix', savefig=False):
         """
         Returns a confusion matrix with k-fold validation.
 
@@ -444,20 +449,13 @@ class Classifier:
             data = np.asarray(pca_data).astype('float64')
 
         predicted_target, actual_target = evaluate_model(self.model, data, self.data_y, normalize=normalize, k_fold=k_fold)
-        generate_matrix(predicted_target, actual_target, normalize=normalize, classes=classes, title=title)
+        generate_matrix(predicted_target, actual_target, classes, normalize=normalize, title=title, savefig=savefig)
 
-    def plot_roc_curve(self, k_fold=10, title="Receiver Operating Characteristic Curve"):
+    def plot_roc_curve(self, k_fold=10, title="Receiver Operating Characteristic Curve", 
+        savefig=False):
         """
         Plots ROC curve with k-fold cross-validation, as such the 
         standard deviation variations are plotted.
-        
-        Example:
-            To assess the performance of a random forest classifier (created
-            using the scikit-learn implementation) we can run the following:
-            
-            >>> from sklearn.ensemble import RandomForestClassifier
-            >>> classifier = RandomForestClassifier()
-            >>> plot_roc_curve(classifier, data_x, data_y)
         
         Args:
             classifier: The machine learning classifier to optimize.
@@ -483,7 +481,7 @@ class Classifier:
             X_train, X_test, y_train, y_test = train_test_split(data, self.data_y, test_size=0.2, random_state=0)
             model0.fit(X_train, y_train)
             y_probas = model0.predict_proba(X_test)
-            skplt.metrics.plot_roc(y_test, y_probas, text_fontsize='large', title='ROC Curve', cmap= 'cividis', plot_macro=False, plot_micro=False)
+            skplt.metrics.plot_roc(y_test, y_probas, text_fontsize='large', title='ROC Curve', cmap='cividis', plot_macro=False, plot_micro=False)
             plt.show()
             return
 
@@ -547,13 +545,20 @@ class Classifier:
         plt.ylabel('True Positive Rate', size=14)
         plt.xlabel('False Positive Rate', size=14)
         plt.title(label=title,fontsize=18)
-        plt.show()
+        if savefig:
+            plt.savefig('Ensemble_ROC_Curve.png', bbox_inches='tight', dpi=300)
+            plt.clf()
+        else:
+            plt.show()
 
-    def plot_hyper_opt(self, xlog=True, ylog=False):
+    def plot_hyper_opt(self, xlim=None, ylim=None, xlog=True, ylog=False, 
+        savefig=False):
         """
         Plots the hyperparameter optimization history.
     
         Args:
+            xlim: Limits for the x-axis. Ex) xlim = (0, 1000)
+            ylim: Limits for the y-axis. Ex) ylim = (0.9, 0.94)
             xlog (boolean): If True the x-axis will be log-scaled.
                 Defaults to True.
             ylog (boolean): If True the y-axis will be log-scaled.
@@ -569,15 +574,22 @@ class Classifier:
         if ylog:
             plt.yscale('log')
         plt.xlabel('Trial #', size=16)
-        plt.ylabel('3-fold CV Accuracy', size=16)
+        plt.ylabel('10-fold CV Accuracy', size=16)
         plt.title(('Hyperparameter Optimization History'), size=18)
-        plt.xlim((1,1e4))
-        plt.ylim((0.9, 0.935))
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
-        plt.legend(prop={'size': 16})
-        plt.show()
+        plt.legend(prop={'size': 16}, loc=2)
+        if xlim is not None:
+            plt.xlim(xlim)
+        if ylim is not None:
+            plt.ylim(ylim)
+        plt.tight_layout()
+        if savefig:
+            plt.savefig('Ensemble_Hyperparameter_Optimization.png', bbox_inches='tight', dpi=300)
+            plt.clf()
+        else:
+            plt.show()
 
     def plot_feature_opt(self, feats='all'):
         """
@@ -631,17 +643,18 @@ def evaluate_model(classifier, data_x, data_y, normalize=True, k_fold=10):
 
     return predicted_targets, actual_targets
 
-def generate_matrix(predicted_labels_list, actual_targets, normalize=True, classes=["DIFFUSE","OTHER"], title='Confusion matrix'):
+def generate_matrix(predicted_labels_list, actual_targets, classes, normalize=True, 
+    title='Confusion Matrix', savefig=False):
     """
     Generates the confusion matrix using the output from the evaluate_model() function.
 
     Args:
         predicted_labels_list: 1D array containing the predicted class labels.
         actual_targets: 1D array containing the actual class labels.
+        classes (list): A list containing the label of the two training bags. This
+            will be used to set the axis. Ex) classes = ['DIFFUSE', 'OTHER']
         normalize (bool, optional): If True the matrix accuracy will be normalized
             and displayed as a percentage accuracy. Defaults to True.
-        classes (list): A list containing the label of the two training bags. This
-            will be used to set the axis. Defaults to a list containing 'DIFFUSE' & 'OTHER'. 
         title (str, optional): The title of the output plot. 
 
     Returns:
@@ -656,7 +669,11 @@ def generate_matrix(predicted_labels_list, actual_targets, normalize=True, class
         generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title)
     elif normalize == False:
         generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title)
-    plt.show()
+    if savefig:
+        plt.savefig('Ensemble_Confusion_Matrix.png', bbox_inches='tight', dpi=300)
+        plt.clf()
+    else:
+        plt.show()
 
 def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix'):
     """
@@ -682,8 +699,10 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
     plt.colorbar()
 
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45, fontsize=14)
-    plt.yticks(tick_marks, classes, fontsize=14)
+    #plt.xticks(tick_marks, classes, rotation=45, fontsize=14)
+    #plt.yticks(tick_marks, classes, fontsize=14)
+    plt.xticks(tick_marks, ['DIFFUSE','OTHER'], rotation=45, fontsize=14)
+    plt.yticks(tick_marks, ['DIFFUSE','OTHER'], fontsize=14)
 
     fmt = '.2f' if normalize is True else 'd'
     thresh = conf_matrix.max() / 2.
@@ -692,9 +711,9 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
         plt.text(j, i, format(conf_matrix[i, j], fmt), fontsize=14, horizontalalignment="center",
                  color="white" if conf_matrix[i, j] > thresh else "black")
 
-    plt.tight_layout()
     plt.ylabel('True label',fontsize=18)
     plt.xlabel('Predicted label',fontsize=18)
+    plt.tight_layout()
 
     return conf_matrix
 

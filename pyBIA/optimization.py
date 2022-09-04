@@ -131,8 +131,8 @@ class objective_cnn(object):
             mode = 'max'
 
         if self.opt_aug:
-            batch = trial.suggest_int('batch', self.batch_min, self.batch_max, step=10)
-            image_size = trial.suggest_int('image_size', self.image_size_min, self.image_size_max, step=5)
+            batch = trial.suggest_int('batch', self.batch_min, self.batch_max, step=5)
+            image_size = trial.suggest_int('image_size', self.image_size_min, self.image_size_max, step=1)
             shift = trial.suggest_int('shift', 0, 25)
             horizontal = trial.suggest_categorical('horizontal', [True, False])
             vertical = trial.suggest_categorical('vertical', [True, False])
@@ -660,7 +660,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             opt_min_pix=opt_min_pix, opt_max_pix=opt_min_pix)
         if limit_search:
             print('NOTE: To expand hyperparameter search space, set limit_search=False, although this may increase the optimization time significantly.')
-        study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
+        study.optimize(objective, n_trials=n_iter, show_progress_bar=True, n_jobs=1)
         params = study.best_trial.params
 
     final_score = study.best_value

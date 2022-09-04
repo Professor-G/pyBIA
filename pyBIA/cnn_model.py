@@ -286,7 +286,7 @@ class Classifier:
 
         return np.array(output)
 
-    def plot_hyper_opt(self, xlog=True, ylog=False):
+    def plot_hyper_opt(self, xlog=True, ylog=False, savefig=False):
         """
         Plots the hyperparameter optimization history.
     
@@ -326,7 +326,10 @@ class Classifier:
         plt.yticks(fontsize=14)
         plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
         plt.legend(prop={'size': 16})
-        plt.show()
+        if savefig:
+            plt.savefig('CNN_Hyperparameter_Optimization.png', dpi=300)
+        else:
+            plt.show()
 
     #def load_bw_model(self):
     #    """

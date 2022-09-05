@@ -202,9 +202,6 @@ class objective_cnn(object):
             else:
                 val_class_2 = None 
 
-            print("class_val_2 shape "+str(val_class_2.shape))
-            print("class_val_1 shape "+str(val_class_1.shape))
-
         else:
             class_1, class_2 = self.class1, self.class2
             val_class_1, val_class_2 = self.val_blob, self.val_other

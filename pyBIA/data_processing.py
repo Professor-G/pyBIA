@@ -163,11 +163,9 @@ def process_class(channel, img_num_channels=1, label=None, normalize=True, min_p
         img_width = channel[0].shape[1]
         img_height = channel[0].shape[0]
     elif len(channel.shape) == 3:
-        if channel.shape[-1] != img_num_channels:
-            raise ValueError('img_num_channels parameter must match the number of filters! Number of filters detected: '+str(channel.shape[-1]))
         img_width = channel.shape[1]
         img_height = channel.shape[0]
-        axis = 1
+        axis = channel.shape[0]
     elif len(channel.shape) == 2:
         img_width = channel.shape[1]
         img_height = channel.shape[0]
@@ -175,11 +173,8 @@ def process_class(channel, img_num_channels=1, label=None, normalize=True, min_p
     else:
         raise ValueError("Channel must either be 2D for a single sample, 3D for multiple samples or single sample with multiple filters, or 4D for multifilter images.")
 
-    print(axis, img_width, img_height, img_num_channels)
     data = channel.reshape(axis, img_width, img_height, img_num_channels)
-    #data = channel.reshape(1, 50, 50, 2)
     if label is None:
-        #warn("Returning processed data only, as no corresponding label was input.")
         return data
 
     #reshape

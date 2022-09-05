@@ -24,7 +24,7 @@ setup(
 ],
     packages=find_packages('.'),
     install_requires = ['numpy','tensorflow','scikit-learn','scikit-optimize','scipy','photutils', 
-        'matplotlib', 'pandas','missingpy', 'optuna', 'boruta', 'astropy', 'xgboost', 'BorutaShap',
+        'matplotlib', 'progress', 'pandas','missingpy', 'optuna', 'boruta', 'astropy', 'xgboost', 'BorutaShap',
         'scikit-plot', 'dill'],
     python_requires='>=3.7,<4',
     include_package_data=True,

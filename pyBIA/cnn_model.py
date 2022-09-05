@@ -70,10 +70,10 @@ class Classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, blob_data=None, other_data=None, img_num_channels=1, optimize=True, limit_search=True, metric='loss',
-        n_iter=25, normalize=True, min_pixel=638, max_pixel=3000, val_blob=None, val_other=None, epochs=100, train_epochs=25, 
-        patience=5, opt_aug=True, batch_min=10, batch_max=150, image_size_min=50, image_size_max=90, balance_val=True,
-        opt_min_pix=None, opt_max_pix=None):
+    def __init__(self, blob_data=None, other_data=None, val_blob=None, val_other=None, img_num_channels=1, 
+        optimize=True, limit_search=True, n_iter=25, normalize=True, min_pixel=638, max_pixel=3000, epochs=100, train_epochs=25, 
+        patience=5, opt_aug=True, batch_min=10, batch_max=250, image_size_min=50, image_size_max=90, balance_val=True,
+        opt_min_pix=None, opt_max_pix=None, metric='loss'):
 
         self.blob_data = blob_data
         self.other_data = other_data
@@ -327,7 +327,7 @@ class Classifier:
         plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
         plt.legend(prop={'size': 16})
         if savefig:
-            plt.savefig('CNN_Hyperparameter_Optimization.png', dpi=300)
+            plt.savefig('CNN_Hyperparameter_Optimization.png', bbox_inches='tight', dpi=300)
         else:
             plt.show()
 
@@ -456,8 +456,10 @@ def pyBIA_model(blob_data, other_data, img_num_channels=1, normalize=True,
 
         X_train, Y_train = create_training_set(blob_data, other_data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
 
-        X_train[X_train > 1] = 1
-        X_train[X_train < 0] = 0
+        if normalize:
+            X_train[X_train > 1] = 1
+            X_train[X_train < 0] = 0
+            
         input_shape = (img_width, img_height, img_num_channels)
        
         # Uniform scaling initializer

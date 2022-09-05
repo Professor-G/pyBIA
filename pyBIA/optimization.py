@@ -46,8 +46,8 @@ class objective_cnn(object):
 
     Unlike the objective functions for the ensemble algorithms, this takes as input
     the two classes directly, instead of the traditional data (data_x) and accompanying
-    label array (data_y). This is because the cnn_model.pyBIA_model() function takes as input the two
-    classes directly, after which it automatically assigns the 0 and 1 label, accordingly. 
+    label array (data_y). This is because the cnn_model.pyBIA_model() function takes as input the
+    two classes, after which it automatically assigns the 0 and 1 label, respectively. 
 
     Note:
         If opt_aug is enabled, then the class1 sample will be the data that will augmented.
@@ -65,7 +65,7 @@ class objective_cnn(object):
         and therefore during that particular trial 20000 images from class2 will be used, and so forth. 
         If class2 does not contain 20000 samples, then all will be used.
 
-        To use the entire class2 sample regardless of the number augmentations performed, set balance=False.
+        To use the entire class2 sample regardless of the number augmentations performed, set balance_val=False.
 
     Args:
         class1
@@ -75,7 +75,7 @@ class objective_cnn(object):
 
     def __init__(self, class1, class2, img_num_channels=1, normalize=True, min_pixel=0,
         max_pixel=100, val_blob=None, val_other=None, train_epochs=25, patience=20, limit_search=True, 
-        opt_aug=False, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, 
+        opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=100, 
         balance_val=True, opt_min_pix=None, opt_max_pix=None, metric='loss'):
 
         self.class1 = class1
@@ -438,11 +438,15 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
     limit_search=True, opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance_val=True,
     opt_min_pix=None, opt_max_pix=None):
     """
-    Optimizes hyperparameters using a k-fold cross validation splitting strategy.
-    This function uses Bayesian Optimizattion and should only be used for
-    optimizing the scikit-learn implementation of the Random Forest Classifier.
+    Optimizes hyperparameters using a k-fold cross validation splitting strategy, unless a CNN
+    is being optimized, in which case no cross-validation is performed during trial assesment.
 
-    **IMPORTANT** If optimizing a CNN model, val_X corresponds to the images of the first class, 
+    **IMPORTANT** In the case of CNN optimization, data_x and data_y are not the standard
+    data plus labels -- if optimizing a CNN the samples for the first class should be passed
+    through the data_x parameter, and the samples for the second class should be given as data_y.
+    These two classes will automatically be assigned the label 0 and 1, respectively.
+
+    Likewise, if optimizing a CNN model, val_X corresponds to the images of the first class, 
     and val_Y the images of the second class. These will be automatically processed
     with class labels of 0 and 1, respectively.
     

@@ -170,9 +170,6 @@ class objective_cnn(object):
                     channel3 = resize(class_2[:,:,:,2], size=image_size)
                     class_2 = data_processing.concat_channels(channel1, channel2, channel3)
 
-            print("class_2 shape "+str(class_2.shape))
-            print("class_1 shape "+str(class_1.shape))
-
             #Need to also crop the validation images
             if self.val_blob is not None:
                 if self.img_num_channels == 1:

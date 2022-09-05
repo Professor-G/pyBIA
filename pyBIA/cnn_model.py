@@ -72,7 +72,7 @@ class Classifier:
     """
     def __init__(self, blob_data=None, other_data=None, val_blob=None, val_other=None, img_num_channels=1, 
         optimize=True, limit_search=True, n_iter=25, normalize=True, min_pixel=638, max_pixel=3000, epochs=100, train_epochs=25, 
-        patience=5, opt_aug=True, batch_min=10, batch_max=250, image_size_min=50, image_size_max=90, balance_val=True,
+        patience=5, opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=90, balance_val=True,
         opt_min_pix=None, opt_max_pix=None, metric='loss'):
 
         self.blob_data = blob_data

@@ -73,7 +73,7 @@ class objective_cnn(object):
         img_num_channels
     """
 
-    def __init__(self, class1, class2, img_num_channels=1, normalize=True, min_pixel=0,
+    def __init__(self, class1, class2, img_num_channels=1, normalize=False, min_pixel=0,
         max_pixel=100, val_blob=None, val_other=None, train_epochs=25, patience=20, limit_search=True, 
         opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=100, 
         balance_val=True, opt_min_pix=None, opt_max_pix=None, metric='loss'):

@@ -76,7 +76,7 @@ class objective_cnn(object):
     def __init__(self, class1, class2, img_num_channels=1, normalize=False, min_pixel=0,
         max_pixel=100, val_blob=None, val_other=None, train_epochs=25, patience=20, limit_search=True, 
         opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=100, 
-        balance_val=True, opt_min_pix=None, opt_max_pix=None, metric='loss'):
+        balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss'):
 
         self.class1 = class1
         self.class2 = class2
@@ -95,20 +95,20 @@ class objective_cnn(object):
         self.image_size_min = image_size_min
         self.image_size_max = image_size_max
         self.balance_val = balance_val
-        self.opt_min_pix = opt_min_pix
-        self.opt_max_pix = opt_max_pix
+        self.opt_max_min_pix = opt_max_min_pix
+        self.opt_max_max_pix = opt_max_max_pix
         self.metric = metric 
 
         if self.metric == 'val_loss' or self.metric == 'val_accuracy':
             if self.val_blob is None and self.val_other is None:
                 raise ValueError('No validation data input, change the metric to either "loss" or "accuracy".')
 
-        if self.opt_min_pix is not None:
-            if self.opt_max_pix is None:
+        if self.opt_max_min_pix is not None:
+            if self.opt_max_max_pix is None:
                 raise ValueError('To optimize min/max normalization pixel value, both opt_min_pix and opt_max_pix must be input')
 
-        if self.opt_max_pix is not None:
-            if self.opt_min_pix is None:
+        if self.opt_max_max_pix is not None:
+            if self.opt_max_min_pix is None:
                 raise ValueError('To optimize min/max normalization pixel value, both opt_min_pix and opt_max_pix must be input')
 
     def __call__(self, trial):
@@ -204,8 +204,9 @@ class objective_cnn(object):
             val_class_1, val_class_2 = self.val_blob, self.val_other
 
         if self.opt_min_pix is not None:
-            min_pix = trial.suggest_int('min_pixel', self.opt_min_pix, self.opt_max_pix, step=1)
-            max_pix = trial.suggest_int('max_pixel', self.opt_min_pix, self.opt_max_pix, step=1)
+            min_pix = 0.0
+            max_pix = trial.suggest_int('max_pixel', self.opt_max_min_pix, self.opt_max_max_pix, step=10)
+            self.normalize=True
         else:
             min_pix, max_pix = self.min_pixel, self.max_pixel
 
@@ -430,7 +431,7 @@ class objective_rf(object):
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, img_num_channels=1, 
     normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='loss', 
     limit_search=True, opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance_val=True,
-    opt_min_pix=None, opt_max_pix=None):
+    opt_max_min_pix=None, opt_max_max_pix=None):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy, unless a CNN
     is being optimized, in which case no cross-validation is performed during trial assesment.
@@ -655,7 +656,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
             val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, limit_search=limit_search, opt_aug=opt_aug, 
             batch_min=batch_min, batch_max=batch_max, image_size_min=image_size_min, image_size_max=image_size_max, balance_val=balance_val,
-            opt_min_pix=opt_min_pix, opt_max_pix=opt_min_pix)
+            opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix)
         if limit_search:
             print('NOTE: To expand hyperparameter search space, set limit_search=False, although this may increase the optimization time significantly.')
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True, n_jobs=1)

@@ -203,7 +203,7 @@ class objective_cnn(object):
             class_1, class_2 = self.class1, self.class2
             val_class_1, val_class_2 = self.val_blob, self.val_other
 
-        if self.opt_min_pix is not None:
+        if self.opt_max_min_pix is not None:
             min_pix = 0.0
             max_pix = trial.suggest_int('max_pixel', self.opt_max_min_pix, self.opt_max_max_pix, step=10)
             self.normalize=True

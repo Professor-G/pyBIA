@@ -5,6 +5,7 @@ Created on Thu Sep 16 21:43:16 2021
 
 @author: daniel
 """
+import copy
 import numpy as np
 from tensorflow.keras.utils import to_categorical
 
@@ -117,9 +118,9 @@ def normalize_pixels(channel, min_pixel=0, max_pixel=100):
         
     """
         
-    channel = (channel - min_pixel) /  (max_pixel - min_pixel)
+    norm_channel = (channel - min_pixel) /  (max_pixel - min_pixel)
 
-    return channel
+    return norm_channel
 
 def process_class(channel, img_num_channels=1, label=None, normalize=True, min_pixel=638, max_pixel=3000):
     """
@@ -150,35 +151,36 @@ def process_class(channel, img_num_channels=1, label=None, normalize=True, min_p
         Reshaped data and label arrays.
     """
 
+    images = copy.deepcopy(channel)
     if normalize is True:
-        channel[np.isnan(channel) == True] = min_pixel 
-        channel[channel > max_pixel] = max_pixel
-        channel[channel < min_pixel] = min_pixel
-        channel = normalize_pixels(channel, min_pixel=min_pixel, max_pixel=max_pixel)
+        images[np.isnan(images) == True] = min_pixel 
+        images[images > max_pixel] = max_pixel
+        images[images < min_pixel] = min_pixel
+        images = normalize_pixels(images, min_pixel=min_pixel, max_pixel=max_pixel)
 
-    if len(channel.shape) == 4:
-        axis = channel.shape[0]
-        if channel.shape[-1] != img_num_channels:
+    if len(images.shape) == 4:
+        axis = images.shape[0]
+        if images.shape[-1] != img_num_channels:
             raise ValueError('img_num_channels parameter must match the number of filters! Number of filters detected: '+str(channel.shape[-1]))
-        img_width = channel[0].shape[1]
-        img_height = channel[0].shape[0]
-    elif len(channel.shape) == 3:
-        img_width = channel.shape[1]
-        img_height = channel.shape[2]
-        axis = channel.shape[0]
-    elif len(channel.shape) == 2:
-        img_width = channel.shape[1]
-        img_height = channel.shape[0]
+        img_width = images[0].shape[1]
+        img_height = images[0].shape[0]
+    elif len(images.shape) == 3:
+        img_width = images.shape[1]
+        img_height = images.shape[2]
+        axis = images.shape[0]
+    elif len(images.shape) == 2:
+        img_width = images.shape[1]
+        img_height = images.shape[0]
         axis = 1
     else:
         raise ValueError("Channel must either be 2D for a single sample, 3D for multiple samples or single sample with multiple filters, or 4D for multifilter images.")
 
-    data = channel.reshape(axis, img_width, img_height, img_num_channels)
+    data = images.reshape(axis, img_width, img_height, img_num_channels)
     if label is None:
         return data
 
     #reshape
-    label = np.expand_dims(np.array([label]*len(channel)), axis=1)
+    label = np.expand_dims(np.array([label]*len(images)), axis=1)
     label = to_categorical(label, 2)
     
     return data, label

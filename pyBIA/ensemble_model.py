@@ -366,6 +366,12 @@ class Classifier:
         else:
             data = self.data_x[:]
 
+        if self.feats_to_use is not None:
+            if len(data.shape) == 1:
+                data = data[self.feats_to_use].reshape(1,-1)
+            else:
+                data = data[:,self.feats_to_use]
+
         if len(data) > 5e3:
             method = 'barnes_hut' #Scales with O(N)
         else:
@@ -442,6 +448,12 @@ class Classifier:
         if norm:
             scaler = MinMaxScaler()
             scaler.fit_transform(data)
+
+        if self.feats_to_use is not None:
+            if len(data.shape) == 1:
+                data = data[self.feats_to_use].reshape(1,-1)
+            else:
+                data = data[:,self.feats_to_use]
         
         if pca:
             pca_transformation = decomposition.PCA(n_components=data.shape[1], whiten=True, svd_solver='auto')
@@ -575,7 +587,7 @@ class Classifier:
         if ylog:
             plt.yscale('log')
         plt.xlabel('Trial #', size=16)
-        plt.ylabel('10-fold CV Accuracy', size=16)
+        plt.ylabel('10-Fold CV Accuracy', size=16)
         plt.title(('Hyperparameter Optimization History'), size=18)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)

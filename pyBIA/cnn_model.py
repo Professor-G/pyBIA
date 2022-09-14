@@ -126,10 +126,10 @@ class Classifier:
             opt_aug=self.opt_aug, batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val,
             opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix)
 
-        if epochs != 0:
+        if self.epochs != 0:
             print("Fitting and returning final model...")
-            if self.opt_min_pix is not None:
-                min_pix, max_pix = self.opt_min_pix, self.best_params['max_pix']
+            if self.opt_max_min_pix is not None:
+                min_pix, max_pix = 0.0, self.best_params['max_pix']
                 self.normalize=True
             else:
                 min_pix, max_pix = self.min_pixel, self.max_pixel

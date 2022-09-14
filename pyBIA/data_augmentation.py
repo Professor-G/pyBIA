@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 
-from pyBIA.data_processing import crop_image
+from pyBIA.data_processing import crop_image, concat_channels
 from warnings import warn
 
 
@@ -189,14 +189,32 @@ def resize(data, size=50):
         resized_data = crop_image(np.array(np.expand_dims(data, axis=-1))[:, :, 0], int(width/2.), int(height/2.), size)
         return resized_data
     else:
-        resized_images = []    
+        resized_images = [] 
+        filter1, filter2, filter3 = [], [], []
         for i in np.arange(0, len(data)):
             if len(data[i].shape) == 2:
-                resized_data = crop_image(np.array(np.expand_dims(data[i], axis=-1))[:, :, 0], int(width/2.), int(height/2.), size)
+                resized_images.append(crop_image(np.array(np.expand_dims(data[i], axis=-1))[:, :, 0], int(width/2.), int(height/2.), size))
+            elif len(data[i].shape) == 3:
+                if data[i].shape[-1] >= 1:
+                    filter1.append(crop_image(data[i][:, :, 0], int(width/2.), int(height/2.), size))
+                if data[i].shape[-1] >= 2:
+                    filter2.append(crop_image(data[i][:, :, 1], int(width/2.), int(height/2.), size))
+                if data[i].shape[-1] == 3:
+                    filter3.append(crop_image(data[i][:, :, 2], int(width/2.), int(height/2.), size))    
+                if data[i].shape[-1] > 3:
+                    raise ValueError('A maximum of 3 filters is currently supported!')            
             else:
-                resized_data = crop_image(data[i][:, :, 0], int(width/2.), int(height/2.), size)
-            resized_images.append(resized_data)
+                raise ValueError('Invalid data input size, the images must be shaped as follows (# of samples, width, height, filters)')
 
+        if len(filter1) != 0:
+            for j in range(len(filter1)):
+                if data[i].shape[-1] == 1:
+                    resized_images.append(filter1[j])
+                elif data[i].shape[-1] == 2:
+                    resized_images.append(concat_channels(filter1[j], filter2[j]))
+                elif data[i].shape[-1] == 3:
+                    resized_images.append(concat_channels(filter1[j], filter2[j], filter3[j]))
+                
     resized_data = np.array(resized_images)
 
     return resized_data

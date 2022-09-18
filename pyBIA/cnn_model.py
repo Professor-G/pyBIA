@@ -233,21 +233,21 @@ class Classifier:
         try:
             self.model = load_model(path+'Keras_Model.h5')
             model = 'model'
-        except FileNotFoundError:
+        except:
             model = ''
             pass
 
         try:
             self.optimization_results = joblib.load(path+'HyperOpt_Results')
             optimization_results = 'optimization_results'
-        except FileNotFoundError:
+        except:
             optimization_results = '' 
             pass
 
         try:
             self.best_params = joblib.load(path+'Best_Params')
             best_params = 'best_params'
-        except FileNotFoundError:
+        except:
             best_params = '' 
             pass        
 
@@ -262,14 +262,9 @@ class Classifier:
 
         Args:
             data: 2D array for single image, 3D array for multiple images.
-            model: The trained Tensorflow model.
-            normalize (bool, optional): True will normalize the data using the input min and max pixels
-            min_pixel (int, optional): The minimum pixel count, defaults to 638. 
-                Pixels with counts below this threshold will be set to this limit.
-            max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
-                Pixels with counts above this threshold will be set to this limit.
             target (str): The name of the target class, assuming binary classification in 
                 which there is an 'OTHER' class. Defaults to 'DIFFUSE'. 
+                
         Returns:
             The class prediction(s), either 'DIFFUSE' or 'OTHER'.
         """

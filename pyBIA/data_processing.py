@@ -219,11 +219,11 @@ def create_training_set(blob_data, other_data, img_num_channels=1, normalize=Tru
         Reshaped data and label arrays.
     """
 
-    gb_data, gb_label = process_class(blob_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
-    other_data, other_label = process_class(other_data, label=1, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+    class1_data, class1_label = process_class(blob_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+    class2_data, class2_label = process_class(other_data, label=1, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
     
-    training_data = np.r_[gb_data, other_data]
-    training_labels = np.r_[gb_label, other_label]
+    training_data = np.r_[class1_data, class2_data]
+    training_labels = np.r_[class1_label, class2_label]
 
     return training_data, training_labels
 

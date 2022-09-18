@@ -283,15 +283,18 @@ class Classifier:
 
         return np.array(output)
 
-    def plot_hyper_opt(self, xlog=True, ylog=False, savefig=False):
+    def plot_hyper_opt(self, xlim=None, ylim=None, xlog=True, ylog=False, savefig=False):
         """
         Plots the hyperparameter optimization history.
     
         Args:
+            xlim: Limits for the x-axis. Ex) xlim = (0, 1000)
+            ylim: Limits for the y-axis. Ex) ylim = (0.9, 0.94)
             xlog (boolean): If True the x-axis will be log-scaled.
                 Defaults to True.
             ylog (boolean): If True the y-axis will be log-scaled.
                 Defaults to False.
+
 
         Returns:
             AxesImage
@@ -308,21 +311,24 @@ class Classifier:
         elif self.metric == 'accuracy':
             ylabel = 'Training Accuracy'
         elif self.metric == 'val_loss':
-            ylabel = 'Validation Loss'
+            ylabel = '1 - Validation Loss'
         elif self.metric == 'loss':
-            ylabel = 'Training Loss'
+            ylabel = '1 - Training Loss'
         else:
             ylabel = 'Optimization Metric'
 
         plt.xlabel('Trial #', size=16)
         plt.ylabel(ylabel, size=16)
         plt.title(('Hyperparameter Optimization History'), size=18)
-        #plt.xlim((1,1e4))
-        #plt.ylim((0.9, 0.935))
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
         plt.legend(prop={'size': 16})
+        if xlim is not None:
+            plt.xlim(xlim)
+        if ylim is not None:
+            plt.ylim(ylim)
+        plt.tight_layout()
         if savefig:
             plt.savefig('CNN_Hyperparameter_Optimization.png', bbox_inches='tight', dpi=300)
         else:

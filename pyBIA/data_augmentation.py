@@ -69,7 +69,7 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
         raise ValueError("Shift parameters must be integers indicating +- pixel range")
 
     def image_rotation(data):
-        return rotate(data, np.random.choice(range(rotation+1), 1)[0], reshape=False, order=0, prefilter=False)
+        return rotate(data, np.random.choice(range(rotation+1), 1)[0], reshape=False, order=1, prefilter=False)
     
     datagen = ImageDataGenerator(
         width_shift_range=width_shift,

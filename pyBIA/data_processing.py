@@ -165,9 +165,14 @@ def process_class(channel, img_num_channels=1, label=None, normalize=True, min_p
         img_width = images[0].shape[1]
         img_height = images[0].shape[0]
     elif len(images.shape) == 3:
-        img_width = images.shape[1]
-        img_height = images.shape[2]
-        axis = images.shape[0]
+        if img_num_channels == 1 :
+            axis = images.shape[0]
+            img_width = images.shape[1]
+            img_height = images.shape[2]
+        else:
+            axis = 1
+            img_width = images.shape[0]
+            img_height = images.shape[1]
     elif len(images.shape) == 2:
         img_width = images.shape[1]
         img_height = images.shape[0]

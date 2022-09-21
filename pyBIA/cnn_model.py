@@ -129,7 +129,7 @@ class Classifier:
         if self.epochs != 0:
             print("Fitting and returning final model...")
             if self.opt_max_min_pix is not None:
-                min_pix, max_pix = 0.0, self.best_params['max_pix']
+                min_pix, max_pix = 0.0, self.best_params['max_pixel']
                 self.normalize=True
             else:
                 min_pix, max_pix = self.min_pixel, self.max_pixel

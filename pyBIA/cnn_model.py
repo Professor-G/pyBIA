@@ -114,7 +114,7 @@ class Classifier:
         Returns:
             Trained classifier.
         """
-        
+
         if self.optimize is False:
             print("Returning base model number {}...".format(self.pyBIA_model))
             if self.pyBIA_model == 1:
@@ -155,11 +155,11 @@ class Classifier:
 
             if self.opt_aug:
                 if self.img_num_channels == 1:
-                    channel1, channel2, channel3 = self.class1, None, None 
+                    channel1, channel2, channel3 = self.blob_data, None, None 
                 elif self.img_num_channels == 2:
-                    channel1, channel2, channel3 = self.class1[:,:,:,0], self.class1[:,:,:,1], None 
+                    channel1, channel2, channel3 = self.blob_data[:,:,:,0], self.blob_data[:,:,:,1], None 
                 elif self.img_num_channels == 3:
-                    channel1, channel2, channel3 = self.class1[:,:,:,0], self.class1[:,:,:,1], self.class1[:,:,:,2]
+                    channel1, channel2, channel3 = self.blob_data[:,:,:,0], self.blob_data[:,:,:,1], self.blob_data[:,:,:,2]
                 else:
                     raise ValueError('Only three filters are supported!')
 
@@ -171,18 +171,18 @@ class Classifier:
                     class_1=[]
                     if self.img_num_channels == 2:
                         for i in range(len(augmented_images[0])):
-                            class_1.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i]))
+                            class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i]))
                     else:
                         for i in range(len(augmented_images[0])):
-                            class_1.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
+                            class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
                     class_1 = np.array(class_1)
                 else:
                     class_1 = augmented_images
 
                 if self.balance_val:
-                    class_2 = self.class2[:len(class_1)]   
+                    class_2 = self.other_data[:len(class_1)]   
                 else:
-                    class_2 = self.class2   
+                    class_2 = self.other_data   
 
                 if self.img_num_channels == 1:
                     class_2 = resize(class_2, size=image_size)
@@ -190,10 +190,10 @@ class Classifier:
                     channel1 = resize(class_2[:,:,:,0], size=image_size)
                     channel2 = resize(class_2[:,:,:,1], size=image_size)
                     if self.img_num_channels == 2:
-                        class_2 = data_processing.concat_channels(channel1, channel2)
+                        class_2 = concat_channels(channel1, channel2)
                     else:
                         channel3 = resize(class_2[:,:,:,2], size=image_size)
-                        class_2 = data_processing.concat_channels(channel1, channel2, channel3)
+                        class_2 = concat_channels(channel1, channel2, channel3)
 
                 #Need to also crop the validation images
                 if self.val_blob is not None:
@@ -203,10 +203,10 @@ class Classifier:
                         val_channel1 = resize(self.val_blob[:,:,:,0], size=image_size)
                         val_channel2 = resize(self.val_blob[:,:,:,1], size=image_size)
                         if self.img_num_channels == 2:
-                            val_class_1 = data_processing.concat_channels(val_channel1, val_channel2)
+                            val_class_1 = concat_channels(val_channel1, val_channel2)
                         else:
                             val_channel3 = resize(self.val_blob[:,:,:,2], size=image_size)
-                            val_class_1 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
+                            val_class_1 = concat_channels(val_channel1, val_channel2, val_channel3)
                 else:
                     val_class_1 = None 
 
@@ -217,15 +217,15 @@ class Classifier:
                         val_channel1 = resize(self.val_other[:,:,:,0], size=image_size)
                         val_channel2 = resize(self.val_other[:,:,:,1], size=image_size)
                         if self.img_num_channels == 2:
-                            val_class_2 = data_processing.concat_channels(val_channel1, val_channel2)
+                            val_class_2 = concat_channels(val_channel1, val_channel2)
                         else:
                             val_channel3 = resize(self.val_other[:,:,:,2], size=image_size)
-                            val_class_2 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
+                            val_class_2 = concat_channels(val_channel1, val_channel2, val_channel3)
                 else:
                     val_class_2 = None 
 
             else:
-                class_1, class_2 = self.class1, self.class2
+                class_1, class_2 = self.blob_data, self.other_data
                 val_class_1, val_class_2 = self.val_blob, self.val_other
 
             if self.pyBIA_model == 1:
@@ -497,17 +497,6 @@ class Classifier:
     #   print('Note: Input data when using this model must be 50x50.')
     #   return 
 
-class MinPool2D(MaxPool2D):
-  """
-  Custom Minimum Pooling class for Keras API
-  """
-
-  def __init__(self, pool_size=(2, 2), strides=1, padding='same'):
-    super(MaxPool2D, self).__init__(pool_size, strides, padding)
-
-  def pooling_function(inputs, pool_size, strides, padding):
-    return -pool2d(-inputs, pool_size, strides, padding, pool_mode='max')
-
 def pyBIA_model_1(blob_data, other_data, img_num_channels=1, normalize=True, 
         min_pixel=0, max_pixel=100, val_blob=None, val_other=None, epochs=100, 
         batch_size=32, lr=0.0001, momentum=0.9, decay=0.0, nesterov=False, 
@@ -527,8 +516,7 @@ def pyBIA_model_1(blob_data, other_data, img_num_channels=1, normalize=True,
         Returns:
             The trained CNN model.
         """
-        if pooling != 'min' or pooling != 'max' or pooling != 'average' or pooling is not None:
-            raise ValueError("pooling parameter must be either: 'max', 'min', 'average', or None")
+
         if len(blob_data.shape) != len(other_data.shape):
             raise ValueError("Shape of blob and other data must be the same.")
         if batch_size < 16:
@@ -581,8 +569,6 @@ def pyBIA_model_1(blob_data, other_data, img_num_channels=1, normalize=True,
                          padding=padding, kernel_initializer=uniform_scaling))
         if pooling_1 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
-        elif pooling_1 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
         elif pooling_1 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))            
         model.add(BatchNormalization())
@@ -688,8 +674,6 @@ def pyBIA_model_2(blob_data, other_data, img_num_channels=1, normalize=True,
                          padding=padding, kernel_initializer=uniform_scaling))
         if pooling_1 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
-        elif pooling_1 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
         elif pooling_1 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))            
         model.add(BatchNormalization())
@@ -698,8 +682,6 @@ def pyBIA_model_2(blob_data, other_data, img_num_channels=1, normalize=True,
                          kernel_initializer=uniform_scaling))
         if pooling_2 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))
-        elif pooling_2 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))
         elif pooling_2 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))            
         model.add(BatchNormalization())
@@ -805,8 +787,6 @@ def pyBIA_model_3(blob_data, other_data, img_num_channels=1, normalize=True,
                          padding=padding, kernel_initializer=uniform_scaling))
         if pooling_1 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
-        elif pooling_1 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
         elif pooling_1 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))            
         model.add(BatchNormalization())
@@ -815,8 +795,6 @@ def pyBIA_model_3(blob_data, other_data, img_num_channels=1, normalize=True,
                          kernel_initializer=uniform_scaling))
         if pooling_2 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))
-        elif pooling_2 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))
         elif pooling_2 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))            
         model.add(BatchNormalization())
@@ -825,8 +803,6 @@ def pyBIA_model_3(blob_data, other_data, img_num_channels=1, normalize=True,
                          kernel_initializer=uniform_scaling))
         if pooling_3 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))
-        elif pooling_3 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))
         elif pooling_3 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))            
         model.add(BatchNormalization())
@@ -933,8 +909,6 @@ def pyBIA_model_4(blob_data, other_data, img_num_channels=1, normalize=True,
                          padding=padding, kernel_initializer=uniform_scaling))
         if pooling_1 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
-        elif pooling_1 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
         elif pooling_1 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))            
         model.add(BatchNormalization())
@@ -943,8 +917,6 @@ def pyBIA_model_4(blob_data, other_data, img_num_channels=1, normalize=True,
                          kernel_initializer=uniform_scaling))
         if pooling_2 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))
-        elif pooling_2 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))
         elif pooling_2 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))            
         model.add(BatchNormalization())
@@ -957,7 +929,7 @@ def pyBIA_model_4(blob_data, other_data, img_num_channels=1, normalize=True,
         if pooling_3 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))
         elif pooling_3 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))
+            model.add(MinPool2D(pool_size=(pool_size_3,pool_size_3), strides=(pool_stride_3,pool_stride_3), padding=padding))
         elif pooling_3 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))            
         model.add(BatchNormalization())
@@ -1119,8 +1091,6 @@ def pyBIA_model_5(blob_data, other_data, img_num_channels=1, normalize=True,
                          padding=padding, kernel_initializer=uniform_scaling))
         if pooling_1 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
-        elif pooling_1 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
         elif pooling_1 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))            
         model.add(BatchNormalization())
@@ -1129,8 +1099,6 @@ def pyBIA_model_5(blob_data, other_data, img_num_channels=1, normalize=True,
                          kernel_initializer=uniform_scaling))
         if pooling_2 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))
-        elif pooling_2 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))
         elif pooling_2 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))            
         model.add(BatchNormalization())
@@ -1145,8 +1113,6 @@ def pyBIA_model_5(blob_data, other_data, img_num_channels=1, normalize=True,
                          kernel_initializer=uniform_scaling))
         if pooling_3 == 'max':
             model.add(MaxPool2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))
-        elif pooling_3 == 'min':
-            model.add(MinPool2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))
         elif pooling_3 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))            
         model.add(BatchNormalization())

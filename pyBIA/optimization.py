@@ -255,58 +255,58 @@ class objective_cnn(object):
                         filter_size_5 = trial.suggest_int('filter_size_5', 1, 11, step=2)
                         strides_5 = trial.suggest_int('strides_5', 1, 15)  
                 
-       # try:
-        if self.pyBIA_model == 1:
-            model, history = cnn_model.pyBIA_model_1(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
-                batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
-                activation_dense=activation_dense, pooling_1=pooling_1, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, 
-                filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2,
-                dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False)
+        try:
+            if self.pyBIA_model == 1:
+                model, history = cnn_model.pyBIA_model_1(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                    min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
+                    batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
+                    activation_dense=activation_dense, pooling_1=pooling_1, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, 
+                    filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2,
+                    dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False)
 
-        elif self.pyBIA_model == 2:
-            model, history = cnn_model.pyBIA_model_2(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
-                batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
-                activation_dense=activation_dense, pooling_1=pooling_1, pooling_2=pooling_2, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, pool_size_2=pool_size_2,
-                pool_stride_2=pool_stride_2, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, filter_2=filter_2, 
-                filter_size_2=filter_size_2, strides_2=stride_2, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2,
-                dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False)
+            elif self.pyBIA_model == 2:
+                model, history = cnn_model.pyBIA_model_2(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                    min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
+                    batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
+                    activation_dense=activation_dense, pooling_1=pooling_1, pooling_2=pooling_2, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, pool_size_2=pool_size_2,
+                    pool_stride_2=pool_stride_2, filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, filter_2=filter_2, 
+                    filter_size_2=filter_size_2, strides_2=stride_2, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2,
+                    dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False)
 
-        elif self.pyBIA_model == 3:
-            model, history = cnn_model.pyBIA_model_3(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
-                batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
-                activation_dense=activation_dense, pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, pool_size_2=pool_size_2,
-                pool_stride_2=pool_stride_2, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, 
-                strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, 
-                strides_3=strides_3, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, dropout_1=dropout_1, dropout_2=dropout_2,
-                early_stop_callback=callbacks, checkpoint=False)
-        
-        elif self.pyBIA_model == 4:
-            model, history = cnn_model.pyBIA_model_4(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
-                batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
-                activation_dense=activation_dense, pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, pool_size_2=pool_size_2,
-                pool_stride_2=pool_stride_2, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, 
-                strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, 
-                strides_3=strides_3, filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_4, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2,
-                dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False)
-        
-        elif self.pyBIA_model == 5:
-            model, history = cnn_model.pyBIA_model_5(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
-                batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
-                activation_dense=activation_dense, pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, pool_size_2=pool_size_2,
-                pool_stride_2=pool_stride_2, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, 
-                strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, 
-                strides_3=strides_3, filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_5, filter_5=filter_5, filter_size_5=filter_size_5, 
-                strides_5=strides_5, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, dropout_1=dropout_1, dropout_2=dropout_2,
-                early_stop_callback=callbacks, checkpoint=False)
+            elif self.pyBIA_model == 3:
+                model, history = cnn_model.pyBIA_model_3(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                    min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
+                    batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
+                    activation_dense=activation_dense, pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, pool_size_2=pool_size_2,
+                    pool_stride_2=pool_stride_2, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, 
+                    strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, 
+                    strides_3=strides_3, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, dropout_1=dropout_1, dropout_2=dropout_2,
+                    early_stop_callback=callbacks, checkpoint=False)
+            
+            elif self.pyBIA_model == 4:
+                model, history = cnn_model.pyBIA_model_4(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                    min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
+                    batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
+                    activation_dense=activation_dense, pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, pool_size_2=pool_size_2,
+                    pool_stride_2=pool_stride_2, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, 
+                    strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, 
+                    strides_3=strides_3, filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_4, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2,
+                    dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False)
+            
+            elif self.pyBIA_model == 5:
+                model, history = cnn_model.pyBIA_model_5(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                    min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
+                    batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, activation_conv=activation_conv, 
+                    activation_dense=activation_dense, pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, pool_size_2=pool_size_2,
+                    pool_stride_2=pool_stride_2, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, 
+                    strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, 
+                    strides_3=strides_3, filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_5, filter_5=filter_5, filter_size_5=filter_size_5, 
+                    strides_5=strides_5, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, dropout_1=dropout_1, dropout_2=dropout_2,
+                    early_stop_callback=callbacks, checkpoint=False)
                  
-        #except:
-        #    print("Invalid hyperparameter combination, skipping trial.")
-        #    return 0.0
+        except:
+            print("Invalid hyperparameter combination, skipping trial.")
+            return 0.0
 
         final_score = history.history[self.metric][-1]
 

@@ -691,7 +691,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         objective = objective_cnn(data_x, data_y, pyBIA_model=pyBIA_model, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
             val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, 
             image_size_min=image_size_min, image_size_max=image_size_max, balance_val=balance_val, opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix)
-        study.optimize(objective, n_trials=n_iter, show_progress_bar=True, n_jobs=1)
+        study.optimize(objective, n_trials=n_iter, show_progress_bar=True)#, n_jobs=1)
         params = study.best_trial.params
 
     final_score = study.best_value

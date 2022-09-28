@@ -473,7 +473,7 @@ class objective_rf(object):
 
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, img_num_channels=1, 
     normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='loss', 
-    limit_search=True, opt_aug=True, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance_val=True,
+    limit_search=True, opt_model=True, opt_aug=False, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance_val=True,
     opt_max_min_pix=None, opt_max_max_pix=None, pyBIA_model=1):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy, unless a CNN
@@ -697,7 +697,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
        
     else:
         objective = objective_cnn(data_x, data_y, pyBIA_model=pyBIA_model, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
-            val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, 
+            val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, opt_model=opt_model, opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, 
             image_size_min=image_size_min, image_size_max=image_size_max, balance_val=balance_val, opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix)
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True)#, n_jobs=1)
         params = study.best_trial.params

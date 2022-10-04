@@ -432,10 +432,10 @@ class Classifier:
         for i in range(len(predictions)):
             if np.argmax(predictions[i]) == 0:
                 prediction = target
-                probas.append(predictions[:,0])
+                probas.append(predictions[i][:,0])
             else:
                 prediction = 'OTHER'
-                probas.append(predictions[:,1])
+                probas.append(predictions[i][:,1])
 
             output.append(prediction)
 

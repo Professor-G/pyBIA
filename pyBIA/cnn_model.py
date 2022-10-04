@@ -409,7 +409,7 @@ class Classifier:
         
         return
 
-    def predict(self, data, target='DIFFUSE'):
+    def predict(self, data, target='DIFFUSE', return_proba=False):
         """
         Returns the class prediction. The input can either be a single 2D array 
         or a 3D array if there are multiple samples.
@@ -418,7 +418,8 @@ class Classifier:
             data: 2D array for single image, 3D array for multiple images.
             target (str): The name of the target class, assuming binary classification in 
                 which there is an 'OTHER' class. Defaults to 'DIFFUSE'. 
-                
+            return_proba (bool): If True the output will return the probability prediction.
+                Defaults to False. 
         Returns:
             The class prediction(s), either 'DIFFUSE' or 'OTHER'.
         """
@@ -427,14 +428,20 @@ class Classifier:
         predictions = self.model.predict(data)
 
         output=[]
+        probas=[]
         for i in range(len(predictions)):
             if np.argmax(predictions[i]) == 0:
                 prediction = target
+                probas.append(predictions[:,0])
             else:
                 prediction = 'OTHER'
+                probas.append(predictions[:,1])
 
             output.append(prediction)
 
+        if return_proba:
+            output = np.c_[output, probas]
+            
         return np.array(output)
 
     def plot_hyper_opt(self, xlim=None, ylim=None, xlog=True, ylog=False, savefig=False):

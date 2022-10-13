@@ -69,6 +69,9 @@ class Classifier:
             the hyperparameter search. Defaults to 25. 
         boruta_trials (int): The number of trials to run when running Boruta for
             feature selection. Set to 0 for no feature selection. Defaults to 50.
+        boruta_model (str): The ensemble to use when calculating the feature importance
+            to be utilized by the Boruta algorithm. Can either be 'rf' or 'xgb'. Note
+            that this does not have to be the same as the machine learning classifier, clf.
         balance (bool, optional): If True, a weights array will be calculated and used
             when fitting the classifier. This can improve classification when classes
             are imbalanced. This is only applied if the classification is a binary task. 
@@ -78,8 +81,8 @@ class Classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, data_x=None, data_y=None, clf='rf', optimize=True, limit_search=True, impute=True, imp_method='KNN', 
-        n_iter=25, boruta_trials=50, balance=True):
+    def __init__(self, data_x=None, data_y=None, clf='rf', optimize=True, limit_search=True, impute=False, imp_method='KNN', 
+        n_iter=25, boruta_trials=50, boruta_model='rf', balance=True):
 
         self.data_x = data_x
         self.data_y = data_y
@@ -90,6 +93,7 @@ class Classifier:
         self.imp_method = imp_method
         self.n_iter = n_iter
         self.boruta_trials = boruta_trials
+        self.boruta_model = boruta_model 
         self.balance = balance 
 
         self.model = None
@@ -151,7 +155,7 @@ class Classifier:
             raise ValueError('clf argument must either be "rf", "nn", or "xgb".')
         
         if self.impute is False and self.optimize is False:
-            print("Returning base model...")
+            print("Returning base {} model...".format(self.clf))
             model.fit(self.data_x, self.data_y)
             self.model = model
             return
@@ -166,13 +170,15 @@ class Classifier:
                 raise ValueError('Invalid imputation method, currently only k-NN and MissForest algorithms are supported.')
             
             if self.optimize:
-                self.data_x = data
+                data = self.data_x[::]
             else:
                 model.fit(data, self.data_y)
                 self.model = model 
                 return
+        else:
+            data = self.data_x[::]
 
-        self.feats_to_use, self.feature_history = borutashap_opt(data, self.data_y, boruta_trials=self.boruta_trials)
+        self.feats_to_use, self.feature_history = borutashap_opt(data, self.data_y, boruta_trials=self.boruta_trials, model=self.boruta_model)
         if len(self.feats_to_use) == 0:
             print('No features selected, increase the number of n_trials when running pyBIA.optimization.borutashap_opt(). Using all features...')
             self.feats_to_use = np.arange(data.shape[1])
@@ -717,7 +723,7 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
     #plt.xticks(tick_marks, ['DIFFUSE','OTHER'], rotation=45, fontsize=14)
     #plt.yticks(tick_marks, ['DIFFUSE','OTHER'], fontsize=14)
 
-    fmt = '.2f' if normalize is True else 'd'
+    fmt = '.4f' if normalize is True else 'd'
     thresh = conf_matrix.max() / 2.
 
     for i, j in itertools.product(range(conf_matrix.shape[0]), range(conf_matrix.shape[1])):

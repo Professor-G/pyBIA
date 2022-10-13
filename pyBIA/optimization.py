@@ -72,7 +72,7 @@ class objective_cnn(object):
         img_num_channels
     """
 
-    def __init__(self, class1, class2, pyBIA_model=1, img_num_channels=1, normalize=False, min_pixel=0,
+    def __init__(self, class1, class2, pyBIA_model=1, img_num_channels=1, normalize=True, min_pixel=0,
         max_pixel=100, val_blob=None, val_other=None, train_epochs=25, patience=20, 
         opt_model=True, opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=100, 
         balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss'):
@@ -136,7 +136,7 @@ class objective_cnn(object):
             shift = trial.suggest_int('shift', 0, 25)
             horizontal = trial.suggest_categorical('horizontal', [True, False])
             vertical = trial.suggest_categorical('vertical', [True, False])
-            rotation = trial.suggest_int('rotation', 0, 360, step=360)
+            rotation = trial.suggest_categorical('rotation', [True, False])
 
             augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=batch, 
                 width_shift=shift, height_shift=shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
@@ -205,7 +205,7 @@ class objective_cnn(object):
 
         if self.opt_max_min_pix is not None:
             min_pix = 0.0
-            max_pix = trial.suggest_int('max_pixel', self.opt_max_min_pix, self.opt_max_max_pix, step=10)
+            max_pix = trial.suggest_int('max_pixel', self.opt_max_min_pix, self.opt_max_max_pix, step=5)
             self.normalize=True
         else:
             min_pix, max_pix = self.min_pixel, self.max_pixel
@@ -330,7 +330,7 @@ class objective_xgb(object):
     2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
     """
 
-    def __init__(self, data_x, data_y, limit_search=True):
+    def __init__(self, data_x, data_y, limit_search=False):
         self.data_x = data_x
         self.data_y = data_y
         self.limit_search = limit_search
@@ -363,13 +363,12 @@ class objective_xgb(object):
                     gamma=gamma, grow_policy=grow_policy, subsample=subsample)#, tree_method='hist')
 
             cv = cross_validate(clf, self.data_x, self.data_y, cv=10)
-            final_score = np.round(np.mean(cv['test_score']), 10)
+            final_score = np.mean(cv['test_score'])
 
             return final_score
 
         booster = trial.suggest_categorical('booster', ['gbtree', 'dart'])
         n_estimators = trial.suggest_int('n_estimators', 100, 500)
-        colsample_bytree = trial.suggest_float('colsample_bytree', 0.5, 1)
         reg_lambda = trial.suggest_float('reg_lambda', 0, 100)
         reg_alpha = trial.suggest_int('reg_alpha', 0, 100)
         max_depth = trial.suggest_int('max_depth', 2, 25)
@@ -379,6 +378,7 @@ class objective_xgb(object):
         min_child_weight = trial.suggest_int('min_child_weight', 1, 100)
         max_delta_step = trial.suggest_int('max_delta_step', 1, 100)
         subsample = trial.suggest_float('subsample', 0.5, 1.0)
+        colsample_bytree = trial.suggest_float('colsample_bytree', 0.5, 1)
 
         if booster == "dart":
             sample_type = trial.suggest_categorical('sample_type', ['uniform', 'weighted'])
@@ -397,7 +397,7 @@ class objective_xgb(object):
                 max_delta_step=max_delta_step, subsample=subsample)#, tree_method='hist')
 
         cv = cross_validate(clf, self.data_x, self.data_y, cv=10)
-        final_score = np.round(np.mean(cv['test_score']), 10)
+        final_score = np.mean(cv['test_score'])
 
         return final_score
 
@@ -430,11 +430,11 @@ class objective_nn(object):
             clf = MLPClassifier(hidden_layer_sizes=tuple(layers),learning_rate_init=learning_rate_init, 
                 solver=solver, activation=activation, alpha=alpha, batch_size=batch_size, max_iter=2500)
         except:
-            print("Invalid hyerparameter combination, skipping trial")
+            print("Invalid hyperparameter combination, skipping trial")
             return 0.0
 
         cv = cross_validate(clf, self.data_x, self.data_y, cv=10)
-        final_score = np.round(np.mean(cv['test_score']), 6)
+        final_score = np.mean(cv['test_score'])
 
         return final_score
 
@@ -463,11 +463,11 @@ class objective_rf(object):
                 min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
                 max_features=max_features, bootstrap=bootstrap)
         except:
-            print("Invalid hyerparameter combination, skipping trial")
+            print("Invalid hyperparameter combination, skipping trial")
             return 0.0
 
         cv = cross_validate(clf, self.data_x, self.data_y, cv=10)
-        final_score = np.round(np.mean(cv['test_score']), 6)
+        final_score = np.mean(cv['test_score'])
 
         return final_score
 
@@ -584,8 +584,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         raise ValueError('clf argument must either be "rf", "xgb", "nn", or "cnn".')
 
     if clf != 'cnn':
-        cv = cross_validate(model_0, data_x, data_y, cv=3)
-        initial_score = np.round(np.mean(cv['test_score']), 6)
+        cv = cross_validate(model_0, data_x, data_y, cv=10)
+        initial_score = np.mean(cv['test_score'])
 
     sampler = optuna.samplers.TPESampler()#seed=1909 
     study = optuna.create_study(direction='maximize', sampler=sampler)
@@ -634,7 +634,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
                 'bootstrap': [True,False]   
             }
             gs = BayesSearchCV(n_iter=n_iter, estimator=RandomForestClassifier(), search_spaces=params, 
-                optimizer_kwargs={'base_estimator': 'RF'}, cv=3)
+                optimizer_kwargs={'base_estimator': 'RF'}, cv=10)
             gs.fit(data_x, data_y)
             best_est, best_score = gs.best_estimator_, np.round(gs.best_score_, 4)
             print('Highest mean accuracy: {}'.format(best_score))
@@ -660,7 +660,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
                 'solver': ['sgd', 'adam'],
                 'max_iter': [100, 150, 200] 
             }
-            gs = BayesSearchCV(n_iter=n_iter, estimator=MLPClassifier(), search_spaces=params, cv=3)
+            gs = BayesSearchCV(n_iter=n_iter, estimator=MLPClassifier(), search_spaces=params, cv=10)
             gs.fit(data_x, data_y)
             best_est, best_score = gs.best_estimator_, np.round(gs.best_score_, 4)
             print('Highest mean accuracy: {}'.format(best_score))
@@ -706,9 +706,9 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
 
     if clf != 'cnn':
         if initial_score > final_score:
-            print('Hyperparameter optimization complete! 10-fold CV accuracy of {} is LOWER than the base accuracy of {}, try increasing the value of n_iter and run again.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
+            print('Hyperparameter optimization complete! Optimal 10-fold CV accuracy of {} is LOWER than the base accuracy of {}, try increasing the value of n_iter and run again.'.format(np.round(final_score, 6), np.round(initial_score, 6)))
         else:
-            print('Hyperparameter optimization complete! 10-fold CV accuracy of {} is HIGHER than the base accuracy of {}.'.format(np.round(final_score, 4), np.round(initial_score, 4)))
+            print('Hyperparameter optimization complete! Optimal 10-fold CV accuracy of {} is HIGHER than the base accuracy of {}.'.format(np.round(final_score, 6), np.round(initial_score, 6)))
         if return_study:
             return model, params, study
         return model, params

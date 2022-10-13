@@ -16,13 +16,13 @@ from warnings import warn
 
 
 def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5, height_shift=5, 
-    horizontal=True, vertical=True, rotation=360, fill='nearest', image_size=50):
+    horizontal=True, vertical=True, rotation=True, fill='nearest', image_size=50):
     """
     This function takes in one image and applies data augmentation techniques.
     Shifts and rotations occur at random, for example, if width_shift is set
     to 10, then an image shift between -10 and 10 pixels will be chosen from a 
     random uniform distribution. Rotation angle is also chosen from a random uniform 
-    distribution, between zero and the rotation argument. 
+    distribution, between zero and 360. 
 
     Note:
         This function is used for offline data augmentation! In practice,
@@ -46,7 +46,8 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
             If set to zero no vertical shifts will be performed. Defaults to 5 pixels.
         horizontal (bool): If False no horizontal flips are allowed. Defaults to True.
         vertical (bool): If False no vertical reflections are allowed. Defaults to True.
-        rotation (int): The rotation angle in degrees. Defaults to 360 for full rotation allowed.
+        rotation (int): If True full 360 rotation is allowed, if False no rotation is performed.
+            Defaults to True.
         fill (str): This is the treatment for data outside the boundaries after roration
             and shifts. Default is set to 'nearest' which repeats the closest pixel values.
             Can set to: {"constant", "nearest", "reflect", "wrap"}.
@@ -65,8 +66,13 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
         additionl outputs, respectively.
     """
 
-    if isinstance(width_shift, int) == False or isinstance(height_shift, int) == False or isinstance(rotation, int) == False:
+    if isinstance(width_shift, int) == False or isinstance(height_shift, int) == False:
         raise ValueError("Shift parameters must be integers indicating +- pixel range")
+
+    if rotation:
+        rotation = 360
+    else:
+        rotation = 0
 
     def image_rotation(data):
         return rotate(data, np.random.choice(range(rotation+1), 1)[0], reshape=False, order=1, prefilter=False)
@@ -180,10 +186,8 @@ def resize(data, size=50):
     if width != height:
         raise ValueError("Can only resize square images")
     if width == size:
-        warn("No resizing necessary, image shape is already in desired size", stacklevel=2)
-        if len(data.shape) == 4:
-            data = data[:, :, :, 0]
-        return data
+        print("No resizing necessary, image shape is already in desired size, returning original data...", stacklevel=2)
+        return data 
 
     if len(data.shape) == 2:
         resized_data = crop_image(np.array(np.expand_dims(data, axis=-1))[:, :, 0], int(width/2.), int(height/2.), size)

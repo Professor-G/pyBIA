@@ -378,6 +378,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=
             props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
         except:
             prop_list.append(-999) #If the object can't be segmented 
+            progess_bar.next()
             continue
 
         sep_list=[]

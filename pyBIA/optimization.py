@@ -330,10 +330,11 @@ class objective_xgb(object):
     2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
     """
 
-    def __init__(self, data_x, data_y, limit_search=False):
+    def __init__(self, data_x, data_y, limit_search=False, opt_cv=10):
         self.data_x = data_x
         self.data_y = data_y
         self.limit_search = limit_search
+        self.opt_cv = opt_cv 
 
     def __call__(self, trial):
 
@@ -362,7 +363,7 @@ class objective_xgb(object):
                 clf = XGBClassifier(booster=booster, n_estimators=n_estimators, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
                     gamma=gamma, grow_policy=grow_policy, subsample=subsample)#, tree_method='hist')
 
-            cv = cross_validate(clf, self.data_x, self.data_y, cv=10)
+            cv = cross_validate(clf, self.data_x, self.data_y, cv=self.opt_cv)
             final_score = np.mean(cv['test_score'])
 
             return final_score
@@ -396,7 +397,7 @@ class objective_xgb(object):
                 reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, gamma=gamma, grow_policy=grow_policy, min_child_weight=min_child_weight,
                 max_delta_step=max_delta_step, subsample=subsample)#, tree_method='hist')
 
-        cv = cross_validate(clf, self.data_x, self.data_y, cv=10)
+        cv = cross_validate(clf, self.data_x, self.data_y, cv=self.opt_cv)
         final_score = np.mean(cv['test_score'])
 
         return final_score
@@ -409,9 +410,10 @@ class objective_nn(object):
     was published in 2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
     """
 
-    def __init__(self, data_x, data_y):
+    def __init__(self, data_x, data_y, opt_cv):
         self.data_x = data_x
         self.data_y = data_y
+        self.opt_cv = opt_cv
 
     def __call__(self, trial):
         learning_rate_init= trial.suggest_float('learning_rate_init', 1e-5, 0.1, step=0.05)
@@ -433,7 +435,7 @@ class objective_nn(object):
             print("Invalid hyperparameter combination, skipping trial")
             return 0.0
 
-        cv = cross_validate(clf, self.data_x, self.data_y, cv=10)
+        cv = cross_validate(clf, self.data_x, self.data_y, cv=self.opt_cv)
         final_score = np.mean(cv['test_score'])
 
         return final_score
@@ -445,9 +447,10 @@ class objective_rf(object):
     was published in 2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
     """
 
-    def __init__(self, data_x, data_y):
+    def __init__(self, data_x, data_y, opt_cv):
         self.data_x = data_x
         self.data_y = data_y
+        self.opt_cv = opt_cv
 
     def __call__(self, trial):
         n_estimators = trial.suggest_int('n_estimators', 100, 3000)
@@ -466,7 +469,7 @@ class objective_rf(object):
             print("Invalid hyperparameter combination, skipping trial")
             return 0.0
 
-        cv = cross_validate(clf, self.data_x, self.data_y, cv=10)
+        cv = cross_validate(clf, self.data_x, self.data_y, cv=self.opt_cv)
         final_score = np.mean(cv['test_score'])
 
         return final_score
@@ -474,7 +477,7 @@ class objective_rf(object):
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, img_num_channels=1, 
     normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='loss', 
     limit_search=True, opt_model=True, opt_aug=False, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance_val=True,
-    opt_max_min_pix=None, opt_max_max_pix=None, pyBIA_model=1):
+    opt_max_min_pix=None, opt_max_max_pix=None, pyBIA_model=1, opt_cv=10):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy, unless a CNN
     is being optimized, in which case no cross-validation is performed during trial assesment.
@@ -555,6 +558,10 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             optimization trial.
         limit_search (bool): If True the XGB optimization search space will be limited,
             for computational and time purposes. Defaults to True.
+        opt_cv (int): Cross-validations to perform when assesing the performance at each
+            hyperparameter optimization trial. For example, if cv=3, then each optimization trial
+            will be assessed according to the 3-fold cross validation accuracy. Defaults to 10.
+            NOTE: The higher this number, the longer the optimization will take.
             
     Returns:
         The first output is the classifier with the optimal hyperparameters.
@@ -584,7 +591,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         raise ValueError('clf argument must either be "rf", "xgb", "nn", or "cnn".')
 
     if clf != 'cnn':
-        cv = cross_validate(model_0, data_x, data_y, cv=10)
+        cv = cross_validate(model_0, data_x, data_y, cv=opt_cv)
         initial_score = np.mean(cv['test_score'])
 
     sampler = optuna.samplers.TPESampler()#seed=1909 
@@ -634,7 +641,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
                 'bootstrap': [True,False]   
             }
             gs = BayesSearchCV(n_iter=n_iter, estimator=RandomForestClassifier(), search_spaces=params, 
-                optimizer_kwargs={'base_estimator': 'RF'}, cv=10)
+                optimizer_kwargs={'base_estimator': 'RF'}, cv=opt_cv)
             gs.fit(data_x, data_y)
             best_est, best_score = gs.best_estimator_, np.round(gs.best_score_, 4)
             print('Highest mean accuracy: {}'.format(best_score))
@@ -660,7 +667,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
                 'solver': ['sgd', 'adam'],
                 'max_iter': [100, 150, 200] 
             }
-            gs = BayesSearchCV(n_iter=n_iter, estimator=MLPClassifier(), search_spaces=params, cv=10)
+            gs = BayesSearchCV(n_iter=n_iter, estimator=MLPClassifier(), search_spaces=params, cv=opt_cv)
             gs.fit(data_x, data_y)
             best_est, best_score = gs.best_estimator_, np.round(gs.best_score_, 4)
             print('Highest mean accuracy: {}'.format(best_score))

@@ -755,7 +755,7 @@ def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
     if model == 'rf':
         classifier = RandomForestClassifier()
     elif model == 'xgb':
-        classifier = XGBClassifier()
+        classifier = XGBClassifier(tree_method='exact', max_depth=20)
     else:
         raise ValueError('Model argument must either be "rf" or "xgb".')
     

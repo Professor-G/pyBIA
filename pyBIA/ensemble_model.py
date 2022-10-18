@@ -169,14 +169,19 @@ class Classifier:
             else:
                 raise ValueError('Invalid imputation method, currently only k-NN and MissForest algorithms are supported.')
             
-            if self.optimize:
-                data = self.data_x[::]
-            else:
+            if self.optimize is False:
+                if data.max() > 1e7 or data.min() < 1e-7:
+                    print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
+                    data[data>1e7], data[data<1e-7] = 1e7, 1e-7
                 model.fit(data, self.data_y)
                 self.model = model 
                 return
+                
         else:
-            data = self.data_x[::]
+            data = self.data_x[:]
+            if data.max() > 1e7 or data.min() < 1e-7:
+                print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
+                data[data>1e7], data[data<1e-7] = 1e7, 1e-7
 
         self.feats_to_use, self.feature_history = borutashap_opt(data, self.data_y, boruta_trials=self.boruta_trials, model=self.boruta_model)
         if len(self.feats_to_use) == 0:
@@ -185,16 +190,16 @@ class Classifier:
         #Re-construct the imputer with the selected features as
         #new predictions will only compute these metrics, need to fit again!
         if self.imp_method == 'KNN':
-            self.data_x, self.imputer = KNN_imputation(data=self.data_x[:,self.feats_to_use], imputer=None)
+            data_x, self.imputer = KNN_imputation(data=self.data_x[:,self.feats_to_use], imputer=None)
         elif self.imp_method == 'MissForest':
-            self.data_x, self.imputer = MissForest_imputation(data=self.data_x[:,self.feats_to_use]), None 
+            data_x, self.imputer = MissForest_imputation(data=self.data_x[:,self.feats_to_use]), None 
         else: 
-            self.data_x = self.data_x[:,self.feats_to_use]
+            data_x = self.data_x[:,self.feats_to_use]
 
-        self.model, self.best_params, self.optimization_results = hyper_opt(self.data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, 
+        self.model, self.best_params, self.optimization_results = hyper_opt(data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, 
             balance=self.balance, return_study=True, limit_search=self.limit_search)
         print("Fitting and returning final model...")
-        self.model.fit(self.data_x, self.data_y)
+        self.model.fit(data_x, self.data_y)
         
     def save(self, path=None, overwrite=False):
         """
@@ -242,6 +247,8 @@ class Classifier:
             joblib.dump(self.optimization_results, path+'HyperOpt_Results')
         if self.best_params is not None:
             joblib.dump(self.best_params, path+'Best_Params')
+        if self.feature_history is not None:
+            joblib.dump(self.feature_history, path+'FeatureOpt_Results')
         print('Files saved in: {}'.format(path))
         return 
 
@@ -286,13 +293,20 @@ class Classifier:
             pass
 
         try:
+            self.feature_history = joblib.load(path+'FeatureOpt_Results')
+            feature_opt_results = 'feature_selection_results'
+        except FileNotFoundError:
+            feats_to_use = ''
+            pass
+
+        try:
             self.optimization_results = joblib.load(path+'HyperOpt_Results')
             optimization_results = 'optimization_results'
         except FileNotFoundError:
             optimization_results = '' 
             pass
 
-        print('Successfully loaded the following class attributes: {}, {}, {}, {}'.format(model, imputer, feats_to_use, optimization_results))
+        print('Successfully loaded the following class attributes: {}, {}, {}, {}, {}'.format(model, imputer, feats_to_use, feature_opt_results, optimization_results))
         
         return
 
@@ -354,9 +368,6 @@ class Classifier:
         Plots a t-SNE projection using the sklearn.manifold.TSNE() method.
 
         Args:
-            data_x (ndarray): 2D array of size (n x m), where n is the
-                number of samples, and m the number of features.
-            data_y (ndarray, str): 1D array containing the corresponing labels.
             norm (bool): If True the data will be min-max normalized. Defaults
                 to True.
             pca (bool): If True the data will be fit to a Principal Component
@@ -366,18 +377,26 @@ class Classifier:
         Returns:
             AxesImage. 
         """
-        if np.any(np.isnan(self.data_x)):
-            print('Automatically imputing NaN values with KNN imputation.')
-            data = KNN_imputation(data=self.data_x)[0]
+
+        if self.model is None:
+            raise ValueError('No model has been created! Run model.create() first.')
+
+        if self.feats_to_use is not None:
+            if len(self.data_x.shape) == 1:
+                data = self.data_x[self.feats_to_use].reshape(1,-1)
+            else:
+                data = self.data_x[:,self.feats_to_use]
         else:
             data = self.data_x[:]
 
-        if self.feats_to_use is not None:
-            if len(data.shape) == 1:
-                data = data[self.feats_to_use].reshape(1,-1)
-            else:
-                data = data[:,self.feats_to_use]
+        if np.any(np.isnan(data)):
+            print('Automatically imputing NaN values with KNN imputation.')
+            data = KNN_imputation(data=data)[0]
 
+        if data.max() > 1e7 or data.min() < 1e-7:
+            print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
+            data[data>1e7], data[data<1e-7] = 1e7, 1e-7
+        
         if len(data) > 5e3:
             method = 'barnes_hut' #Scales with O(N)
         else:
@@ -444,13 +463,27 @@ class Classifier:
             AxesImage.
         """
         
+        if self.model is None:
+            raise ValueError('No model has been created! Run model.create() first.')
+
         classes = [str(label) for label in np.unique(self.data_y)]
-        if np.any(np.isnan(self.data_x)):
-            print('Automatically imputing NaN values with KNN imputation.')
-            data = KNN_imputation(data=self.data_x)[0]
+
+        if self.feats_to_use is not None:
+            if len(self.data_x.shape) == 1:
+                data = self.data_x[self.feats_to_use].reshape(1,-1)
+            else:
+                data = self.data_x[:,self.feats_to_use]
         else:
-            data = self.data_x
-     
+            data = self.data_x[:]
+
+        if np.any(np.isnan(data)):
+            print('Automatically imputing NaN values with KNN imputation...')
+            data = KNN_imputation(data=data)[0]
+
+        if data.max() > 1e7 or data.min() < 1e-7:
+            print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
+            data[data>1e7], data[data<1e-7] = 1e7, 1e-7
+
         if norm:
             scaler = MinMaxScaler()
             scaler.fit_transform(data)
@@ -489,11 +522,24 @@ class Classifier:
         Returns:
             AxesImage
         """
-        if np.any(np.isnan(self.data_x)):
-            print('Automatically imputing NaN values with KNN imputation.')
-            data = KNN_imputation(data=self.data_x)[0]
+        if self.model is None:
+            raise ValueError('No model has been created! Run model.create() first.')
+
+        if self.feats_to_use is not None:
+            if len(self.data_x.shape) == 1:
+                data = self.data_x[self.feats_to_use].reshape(1,-1)
+            else:
+                data = self.data_x[:,self.feats_to_use]
         else:
-            data = self.data_x
+            data = self.data_x[:]
+
+        if np.any(np.isnan(data)):
+            print('Automatically imputing NaN values with KNN imputation...')
+            data = KNN_imputation(data=data)[0]
+
+        if data.max() > 1e7 or data.min() < 1e-7:
+            print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
+            data[data>1e7], data[data<1e-7] = 1e7, 1e-7
         
         model0 = self.model
         if len(np.unique(self.data_y)) != 2:
@@ -623,7 +669,7 @@ class Classifier:
             AxesImage
         """
 
-        self.feat_selector.plot(which_features=feats, X_size=14)
+        self.feature_history.plot(which_features=feats, X_size=14)
 
 
 #Helper functions below to generate confusion matrix

@@ -319,7 +319,7 @@ class Classifier:
             optimization_results = '' 
             pass
 
-        print('Successfully loaded the following class attributes: {}, {}, {}, {}, {}'.format(model, imputer, feats_to_use, best_params, feature_opt_results, optimization_results))
+        print('Successfully loaded the following class attributes: {}, {}, {}, {}, {}, {}'.format(model, imputer, feats_to_use, best_params, feature_opt_results, optimization_results))
         
         return
 

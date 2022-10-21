@@ -454,15 +454,16 @@ class Classifier:
         else:
             plt.show()
 
-    def plot_conf_matrix(self, norm=True, pca=False, k_fold=10, normalize=True, 
+    def plot_conf_matrix(self,  data_y=None, norm=True, pca=False, k_fold=10, normalize=True, 
         title='Confusion Matrix', savefig=False):
         """
         Returns a confusion matrix with k-fold validation.
 
         Args:
-            data_x (ndarray): 2D array of size (n x m), where n is the
-                number of samples, and m the number of features.
-            data_y (ndarray, str): 1D array containing the corresponing labels.
+            data_y (ndarray, str, optional): 1D array containing the corresponing labels.
+                Only use if using XGB algorithm as this method converts labels to numerical,
+                in which case it may be desired to input the original label array using
+                this parameter. Defaults to None, which uses the data_y attribute.
             norm (bool): If True the data will be min-max normalized. Defaults
                 to True.
             pca (bool): If True the data will be fit to a Principal Component
@@ -486,7 +487,10 @@ class Classifier:
         if self.model is None:
             raise ValueError('No model has been created! Run .create() first.')
 
-        classes = [str(label) for label in np.unique(self.data_y)]
+        if data_y is None:
+            classes = [str(label) for label in np.unique(self.data_y)]
+        else:
+            classes = [str(label) for label in np.unique(data_y)]
 
         if self.feats_to_use is not None:
             if len(self.data_x.shape) == 1:
@@ -517,8 +521,9 @@ class Classifier:
             pca_data = pca_transformation.transform(data)
             data = np.asarray(pca_data).astype('float64')
 
+
         predicted_target, actual_target = evaluate_model(self.model, data, self.data_y, normalize=normalize, k_fold=k_fold)
-        generate_matrix(predicted_target, actual_target, classes, normalize=normalize, title=title, savefig=savefig)
+        generate_matrix(predicted_target, actual_target, normalize=normalize, classes=classes, title=title, savefig=savefig)
 
     def plot_roc_curve(self, k_fold=10, title="Receiver Operating Characteristic Curve", 
         savefig=False):

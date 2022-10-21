@@ -441,6 +441,8 @@ class Classifier:
             feats = np.unique(self.data_y)
             data_y = self.data_y
         else:
+            if isinstance(data_y, np.ndarray) is False: 
+                data_y = np.array(data_y)
             feats = np.unique(data_y)
 
         for count, feat in enumerate(feats):

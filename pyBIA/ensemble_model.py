@@ -484,7 +484,7 @@ class Classifier:
         """
         
         if self.model is None:
-            raise ValueError('No model has been created! Run model.create() first.')
+            raise ValueError('No model has been created! Run .create() first.')
 
         classes = [str(label) for label in np.unique(self.data_y)]
 
@@ -511,12 +511,6 @@ class Classifier:
             scaler = MinMaxScaler()
             scaler.fit_transform(data)
 
-        if self.feats_to_use is not None:
-            if len(data.shape) == 1:
-                data = data[self.feats_to_use].reshape(1,-1)
-            else:
-                data = data[:,self.feats_to_use]
-        
         if pca:
             pca_transformation = decomposition.PCA(n_components=data.shape[1], whiten=True, svd_solver='auto')
             pca_transformation.fit(data) 

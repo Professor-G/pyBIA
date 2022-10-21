@@ -379,7 +379,7 @@ class Classifier:
             
         return np.array(output)
 
-    def plot_tsne(self, norm=True, pca=False, title='Feature Parameter Space', 
+    def plot_tsne(self, data_y=None, norm=True, pca=False, title='Feature Parameter Space', 
         savefig=False):
         """
         Plots a t-SNE projection using the sklearn.manifold.TSNE() method.
@@ -436,12 +436,17 @@ class Classifier:
         x, y = feats[:,0], feats[:,1]
      
         markers = ['o', '+', '*', 's', 'v', '.', 'x', 'h', 'p', '<', '>']
-        feats = np.unique(self.data_y)
+
+        if data_y is None:
+            feats = np.unique(self.data_y)
+            data_y = self.data_y
+        else:
+            feats = np.unique(data_y)
 
         for count, feat in enumerate(feats):
             if count+1 > len(markers):
                 count = -1
-            mask = np.where(self.data_y == feat)[0]
+            mask = np.where(data_y == feat)[0]
             plt.scatter(x[mask], y[mask], marker=markers[count], label=str(feat), alpha=0.7)
 
         plt.legend(prop={'size': 16})
@@ -454,7 +459,7 @@ class Classifier:
         else:
             plt.show()
 
-    def plot_conf_matrix(self,  data_y=None, norm=True, pca=False, k_fold=10, normalize=True, 
+    def plot_conf_matrix(self, data_y=None, norm=False, pca=False, k_fold=10, normalize=True, 
         title='Confusion Matrix', savefig=False):
         """
         Returns a confusion matrix with k-fold validation.
@@ -465,7 +470,7 @@ class Classifier:
                 in which case it may be desired to input the original label array using
                 this parameter. Defaults to None, which uses the data_y attribute.
             norm (bool): If True the data will be min-max normalized. Defaults
-                to True.
+                to False. NOTE: Set this to True if pca=True.
             pca (bool): If True the data will be fit to a Principal Component
                 Analysis and all of the corresponding principal components will 
                 be used to evaluate the classifier and construct the matrix. 

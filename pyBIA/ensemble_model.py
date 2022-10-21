@@ -801,7 +801,7 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
     for i, j in itertools.product(range(conf_matrix.shape[0]), range(conf_matrix.shape[1])):
         plt.text(j, i, format(conf_matrix[i, j], fmt), fontsize=14, horizontalalignment="center",
                  color="white" if conf_matrix[i, j] > thresh else "black")
-
+    plt.grid(False)
     plt.ylabel('True label',fontsize=18)
     plt.xlabel('Predicted label',fontsize=18)
     plt.tight_layout()

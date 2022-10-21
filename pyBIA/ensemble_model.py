@@ -525,7 +525,7 @@ class Classifier:
         predicted_target, actual_target = evaluate_model(self.model, data, self.data_y, normalize=normalize, k_fold=k_fold)
         generate_matrix(predicted_target, actual_target, normalize=normalize, classes=classes, title=title, savefig=savefig)
 
-    def plot_roc_curve(self, k_fold=10, title="Receiver Operating Characteristic Curve", 
+    def plot_roc_curve(self, k_fold=10, pca=False, title="Receiver Operating Characteristic Curve", 
         savefig=False):
         """
         Plots ROC curve with k-fold cross-validation, as such the 
@@ -565,6 +565,12 @@ class Classifier:
         if data.max() > 1e7 or data.min() < 1e-7:
             print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
             data[data>1e7], data[data<1e-7] = 1e7, 1e-7
+
+        if pca:
+            pca_transformation = decomposition.PCA(n_components=data.shape[1], whiten=True, svd_solver='auto')
+            pca_transformation.fit(data) 
+            pca_data = pca_transformation.transform(data)
+            data = np.asarray(pca_data).astype('float64')
         
         model0 = self.model
         if len(np.unique(self.data_y)) != 2:

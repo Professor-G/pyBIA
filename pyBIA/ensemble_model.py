@@ -299,10 +299,17 @@ class Classifier:
             pass
 
         try:
+            self.best_params = joblib.load(path+'Best_Params')
+            best_params = 'best_params'
+        except FileNotFoundError:
+            best_params = ''
+            pass
+
+        try:
             self.feature_history = joblib.load(path+'FeatureOpt_Results')
             feature_opt_results = 'feature_selection_results'
         except FileNotFoundError:
-            feats_to_use = ''
+            feature_opt_results = ''
             pass
 
         try:
@@ -331,6 +338,10 @@ class Classifier:
         Returns:
             2D array containing the classes and the corresponding probability prediction
         """
+
+        
+        print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
+        data[data>1e7], data[data<1e-7] = 1e7, 1e-7
 
         classes = self.model.classes_
         output = []
@@ -386,7 +397,7 @@ class Classifier:
 
         if self.model is None:
             raise ValueError('No model has been created! Run model.create() first.')
-
+        
         if self.feats_to_use is not None:
             if len(self.data_x.shape) == 1:
                 data = self.data_x[self.feats_to_use].reshape(1,-1)
@@ -749,6 +760,7 @@ def generate_matrix(predicted_labels_list, actual_targets, classes, normalize=Tr
         generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title)
     elif normalize == False:
         generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title)
+        
     if savefig:
         plt.savefig('Ensemble_Confusion_Matrix.png', bbox_inches='tight', dpi=300)
         plt.clf()

@@ -1027,7 +1027,7 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
         with plt.rc_context({'axes.edgecolor':'silver', 'axes.linewidth':5, 'xtick.color':'black', 
             'ytick.color':'black', 'figure.facecolor':'white', 'axes.titlesize':22}):
             fig, axes = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8,8))
-            fig.suptitle(r"$\sigma$ Detection Threshold", fontsize=24, x=.5, y=0.98, color='white')
+            fig.suptitle("Source Detection Threshold", fontsize=24, x=.5, y=0.98, color='white')
             ((ax1, ax2), (ax4, ax3)) = axes
             ax1.set_aspect('equal')
             ax2.set_aspect('equal')

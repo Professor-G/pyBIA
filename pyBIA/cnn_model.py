@@ -444,11 +444,15 @@ class Classifier:
             
         return np.array(output)
 
-    def plot_hyper_opt(self, xlim=None, ylim=None, xlog=True, ylog=False, savefig=False):
+    def plot_hyper_opt(self, baseline=None, xlim=None, ylim=None, xlog=True, ylog=False, savefig=False):
         """
         Plots the hyperparameter optimization history.
     
         Args:
+            baseline (float): Baseline accuracy achieved when using only
+                the default engine hyperparameters. If input a vertical
+                line will be plot to indicate this baseline accuracy.
+                Defaults to None.
             xlim: Limits for the x-axis. Ex) xlim = (0, 1000)
             ylim: Limits for the y-axis. Ex) ylim = (0.9, 0.94)
             xlog (boolean): If True the x-axis will be log-scaled.
@@ -462,11 +466,9 @@ class Classifier:
         """
 
         fig = plot_optimization_history(self.optimization_results)
-        if xlog:
-            plt.xscale('log')
-        if ylog:
-            plt.yscale('log')
-
+        if baseline is not None:
+            plt.axhline(y=baseline, color='k', linestyle='--', linewidth=3, alpha=0.7, label='Default Model')
+        
         if self.metric == 'val_accuracy':
             ylabel = 'Validation Accuracy'
         elif self.metric == 'accuracy':
@@ -484,11 +486,15 @@ class Classifier:
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
-        plt.legend(prop={'size': 16})
+        plt.legend(prop={'size': 12})
         if xlim is not None:
             plt.xlim(xlim)
         if ylim is not None:
             plt.ylim(ylim)
+        if xlog:
+            plt.xscale('log')
+        if ylog:
+            plt.yscale('log')
         plt.tight_layout()
         if savefig:
             plt.savefig('CNN_Hyperparameter_Optimization.png', bbox_inches='tight', dpi=300)

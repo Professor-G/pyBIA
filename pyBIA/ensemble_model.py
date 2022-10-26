@@ -678,11 +678,11 @@ class Classifier:
         fig = plot_optimization_history(self.optimization_results)
         if baseline is not None:
             plt.axhline(y=baseline, color='k', linestyle='--', linewidth=3, alpha=0.7, label='Default Model')
-        plt.xlabel('Trial #', size=16)
-        plt.ylabel('10-Fold CV Accuracy', size=16)
+        plt.xlabel('Trial #', size=16, alpha=1, color='k')
+        plt.ylabel('10-Fold CV Accuracy', size=16, alpha=1, color='k')
         plt.title(('Hyperparameter Optimization History'), size=18)
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
+        plt.xticks(fontsize=14, color='k')
+        plt.yticks(fontsize=14, color='k')
         plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
         if xlim is not None:
             plt.xlim(xlim)

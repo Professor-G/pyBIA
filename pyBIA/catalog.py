@@ -887,7 +887,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
 
 
 def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=[0.1, 0.5, 0.9], kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, cmap='viridis', path=None, name='', savefig=False, dpi=300):
+    deblend=False, pix_conversion=5, cmap='viridis', path=None, name='', title='Source Detection Threshold', savefig=False):
     """
     Returns two subplots: source and segementation object. 
 
@@ -1024,10 +1024,10 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
 
         #props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
 
-        with plt.rc_context({'axes.edgecolor':'silver', 'axes.linewidth':5, 'xtick.color':'black', 
-            'ytick.color':'black', 'figure.facecolor':'white', 'axes.titlesize':22}):
+        with plt.rc_context({'axes.edgecolor':'white', 'axes.linewidth':5, 'xtick.color':'white', 
+            'ytick.color':'white', 'figure.facecolor':'black', 'axes.titlesize':22}):
             fig, axes = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8,8))
-            fig.suptitle("Source Detection Threshold", fontsize=24, x=.5, y=0.98, color='white')
+            fig.suptitle(title, fontsize=24, x=.5, y=0.98, color='black')
             ((ax1, ax2), (ax4, ax3)) = axes
             ax1.set_aspect('equal')
             ax2.set_aspect('equal')
@@ -1043,29 +1043,29 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax4.imshow(segm3.data, origin='lower', cmap=segm3.make_cmap(seed=19))
 
             ax2.plot(0,0,label=r'$\sigma$='+str(nsig[0]), color='none')
-            leg1 = ax2.legend(handlelength=0, handletextpad=0, fancybox=True, prop={'size':16})
+            leg1 = ax2.legend(handlelength=0, handletextpad=0, fancybox=True, prop={'size':16}, loc='upper right')
             for item in leg1.legendHandles:
                 item.set_visible(False)
 
             ax3.plot(0,0,label=r'$\sigma$='+str(nsig[1]), color='none')
-            leg2 = ax3.legend(handlelength=0, handletextpad=0, fancybox=True, prop={'size':16})
+            leg2 = ax3.legend(handlelength=0, handletextpad=0, fancybox=True, prop={'size':16}, loc='lower right')
             for item in leg2.legendHandles:
                 item.set_visible(False)
                 
             ax4.plot(0,0,label=r'$\sigma$='+str(nsig[2]), color='none')
-            leg3 = ax4.legend(handlelength=0, handletextpad=0, fancybox=True, prop={'size':16})
+            leg3 = ax4.legend(handlelength=0, handletextpad=0, fancybox=True, prop={'size':16}, loc='lower left')
             for item in leg3.legendHandles:
                 item.set_visible(False)  
          
             #'seismic', 'twilight', 'YlGnBu_r', 'bone', 'cividis' #best cmaps
             plt.rcParams["font.family"] = "Times New Roman"
-            plt.rcParams["font.weight"] = "bold"
-            plt.rcParams["axes.labelweight"] = "bold"
+            #plt.rcParams["font.weight"] = "bold"
+            #plt.rcParams["axes.labelweight"] = "bold"
             plt.rcParams['figure.figsize'] = 5, 7
             plt.rcParams['xtick.major.pad'] = 6
             plt.rcParams['ytick.major.pad'] = 6
 
-            plt.gcf().set_facecolor("black")
+            plt.gcf().set_facecolor("white")
             fig.subplots_adjust(wspace=0, hspace=0)
             ax1.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
             ax2.grid(True, alpha=0.35, linestyle='--')
@@ -1108,15 +1108,15 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax4.yaxis.set_visible(True)
             
             if isinstance(name, str):
-                ax1.set_title(name, color='mediumturquoise', size=30)
+                ax1.set_title(name, color='black', size=30)
             else:
-                ax1.title(name[i], color='mediumturquoise', size=30)
+                ax1.title(name[i], color='black', size=30)
 
 
-            ax1.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', fontweight='ultralight', color='snow', size=16)
-            ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', fontweight='ultralight', color='snow', size=16)
-            ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', fontweight='ultralight', color='snow', size=16)
-            ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', fontweight='ultralight', color='snow', size=16)
+            ax1.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=16)
+            ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=16)
+            ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=16)
+            ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=16)
             
             #ax2_twin.set_ylabel(r'$\Delta\delta$ [arcsec]', fontweight='ultralight', color='snow', size=18)
             #ax3_twin.set_ylabel(r'$\Delta\delta$ [arcsec]', fontweight='ultralight', color='snow', size=18)
@@ -1141,12 +1141,12 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax4.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
 
             
-            ax1.tick_params(axis="both", which='minor', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            ax2.tick_params(axis="both", which='minor', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            ax3.tick_params(axis="both", which='minor', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            ax4.tick_params(axis="both", which='minor', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            ax1.tick_params(axis="both", which='minor', length=5, width=2, color='black', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            ax2.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            ax3.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            ax4.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
             
-            ax1.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            ax1.tick_params(axis="both", which='major', length=10, width=2, color='black', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
             ax2.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
             ax3.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
             ax4.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
@@ -1160,38 +1160,38 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
 
             ax1.set_frame_on(True)
             ax1.set_xticks(ticks_2)
-            ax1.set_xticklabels(x_label_list_2)
+            ax1.set_xticklabels(x_label_list_2, color='black')
             ax1.set_yticks(ticks_2)
-            ax1.set_yticklabels(x_label_list_2)
+            ax1.set_yticklabels(x_label_list_2, color='black')
 
             ax2.set_frame_on(True)
             ax2.set_xticks(ticks_2)
-            ax2.set_xticklabels(x_label_list_2)
+            ax2.set_xticklabels(x_label_list_2, color='black')
             ax2.set_yticks(ticks_2)
-            ax2.set_yticklabels(x_label_list_2)
+            ax2.set_yticklabels(x_label_list_2, color='black')
 
             ax3.set_frame_on(True)
             ax3.set_xticks(ticks_2)
-            ax3.set_xticklabels(x_label_list_2)
+            ax3.set_xticklabels(x_label_list_2, color='black')
             ax3.set_yticks(ticks_2)
-            ax3.set_yticklabels(x_label_list_2)
+            ax3.set_yticklabels(x_label_list_2, color='black')
 
             ax4.set_frame_on(True)
             ax4.set_xticks(ticks_2)
-            ax4.set_xticklabels(x_label_list_2)
+            ax4.set_xticklabels(x_label_list_2, color='black')
             ax4.set_yticks(ticks_2)
-            ax4.set_yticklabels(x_label_list_2)
+            ax4.set_yticklabels(x_label_list_2, color='black')
 
-            ax1.tick_params(axis="both", colors="white", labeltop=False, labelleft=True, labelright=False, labelbottom=False, labelsize=14)
-            ax2.tick_params(axis="both", colors="white", labeltop=True, labelleft=False, labelright=True, labelbottom=False, labelsize=14)
-            ax3.tick_params(axis="both", colors="white", labeltop=False, labelleft=False, labelright=True, labelbottom=True, labelsize=14)
-            ax4.tick_params(axis="both", colors="white", labeltop=False, labelleft=True, labelright=False, labelbottom=True, labelsize=14)
+           # ax1.tick_params(axis="both", colors="black", labeltop=False, labelleft=True, labelright=False, labelbottom=False, labelsize=14)
+           # ax2.tick_params(axis="both", colors="black", labeltop=True, labelleft=False, labelright=True, labelbottom=False, labelsize=14)
+           # ax3.tick_params(axis="both", colors="black", labeltop=False, labelleft=False, labelright=True, labelbottom=True, labelsize=14)
+           # ax4.tick_params(axis="both", colors="black", labeltop=False, labelleft=True, labelright=False, labelbottom=True, labelsize=14)
 
             if savefig is True:
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
-                fig.savefig(path+name, dpi=dpi, bbox_inches='tight')
+                fig.savefig(path+name, dpi=300, bbox_inches='tight')
                 plt.clf()
                 return
             plt.show()

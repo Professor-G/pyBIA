@@ -809,8 +809,8 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
     plt.colorbar()
 
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45, fontsize=14)
-    plt.yticks(tick_marks, classes, fontsize=14)
+    plt.xticks(tick_marks, classes, rotation=45, fontsize=14, alpha=1, color='k')
+    plt.yticks(tick_marks, classes, fontsize=14,alpha=1, color='k')
     #plt.xticks(tick_marks, ['DIFFUSE','OTHER'], rotation=45, fontsize=14)
     #plt.yticks(tick_marks, ['DIFFUSE','OTHER'], fontsize=14)
 
@@ -820,9 +820,10 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
     for i, j in itertools.product(range(conf_matrix.shape[0]), range(conf_matrix.shape[1])):
         plt.text(j, i, format(conf_matrix[i, j], fmt), fontsize=14, horizontalalignment="center",
                  color="white" if conf_matrix[i, j] > thresh else "black")
+
     plt.grid(False)
-    plt.ylabel('True label',fontsize=18)
-    plt.xlabel('Predicted label',fontsize=18)
+    plt.ylabel('True label',fontsize=18, alpha=1, color='k')
+    plt.xlabel('Predicted label',fontsize=18, alpha=1, color='k')
     plt.tight_layout()
 
     return conf_matrix

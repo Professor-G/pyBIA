@@ -725,7 +725,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             return params, study
         return params
 
-def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
+def borutashap_opt(data_x, data_y, boruta_trials=50, model='rf', importance_type='gain'):
     """
     Applies a combination of the Boruta algorithm and
     Shapley values, a method developed by Eoghan Keany (2020).
@@ -736,13 +736,17 @@ def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
         data_x (ndarray): 2D array of size (n x m), where n is the
             number of samples, and m the number of features.
         data_y (ndarray, str): 1D array containing the corresponing labels.
+        boruta_trials (int): The number of trials to run. A larger number is
+            better as the distribution will be more robust to random fluctuations. 
+            Defaults to 50.
         model (str): The ensemble method to use when fitting and calculating
             the feature importance metric. Only two options are currently
             supported, 'rf' for Random Forest and 'xgb' for Extreme Gradient Boosting.
             Defaults to 'rf'.
-        boruta_trials (int): The number of trials to run. A larger number is
-            better as the distribution will be more robust to random fluctuations. 
-            Defaults to 50.
+        importance_type (str): The feature importance type to use, only applicable
+            when using clf='xgb'. The options include “gain”, “weight”, “cover”,
+            “total_gain” or “total_cover”. Defaults to 'gain'.
+
     Returns:
         First output is a 1D array containing the indices of the selected features. 
         These indices can then be used to select the columns in the data_x array.
@@ -754,7 +758,7 @@ def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
         return np.arange(data_x.shape[1]), None
 
     if boruta_trials < 20:
-        print('Results are unstable if boruta_trials is too low!')
+        print('WARNING: Results are unstable if boruta_trials is too low!')
     if np.any(np.isnan(data_x)):
         print('NaN values detected, applying Strawman imputation...')
         data_x = Strawman_imputation(data_x)
@@ -762,7 +766,7 @@ def borutashap_opt(data_x, data_y, model='rf', boruta_trials=50):
     if model == 'rf':
         classifier = RandomForestClassifier()
     elif model == 'xgb':
-        classifier = XGBClassifier(tree_method='exact', max_depth=20)
+        classifier = XGBClassifier(tree_method='exact', max_depth=20, importance_type=importance_type)
     else:
         raise ValueError('Model argument must either be "rf" or "xgb".')
     

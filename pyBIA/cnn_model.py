@@ -480,8 +480,8 @@ class Classifier:
         else:
             ylabel = 'Optimization Metric'
 
-        plt.xlabel('Trial #', size=16 alpha=1, color='k')
-        plt.ylabel(ylabel, size=16 alpha=1, color='k')
+        plt.xlabel('Trial #', size=16, alpha=1, color='k')
+        plt.ylabel(ylabel, size=16, alpha=1, color='k')
         plt.title(('Hyperparameter Optimization History'), size=18)
         plt.xticks(fontsize=14, color='k')
         plt.yticks(fontsize=14, color='k')

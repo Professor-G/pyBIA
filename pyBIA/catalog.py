@@ -305,7 +305,8 @@ class Catalog:
                 kernel_size=self.kernel_size, invert=self.invert, deblend=self.deblend, name=name)
         return
 
-def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=None, invert=False, deblend=False):
+def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=5, kernel_size=21, median_bkg=None, 
+    invert=False, deblend=False):
     """
     Applies image segmentation on each object to calculate morphological 
     parameters calculated from the moment-based properties (see: ). These parameters 
@@ -321,10 +322,13 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=
         y (ndarray): 1D array or list containing the y-pixel position.
             Can contain one position or multiple samples.
         size (int, optional): The size of the box to consider when calculating
-            features related to the local environment. Default is 100 pixels, which
-            is also the default image size the image classifier uses.
+            features related to the local environment. Default is 100x100 pixels.
         nsig (float): The sigma detection limit. Objects brighter than nsig standard 
             deviations from the background will be detected during segmentation. Defaults to 0.6.
+        threshold (int): To avoid non-detections the segmentation map will be cropped at the center,
+            this central subarray will be of size (threshold x threshold). If no segmentation object
+            is located in this central area, the source will be flagged as a non-detection. Defaults
+            to 5 pixels.
         median_bkg (ndarray, optional): 1D array containing the median background
             in the annuli of each around each (x,y) object. This is not a standard rms or background
             map input. Defaults to None, in which case data is assumed to be background-subtracted.
@@ -364,7 +368,8 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=
     except TypeError:
         x, y = [x], [y]
 
-    size = 100 if data.shape[0] > 100 else data.shape[0]
+    size = size if data.shape[0] > size and data.shape[1] > size else min(data.shape[0],data.shape[1])
+
     prop_list=[]
     progess_bar = bar.FillingSquaresBar('Applying image segmentation...', max=len(x))
 
@@ -377,12 +382,17 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=
         try:
             props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
         except:
-            prop_list.append(-999) #If the object can't be segmented 
+            prop_list.append(-999) #If there are no segmented objects in the image
+            progess_bar.next()
+            continue
+
+        if np.count_nonzero(segm.data[int(size/2)-threshold:int(size/2)+threshold,int(size/2)-threshold:int(size/2)+threshold]) == 0: 
+            prop_list.append(-999) #If there is no segmented object within a central area of (threshold x threshold)
             progess_bar.next()
             continue
 
         sep_list=[]
-        for xx in range(len(props)): #This is to select the segmented object closest to the center, (x,y)=(50,50)
+        for xx in range(len(props)): #This is to select the segmented object closest to the center, (x,y)=(size/2, size/2)
             xcen = float(props[xx].centroid[0])
             ycen = float(props[xx].centroid[1])
             sep_list.append(np.sqrt((xcen-(size/2))**2 + (ycen-(size/2))**2))
@@ -396,7 +406,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, kernel_size=21, median_bkg=
     progess_bar.finish()
 
     if -999 in prop_list:
-        print('WARNING: At least one object could not be detected in segmentation... perhaps the object is too faint. This object is still in the catalog, the morphological features have been set to -999.')
+        print('WARNING: At least one object could not be detected in segmentation, perhaps the object is too faint. The morphological features have been set to -999.')
     return np.array(prop_list, dtype=object)
 
 def make_table(props):

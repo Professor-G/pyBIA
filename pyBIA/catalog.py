@@ -21,7 +21,7 @@ from photutils.aperture import ApertureStats, CircularAperture, CircularAnnulus
 from astropy.stats import sigma_clipped_stats, SigmaClip, gaussian_fwhm_to_sigma
 from astropy.convolution import Gaussian2DKernel, convolve
 
-from pyBIA import data_processing
+from pyBIA import data_processing, data_augmentation
 from pathlib import Path
 from progress import bar
 
@@ -174,8 +174,8 @@ class Catalog:
                 self.x, self.y = [self.x], [self.y]
             if len(self.x) != len(self.y):
                 raise ValueError("The two position arrays (x & y) must be the same size.")
-        if self.invert == False:
-            print('WARNING: If data is from .fits file you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.')
+        #if self.invert == False:
+        #    print('WARNING: If data is from .fits file you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.')
         
         Ny, Nx = self.data.shape
 
@@ -305,7 +305,7 @@ class Catalog:
                 kernel_size=self.kernel_size, invert=self.invert, deblend=self.deblend, name=name)
         return
 
-def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=5, kernel_size=21, median_bkg=None, 
+def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=21, median_bkg=None, 
     invert=False, deblend=False):
     """
     Applies image segmentation on each object to calculate morphological 
@@ -362,7 +362,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=5, kernel_size=21
     """
 
     if data.shape[0] < 100:
-        warn('Small image warning: results may be unstable if the object does not fit entirely within the frame.')
+        print('Small image warning: results may be unstable if the object does not fit entirely within the frame.')
     try: #If position array is a single number it will be converted into a list of unit length
         len(x)
     except TypeError:
@@ -386,8 +386,19 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=5, kernel_size=21
             progess_bar.next()
             continue
 
-        if np.count_nonzero(segm.data[int(size/2)-threshold:int(size/2)+threshold,int(size/2)-threshold:int(size/2)+threshold]) == 0: 
-            prop_list.append(-999) #If there is no segmented object within a central area of (threshold x threshold)
+        #Mask a circular area at the center of the image, using radius=threshold
+        #Flag if there is no segmented object within the circular mask 
+        x_pos, y_pos = np.ogrid[:new_data.shape[0],:new_data.shape[1]]
+        cx = cy = int(size/2)
+        tmin, tmax = np.deg2rad((0,360))
+        r2 = (x_pos-cx)*(x_pos-cx) + (y_pos-cy)*(y_pos-cy)
+        theta = np.arctan2(x_pos-cx,y_pos-cy) - tmin
+        theta %= (2*np.pi)
+        circmask = r2 <= threshold*threshold
+        anglemask = theta <= (tmax-tmin)
+        mask = circmask*anglemask
+        if np.count_nonzero(segm.data[mask]) == 0: 
+            prop_list.append(-999) 
             progess_bar.next()
             continue
 
@@ -406,7 +417,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=5, kernel_size=21
     progess_bar.finish()
 
     if -999 in prop_list:
-        print('WARNING: At least one object could not be detected in segmentation, perhaps the object is too faint. The morphological features have been set to -999.')
+        print('NOTE: At least one object could not be detected in segmentation, perhaps the object is too faint. The morphological features have been set to -999.')
     return np.array(prop_list, dtype=object)
 
 def make_table(props):

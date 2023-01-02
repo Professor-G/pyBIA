@@ -45,6 +45,9 @@ class Catalog:
             the data. This length must be odd. Defaults to 21.
         nsig (float): The sigma detection limit. Objects brighter than nsig standard 
             deviations from the background will be detected during segmentation. Defaults to 0.7.
+        threshold (float): Segmentation detection threshold. If during image segmentation no central source
+            is located within a circular mask of radius = threshold, then the object is
+            flagged as non-detection. Defaults to 10 pixels.
         deblend (bool, optional): If True, the objects are deblended during the segmentation
             procedure, thus deblending the objects before the morphological features
             are computed. Defaults to False so as to keep blobs as one segmentation object.
@@ -69,9 +72,9 @@ class Catalog:
             need individual class instance. Defaults to None.
     """
 
-    def __init__(self, data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0.7, deblend=False, 
-        obj_name=None, field_name=None, flag=None, aperture=15, annulus_in=20, annulus_out=35, kernel_size=21,
-        invert=False, cat=None):
+    def __init__(self, data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0.7, threshold=10, 
+        deblend=False, obj_name=None, field_name=None, flag=None, aperture=15, annulus_in=20, annulus_out=35, 
+        kernel_size=21, invert=False, cat=None):
 
         self.data = data 
         self.x = x
@@ -81,6 +84,7 @@ class Catalog:
         self.morph_params = morph_params
         self.kernel_size = kernel_size
         self.nsig = nsig
+        self.threshold = threshold
         self.deblend = deblend
         self.aperture = aperture 
         self.annulus_in = annulus_in
@@ -244,7 +248,7 @@ class Catalog:
         if self.error is None:
             if self.morph_params == True:
                 prop_list = morph_parameters(self.data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
-                    invert=self.invert, deblend=self.deblend)
+                    invert=self.invert, deblend=self.deblend, threshold=self.threshold)
                 tbl = make_table(prop_list)
                 self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
                     flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
@@ -256,7 +260,7 @@ class Catalog:
            
         if self.morph_params == True:
             prop_list = morph_parameters(self.data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
-                    invert=self.invert, deblend=self.deblend)
+                    invert=self.invert, deblend=self.deblend, threshold=self.threshold)
             tbl = make_table(prop_list)
             self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=flux, flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)

@@ -363,7 +363,7 @@ class objective_xgb(object):
                 clf = XGBClassifier(booster=booster, n_estimators=n_estimators, reg_lambda=reg_lambda, reg_alpha=reg_alpha, max_depth=max_depth, eta=eta, 
                     gamma=gamma, grow_policy=grow_policy, subsample=subsample)#, tree_method='hist')
 
-            cv = cross_validate(clf, self.data_x, self.data_y, cv=self.opt_cv)
+            cv = cross_validate(clf, self.data_x, self.data_y, cv=self.opt_cv) #FROM SKLEARN DOCUMENTATION: For int/None inputs, if the estimator is a classifier and y is either binary or multiclass, StratifiedKFold is used. In all other cases, Fold is used.
             final_score = np.mean(cv['test_score'])
 
             return final_score
@@ -677,7 +677,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         objective = objective_xgb(data_x, data_y, limit_search=limit_search)
         if limit_search:
             print('NOTE: To expand hyperparameter search space, set limit_search=False, although this will increase the optimization time significantly.')
-        study.optimize(objective, n_trials=n_iter, show_progress_bar=True)
+        study.optimize(objective, n_trials=n_iter, show_progress_bar=True)#gc_after_trial=True
         params = study.best_trial.params
         if limit_search:
             if params['booster'] == 'dart':

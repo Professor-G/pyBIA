@@ -11,6 +11,7 @@ filterwarnings("ignore", category=RuntimeWarning) #Ignore sigma_clipping NaN war
 from astropy.io import fits 
 from astropy.wcs import WCS
 import matplotlib.pyplot as plt
+#plt.style.use('/Users/daniel/Documents/plot_style.txt') 
 import matplotlib.ticker as tck 
 import numpy as np
 import pandas as pd
@@ -1049,10 +1050,21 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
 
         #props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
 
-        with plt.rc_context({'axes.edgecolor':'white', 'axes.linewidth':5, 'xtick.color':'white', 
-            'ytick.color':'white', 'figure.facecolor':'black', 'axes.titlesize':22}):
+        plt.rcParams["mathtext.fontset"] = "stix"
+        plt.rcParams["font.family"] = "STIXGeneral"
+        #plt.rcParams["font.size"] = 15
+        #plt.rcParams["font.weight"] = "bold"
+        #plt.rcParams["axes.labelweight"] = "bold"
+        #plt.rcParams['figure.figsize'] = 5, 7
+        plt.rcParams["axes.formatter.use_mathtext"]=True
+        #plt.rcParams['xtick.major.pad'] = 6
+        #plt.rcParams['ytick.major.pad'] = 6
+        plt.rcParams['text.usetex']=False
+
+        with plt.rc_context({'axes.edgecolor':'white', 'xtick.color':'white', 
+            'ytick.color':'white', 'figure.facecolor':'black'}):#, 'axes.titlesize':22}):
             fig, axes = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8,8))
-            fig.suptitle(title, fontsize=24, x=.5, y=0.98, color='black')
+            fig.suptitle(title, x=.5, y=0.98, color='black', fontsize=16)
             ((ax1, ax2), (ax4, ax3)) = axes
             ax1.set_aspect('equal')
             ax2.set_aspect('equal')
@@ -1067,29 +1079,23 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax3.imshow(segm2.data, origin='lower', cmap=segm2.make_cmap(seed=19))
             ax4.imshow(segm3.data, origin='lower', cmap=segm3.make_cmap(seed=19))
 
-            ax2.plot(0,0,label=r'$\sigma$='+str(nsig[0]), color='none')
-            leg1 = ax2.legend(handlelength=0, handletextpad=0, fancybox=True, prop={'size':16}, loc='upper right')
+            ax2.plot(0,0,label=str(nsig[0])+r'$\sigma$', color='none')
+            leg1 = ax2.legend(handlelength=0, handletextpad=0, fancybox=True, loc='upper right', prop={'size':16})
             for item in leg1.legendHandles:
                 item.set_visible(False)
 
-            ax3.plot(0,0,label=r'$\sigma$='+str(nsig[1]), color='none')
-            leg2 = ax3.legend(handlelength=0, handletextpad=0, fancybox=True, prop={'size':16}, loc='lower right')
+            ax3.plot(0,0,label=str(nsig[1])+r'$\sigma$', color='none')
+            leg2 = ax3.legend(handlelength=0, handletextpad=0, fancybox=True, loc='lower right', prop={'size':16})
             for item in leg2.legendHandles:
                 item.set_visible(False)
                 
-            ax4.plot(0,0,label=r'$\sigma$='+str(nsig[2]), color='none')
-            leg3 = ax4.legend(handlelength=0, handletextpad=0, fancybox=True, prop={'size':16}, loc='lower left')
+            ax4.plot(0,0,label=str(nsig[2])+r'$\sigma$', color='none')
+            leg3 = ax4.legend(handlelength=0, handletextpad=0, fancybox=True, loc='lower left', prop={'size':16})
             for item in leg3.legendHandles:
                 item.set_visible(False)  
          
             #'seismic', 'twilight', 'YlGnBu_r', 'bone', 'cividis' #best cmaps
-            plt.rcParams["font.family"] = "Times New Roman"
-            #plt.rcParams["font.weight"] = "bold"
-            #plt.rcParams["axes.labelweight"] = "bold"
-            plt.rcParams['figure.figsize'] = 5, 7
-            plt.rcParams['xtick.major.pad'] = 6
-            plt.rcParams['ytick.major.pad'] = 6
-
+            
             plt.gcf().set_facecolor("white")
             fig.subplots_adjust(wspace=0, hspace=0)
             ax1.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
@@ -1133,15 +1139,15 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax4.yaxis.set_visible(True)
             
             if isinstance(name, str):
-                ax1.set_title(name, color='black', size=30)
+                ax1.set_title(name, color='black', size=18)
             else:
-                ax1.title(name[i], color='black', size=30)
+                ax1.title(name[i], color='black', size=18)
 
 
-            ax1.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=16)
-            ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=16)
-            ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=16)
-            ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=16)
+            ax1.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=17)
+            ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
+            ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=17)
+            ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
             
             #ax2_twin.set_ylabel(r'$\Delta\delta$ [arcsec]', fontweight='ultralight', color='snow', size=18)
             #ax3_twin.set_ylabel(r'$\Delta\delta$ [arcsec]', fontweight='ultralight', color='snow', size=18)
@@ -1166,15 +1172,15 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax4.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
 
             
-            ax1.tick_params(axis="both", which='minor', length=5, width=2, color='black', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            ax2.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            ax3.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            ax4.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            #ax1.tick_params(axis="both", which='minor', length=5, width=2, color='black', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            #ax2.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            #ax3.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            #ax4.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
             
-            ax1.tick_params(axis="both", which='major', length=10, width=2, color='black', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            ax2.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            ax3.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            ax4.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            #ax1.tick_params(axis="both", which='major', length=10, width=2, color='black', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            #ax2.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            #ax3.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
+            #ax4.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
 
             length = new_data.shape[0]
             x_label_list_1 = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
@@ -1185,27 +1191,27 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
 
             ax1.set_frame_on(True)
             ax1.set_xticks(ticks_2)
-            ax1.set_xticklabels(x_label_list_2, color='black')
+            ax1.set_xticklabels(x_label_list_2, color='black', fontsize=16)
             ax1.set_yticks(ticks_2)
-            ax1.set_yticklabels(x_label_list_2, color='black')
+            ax1.set_yticklabels(x_label_list_2, color='black', fontsize=16)
 
             ax2.set_frame_on(True)
             ax2.set_xticks(ticks_2)
-            ax2.set_xticklabels(x_label_list_2, color='black')
+            ax2.set_xticklabels(x_label_list_2, color='black', fontsize=16)
             ax2.set_yticks(ticks_2)
-            ax2.set_yticklabels(x_label_list_2, color='black')
+            ax2.set_yticklabels(x_label_list_2, color='black', fontsize=16)
 
             ax3.set_frame_on(True)
             ax3.set_xticks(ticks_2)
-            ax3.set_xticklabels(x_label_list_2, color='black')
+            ax3.set_xticklabels(x_label_list_2, color='black', fontsize=16)
             ax3.set_yticks(ticks_2)
-            ax3.set_yticklabels(x_label_list_2, color='black')
+            ax3.set_yticklabels(x_label_list_2, color='black', fontsize=16)
 
             ax4.set_frame_on(True)
             ax4.set_xticks(ticks_2)
-            ax4.set_xticklabels(x_label_list_2, color='black')
+            ax4.set_xticklabels(x_label_list_2, color='black', fontsize=16)
             ax4.set_yticks(ticks_2)
-            ax4.set_yticklabels(x_label_list_2, color='black')
+            ax4.set_yticklabels(x_label_list_2, color='black', fontsize=16)
 
            # ax1.tick_params(axis="both", colors="black", labeltop=False, labelleft=True, labelright=False, labelbottom=False, labelsize=14)
            # ax2.tick_params(axis="both", colors="black", labeltop=True, labelleft=False, labelright=True, labelbottom=False, labelsize=14)

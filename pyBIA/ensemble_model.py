@@ -10,8 +10,11 @@ import joblib
 import random
 import itertools
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-plt.rc('font', family='serif')
+#plt.rc('font', family='serif')
+plt.style.use('/Users/daniel/Documents/plot_style.txt') 
+from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
 from warnings import warn
 from pathlib import Path
 from collections import Counter  
@@ -25,7 +28,7 @@ from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.manifold import TSNE
 
 from pyBIA.optimization import hyper_opt, borutashap_opt, KNN_imputation, MissForest_imputation
-from optuna.visualization.matplotlib import plot_optimization_history
+from optuna.visualization.matplotlib import plot_optimization_history, plot_param_importances
 from xgboost import XGBClassifier
 import scikitplot as skplt
 
@@ -136,7 +139,7 @@ class Classifier:
             if len(np.unique(self.data_y)) == 2:
                 counter = Counter(self.data_y)
                 if counter[np.unique(self.data_y)[0]] != counter[np.unique(self.data_y)[1]]:
-                    if self.balance:
+                    if self.balance: #If balance is True but optimize is False
                         print('Unbalanced dataset detected, to apply weights set optimize=True.')
 
         if self.clf == 'rf':
@@ -177,7 +180,7 @@ class Classifier:
             if self.optimize is False:
                 if data.max() > 1e7 or data.min() < 1e-7:
                     print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
-                    data[data>1e7], data[data<1e-7] = 1e7, 1e-7
+                    data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
                 print("Returning base {} model...".format(self.clf))
                 model.fit(data, self.data_y)
                 self.model = model 
@@ -187,7 +190,7 @@ class Classifier:
             data = self.data_x[:]
             if data.max() > 1e7 or data.min() < 1e-7:
                 print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
-                data[data>1e7], data[data<1e-7] = 1e7, 1e-7
+                data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
 
         self.feats_to_use, self.feature_history = borutashap_opt(data, self.data_y, boruta_trials=self.boruta_trials, model=self.boruta_model)
         if len(self.feats_to_use) == 0:
@@ -340,9 +343,8 @@ class Classifier:
         """
 
         
-        print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
-        data[data>1e7], data[data<1e-7] = 1e7, 1e-7
-
+        #print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
+        data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
         classes = self.model.classes_
         output = []
 
@@ -379,12 +381,21 @@ class Classifier:
             
         return np.array(output)
 
-    def plot_tsne(self, data_y=None, norm=True, pca=False, title='Feature Parameter Space', 
-        savefig=False):
+    def plot_tsne(self, data_y=None, special_class=None, norm=True, pca=False, 
+        legend_loc='upper center', title='Feature Parameter Space', savefig=False):
         """
         Plots a t-SNE projection using the sklearn.manifold.TSNE() method.
 
+        Note:
+            To highlight individual samples, use the data_y optional input
+            and set that sample's data_y value to a unique name, and set that 
+            same label in the special_class variable so that it can be visualized 
+            clearly.
+
         Args:
+            data_y (ndarray, optional): If using XGBoost then the
+            special_class (optional): The class label that you wish to highlight,
+                setting this optional parameter will 
             norm (bool): If True the data will be min-max normalized. Defaults
                 to True.
             pca (bool): If True the data will be fit to a Principal Component
@@ -395,9 +406,6 @@ class Classifier:
             AxesImage. 
         """
 
-        if self.model is None:
-            raise ValueError('No model has been created! Run model.create() first.')
-        
         if self.feats_to_use is not None:
             if len(self.data_x.shape) == 1:
                 data = self.data_x[self.feats_to_use].reshape(1,-1)
@@ -413,9 +421,7 @@ class Classifier:
             else:
                 data = KNN_imputation(data=data)[0]
 
-        if data.max() > 1e7 or data.min() < 1e-7:
-            print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
-            data[data>1e7], data[data<1e-7] = 1e7, 1e-7
+        data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
         
         if len(data) > 5e3:
             method = 'barnes_hut' #Scales with O(N)
@@ -435,8 +441,9 @@ class Classifier:
             perplexity=35, init='random').fit_transform(data)
         x, y = feats[:,0], feats[:,1]
      
-        markers = ['o', '+', '*', 's', 'v', '.', 'x', 'h', 'p', '<', '>']
-
+        markers = ['o', 's', '+', 'v', '.', 'x', 'h', 'p', '<', '>', '*']
+        #color = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'b', 'g', 'r', 'c']
+        color = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf']
         if data_y is None:
             feats = np.unique(self.data_y)
             data_y = self.data_y
@@ -449,12 +456,24 @@ class Classifier:
             if count+1 > len(markers):
                 count = -1
             mask = np.where(data_y == feat)[0]
-            plt.scatter(x[mask], y[mask], marker=markers[count], label=str(feat), alpha=0.7)
+            if feat == special_class:
+                pass
+            else:
+                plt.scatter(x[mask], y[mask], marker=markers[count], c=color[count], label=str(feat), alpha=0.44)
 
-        plt.legend(prop={'size': 16})
-        plt.title(title, size=18)
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
+        if special_class is not None:
+            mask = np.where(data_y == special_class)[0]
+            if len(mask) == 0:
+                raise ValueError('The data_y array does not contain the value input in the special_class parameter.')
+            plt.scatter(x[mask], y[mask], marker='*', c='red', label=special_class, s=200, alpha=1.0)
+        
+        plt.legend(loc=legend_loc, ncol=len(np.unique(data_y)), frameon=False, handlelength=2)#prop={'size': 14}
+        plt.title(title)#, size=18)
+        plt.xticks()#fontsize=14)
+        plt.yticks()#fontsize=14)
+        plt.ylabel('t-SNE Dimension 1')
+        plt.xlabel('t-SNE Dimension 2')
+
         if savefig:
             plt.savefig('tSNE_Projection.png', bbox_inches='tight', dpi=300)
             plt.clf()
@@ -514,9 +533,7 @@ class Classifier:
             else:
                 data = KNN_imputation(data=data)[0]
 
-        if data.max() > 1e7 or data.min() < 1e-7:
-            print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
-            data[data>1e7], data[data<1e-7] = 1e7, 1e-7
+        data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
 
         if norm:
             scaler = MinMaxScaler()
@@ -527,7 +544,6 @@ class Classifier:
             pca_transformation.fit(data) 
             pca_data = pca_transformation.transform(data)
             data = np.asarray(pca_data).astype('float64')
-
 
         predicted_target, actual_target = evaluate_model(self.model, data, self.data_y, normalize=normalize, k_fold=k_fold)
         generate_matrix(predicted_target, actual_target, normalize=normalize, classes=classes, title=title, savefig=savefig)
@@ -569,9 +585,7 @@ class Classifier:
             else:
                 data = KNN_imputation(data=data)[0]
 
-        if data.max() > 1e7 or data.min() < 1e-7:
-            print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
-            data[data>1e7], data[data<1e-7] = 1e7, 1e-7
+        data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
 
         if pca:
             pca_transformation = decomposition.PCA(n_components=data.shape[1], whiten=True, svd_solver='auto')
@@ -596,33 +610,33 @@ class Classifier:
 
         train = data
         fig, ax = plt.subplots()
+
         for i, (data_x, test) in enumerate(cv.split(train, self.data_y)):
             model0.fit(train[data_x], self.data_y[data_x])
             viz = RocCurveDisplay.from_estimator(
                 model0,
                 train[test],
                 self.data_y[test],
-                name="ROC fold {}".format(i+1),
-                alpha=0.3,
+                alpha=0,#0.3,
                 lw=1,
                 ax=ax,
+                name="ROC fold {}".format(i+1),
             )
             interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr)
             interp_tpr[0] = 0.0
             tprs.append(interp_tpr)
             aucs.append(viz.roc_auc)
 
-        ax.plot([0, 1], [0, 1], linestyle="--", lw=2, color="r", label="Random Chance", alpha=0.8)
-
         mean_tpr = np.mean(tprs, axis=0)
         mean_tpr[-1] = 1.0
         mean_auc = auc(mean_fpr, mean_tpr)
         std_auc = np.std(aucs)
-        ax.plot(
+        lns1, = ax.plot(
             mean_fpr,
             mean_tpr,
             color="b",
-            label=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc),
+            #label=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc),
+            label=r"Mean (AUC = %0.2f)" % (mean_auc),
             lw=2,
             alpha=0.8,
         )
@@ -630,13 +644,13 @@ class Classifier:
         std_tpr = np.std(tprs, axis=0)
         tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
         tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
-        ax.fill_between(
+        lns_sigma = ax.fill_between(
             mean_fpr,
             tprs_lower,
             tprs_upper,
             color="grey",
             alpha=0.2,
-            label=r"$\pm$ 1 std. dev.",
+            label=r"$\pm$ 1$\sigma$",
         )
 
         ax.set(
@@ -644,10 +658,18 @@ class Classifier:
             ylim=[0.0, 1.0],
             title="Receiver Operating Characteristic Curve",
         )
-        ax.legend(loc="lower right")
-        plt.ylabel('True Positive Rate', size=14)
-        plt.xlabel('False Positive Rate', size=14)
-        plt.title(label=title,fontsize=18)
+        
+        lns2, = ax.plot([0, 1], [0, 1], linestyle="--", lw=2, color="r", label="Random (AUC=0.5)", alpha=0.8)
+
+        #handles, labels = ax.get_legend_handles_labels()
+        #ax.legend(handles[-3:], labels[-3:], loc="lower center", ncol=3, frameon=False, handlelength=2)
+        ax.legend([lns2, (lns1, lns_sigma)], ['Random (AUC = 0.5)', r"Mean (AUC = %0.2f)" % (mean_auc)], loc='lower center', ncol=2, frameon=False, handlelength=2)
+
+        ax.set_facecolor("white")
+        plt.ylabel('True Positive Rate')#, size=14)
+        plt.xlabel('False Positive Rate')#, size=14)
+        plt.title(label=title)#,fontsize=18)
+
         if savefig:
             plt.savefig('Ensemble_ROC_Curve.png', bbox_inches='tight', dpi=300)
             plt.clf()
@@ -675,15 +697,35 @@ class Classifier:
             AxesImage
         """
 
-        fig = plot_optimization_history(self.optimization_results)
+        #fig = plot_optimization_history(self.optimization_results)
+        trials = self.optimization_results.get_trials()
+        trial_values, best_value = [], []
+        for trial in range(len(trials)):
+            value = trials[trial].values[0]
+            trial_values.append(value)
+            if trial == 0:
+                best_value.append(value)
+            else:
+                if any(y > value for y in best_value): #If there are any numbers in best values that are higher than current one
+                    best_value.append(np.array(best_value)[trial-1])
+                else:
+                    best_value.append(value)
+
         if baseline is not None:
-            plt.axhline(y=baseline, color='k', linestyle='--', linewidth=3, alpha=0.7, label='Default Model')
-        plt.xlabel('Trial #', size=16, alpha=1, color='k')
-        plt.ylabel('10-Fold CV Accuracy', size=16, alpha=1, color='k')
-        plt.title(('Hyperparameter Optimization History'), size=18)
-        plt.xticks(fontsize=14, color='k')
-        plt.yticks(fontsize=14, color='k')
-        plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
+            plt.axhline(y=baseline, color='k', linestyle='--', label='Baseline Model')
+            ncol=3
+        else:
+            ncol=2
+
+        plt.plot(range(len(trials)), best_value, color='r', alpha=0.83, linestyle='-', label='Best Model')
+        plt.scatter(range(len(trials)), trial_values, c='b', marker='+', s=35, alpha=0.45, label='Trial')
+        plt.xlabel('Trial #', alpha=1, color='k')
+        plt.ylabel('Accuracy', alpha=1, color='k')
+        plt.title('XGBoost Hyperparameter Optimization')#, size=18)
+        #plt.xticks(fontsize=14)#, color='k')
+        #plt.yticks(fontsize=14)#, color='k')
+        #plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
+        plt.grid(False)
         if xlim is not None:
             plt.xlim(xlim)
         if ylim is not None:
@@ -692,28 +734,156 @@ class Classifier:
             plt.xscale('log')
         if ylog:
             plt.yscale('log')
-        plt.tight_layout()
-        plt.legend(prop={'size': 12}, loc='upper left')
+        #plt.tight_layout()
+        #plt.legend(prop={'size': 12}, loc='upper left')
+        plt.legend(loc='upper center', ncol=ncol, frameon=False)#, handlelength=4)#prop={'size': 14}
+        plt.rcParams['axes.facecolor']='white'
+        
         if savefig:
             plt.savefig('Ensemble_Hyperparameter_Optimization.png', bbox_inches='tight', dpi=300)
             plt.clf()
         else:
             plt.show()
 
-    def plot_feature_opt(self, feats='all'):
+    def plot_feature_opt(self, feat_names=None, top=3, include_other=True, include_shadow=True, 
+        flip_axes=True, save_data=False, savefig=False):
         """
         Returns whisker plot displaying the z-score distribution of each feature
         across all trials.
+    
+        Note:
+            The following can be used to output the plot from the original API.
 
-        Args:
-            feats (str): Defines what features to show, can either be
-                'accepted', 'rejected', or 'all'.
+            model.feature_history.plot(which_features='accepted', X_size=14)
+
+            Can designate to display either 'all', 'accepted', or 'tentative'
+
+
+        Args: 
+            feat_names (ndarry, optional): A list or array containing the names
+                of the features in the data_x matrix, in order. Defaults to None,
+                in which case the respective indices will appear instead.
+            top (float, optional): Designates how many features to plot.
+            save_data (bool):
+            savefig (bool): 
 
         Returns:
             AxesImage
         """
 
-        self.feature_history.plot(which_features=feats, X_size=14)
+        fname = str(Path.home())+'/__borutaimportances__' #Temporary file
+        self.feature_history.results_to_csv(filename=fname)
+        csv_data = pd.read_csv(fname+'.csv')
+        x, y, y_err = [], [], []
+        for i in range(top):
+            x.append(int(csv_data.iloc[i].Features))
+            y.append(float(csv_data.iloc[i]['Average Feature Importance']))
+            y_err.append(float(csv_data.iloc[i]['Standard Deviation Importance']))
+            
+        if include_other:
+            mean = []
+            std = []
+            accepted_indices = np.where(csv_data.Decision == 'Accepted')[0]
+            for j in accepted_indices[top:]:
+                mean.append(float(csv_data.iloc[j]['Average Feature Importance']))
+                std.append(float(csv_data.iloc[j]['Standard Deviation Importance']))
+            x.append(0), y.append(np.mean(mean)), y_err.append(np.mean(std))
+
+        if include_shadow:
+            ix = np.where(csv_data.Features == 'Max_Shadow')[0]
+            y.append(float(csv_data.iloc[ix]['Average Feature Importance']))
+            y_err.append(float(csv_data.iloc[ix]['Standard Deviation Importance']))
+            x.append(int(ix))
+
+        if feat_names is not None:  
+            if isinstance(feat_names, np.ndarray) is False: 
+                feat_names = np.array(feat_names)
+            if include_shadow is False:
+                if include_other is False:
+                    x_names = feat_names[x] #By default x is the index of the feature
+                else:
+                    x_names = np.r_[feat_names[x[:-1]], ['Other Features']]
+            else:
+                if include_other is False:
+                    x_names = np.r_[feat_names[x[:-1]], ['Max Shadow']]
+                else:
+                    x_names = np.r_[feat_names[x[:-2]], ['Other Features'], ['Max Shadow']]
+        else:
+            if include_other is False:
+                x_names = csv_data.iloc[x[:top]].Features
+            else:
+                x_names = np.r_[csv_data.iloc[:len(x)].iloc[:-1].Features, ['Other Features']]
+
+        
+        fig, ax = plt.subplots()
+
+        y, y_err = np.array(y), np.array(y_err)
+
+        if flip_axes:
+            lns, = ax.plot(y, np.arange(len(x)), 'k*--', lw=0.77)
+            lns_sigma = ax.fill_betweenx(np.arange(len(x)), y-y_err, y+y_err, color="grey", alpha=0.2)
+            ax.set_xlabel('Z Score', alpha=1, color='k')
+            ax.set_yticks(np.arange(len(x)), x_names)#, rotation=90)
+            for t in ax.get_yticklabels():
+                txt = t.get_text()
+                if 'Max Shadow' in txt:
+                    t.set_color('red')
+                    ax.plot(y[-1], np.arange(len(x))[-1], marker='*', color='red')
+            ax.set_ylim((np.arange(len(x))[0]-0.5, np.arange(len(x))[-1]+0.5))
+            ax.set_xlim((np.min(y)-1, np.max(y)+1))
+            ax.invert_yaxis(), ax.invert_xaxis()
+        else:
+            lns, = ax.plot(np.arange(len(x)), y, 'k*--', lw=0.77)#, label='XGBoost', lw=0.77)
+            lns_sigma = ax.fill_between(np.arange(len(x)), y-y_err, y+y_err, color="grey", alpha=0.2)
+            ax.set_ylabel('Z Score', alpha=1, color='k')
+            ax.set_xticks(np.arange(len(x)), x_names, rotation=90)
+            for t in ax.get_xticklabels():
+                txt = t.get_text()
+                if 'Max Shadow' in txt:
+                    t.set_color('red')
+                    ax.plot(np.arange(len(x))[-1], y[-1], marker='*', color='red')
+            ax.set_xlim((np.arange(len(x))[0]-0.5, np.arange(len(x))[-1]+0.5))
+            ax.set_ylim((np.min(y)-1, np.max(y)+1))
+
+        ax.set_title('Feature Importance')#, size=18)
+        ax.legend([(lns, lns_sigma)], [r'$\pm$ 1$\sigma$'], loc='upper right', ncol=1, frameon=False, handlelength=2)
+
+        if savefig:
+            plt.savefig('Feature_Importance.png', bbox_inches='tight', dpi=300)
+            plt.clf()
+        else:
+            plt.show()
+
+        if save_data is False:
+            os.remove(fname+'.csv')
+
+    def plot_hyper_param_importance(self, plot_time=False, savefig=False):
+        """
+        Plots the hyperparameter optimization history.
+    
+        Args:
+            plot_tile (bool):
+            savefig (bool): 
+
+        Returns:
+            AxesImage
+        """
+
+        if plot_time is False:
+            fig = plot_param_importances(self.optimization_results)
+            plt.title('Hyperparameter Importance')#, size=16)
+        else:
+            fig = plot_param_importances(self.optimization_results, target=lambda t: t.duration.total_seconds(), target_name="duration")
+            plt.title('Hyperparameter Duration Importance')#, size=16)
+        plt.tight_layout()
+        if savefig:
+            if plot_time:
+                plt.savefig('Ensemble_Hyperparameter_Importance.png', bbox_inches='tight', dpi=300)
+            else:
+                plt.savefig('Ensemble_Hyperparameter_Duration_Importance.png', bbox_inches='tight', dpi=300)
+            plt.clf()
+        else:
+            plt.show()
 
 
 #Helper functions below to generate confusion matrix
@@ -736,12 +906,13 @@ def evaluate_model(classifier, data_x, data_y, normalize=True, k_fold=10):
         The second output is the 1D array of the predicted class labels.
     """
 
-    k_fold = KFold(k_fold, shuffle=True, random_state=1)
+    #k_fold = KFold(k_fold, shuffle=False)#, random_state=1)
+    k_fold = StratifiedKFold(k_fold, shuffle=True)#, random_state=1)
 
     predicted_targets = np.array([])
     actual_targets = np.array([])
 
-    for train_ix, test_ix in k_fold.split(data_x):
+    for train_ix, test_ix in k_fold.split(data_x, data_y):
         train_x, train_y, test_x, test_y = data_x[train_ix], data_y[train_ix], data_x[test_ix], data_y[test_ix]
         # Fit the classifier
         classifier.fit(train_x, train_y)
@@ -778,13 +949,13 @@ def generate_matrix(predicted_labels_list, actual_targets, classes, normalize=Tr
         generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title)
     elif normalize == False:
         generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title)
-        
+    
     if savefig:
         plt.savefig('Ensemble_Confusion_Matrix.png', bbox_inches='tight', dpi=300)
         plt.clf()
     else:
         plt.show()
-
+    
 def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix'):
     """
     Generates the confusion matrix figure object, but does not plot.
@@ -803,14 +974,14 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
 
     if normalize:
         conf_matrix = conf_matrix.astype('float') / conf_matrix.sum(axis=1)[:, np.newaxis]
-    
+
     plt.imshow(conf_matrix, interpolation='nearest', cmap=plt.get_cmap('Blues'))
-    plt.title(title, fontsize=20)
+    plt.title(title)#, fontsize=20)
     plt.colorbar()
 
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45, fontsize=14, alpha=1, color='k')
-    plt.yticks(tick_marks, classes, fontsize=14,alpha=1, color='k')
+    plt.xticks(tick_marks, classes, alpha=1, color='k')#rotation=45, fontsize=14,
+    plt.yticks(tick_marks, classes, alpha=1, color='k')#fontsize=14,
     #plt.xticks(tick_marks, ['DIFFUSE','OTHER'], rotation=45, fontsize=14)
     #plt.yticks(tick_marks, ['DIFFUSE','OTHER'], fontsize=14)
 
@@ -818,12 +989,12 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
     thresh = conf_matrix.max() / 2.
 
     for i, j in itertools.product(range(conf_matrix.shape[0]), range(conf_matrix.shape[1])):
-        plt.text(j, i, format(conf_matrix[i, j], fmt), fontsize=14, horizontalalignment="center",
-                 color="white" if conf_matrix[i, j] > thresh else "black")
+        plt.text(j, i, format(conf_matrix[i, j], fmt), horizontalalignment="center",
+                 color="white" if conf_matrix[i, j] > thresh else "black")#fontsize=14,
 
     plt.grid(False)
-    plt.ylabel('True label',fontsize=18, alpha=1, color='k')
-    plt.xlabel('Predicted label',fontsize=18, alpha=1, color='k')
+    plt.ylabel('True label', alpha=1, color='k')#fontsize=18
+    plt.xlabel('Predicted label',alpha=1, color='k')#fontsize=18
     plt.tight_layout()
 
     return conf_matrix

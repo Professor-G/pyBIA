@@ -22,10 +22,10 @@ def make_moments_table(image):
 	features = moments + central_moments + hu_moments + fourier_descriptors + legendre_moments
 
 	col_names = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',
-	             'mu00','mu10','mu01','mu20','mu11','mu02','mu30','mu21','mu12','mu03',
-	             'hu1','hu2','hu3','hu4','hu5','hu6','hu7',
-	             'fourier_1','fourier_2','fourier_3',
-	             'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6','legendre_7','legendre_8','legendre_9','legendre_10']
+		'mu00','mu10','mu01','mu20','mu11','mu02','mu30','mu21','mu12','mu03',
+		'hu1','hu2','hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',
+		'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6',
+		'legendre_7','legendre_8','legendre_9','legendre_10']
 
 	features, col_names = np.array(features), np.array(col_names)
 	dtype = ('f8',) * len(col_names)

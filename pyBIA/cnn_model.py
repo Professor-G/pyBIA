@@ -460,7 +460,7 @@ class Classifier:
 def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True, 
         min_pixel=0, max_pixel=100, val_blob=None, val_other=None, epochs=100, 
         batch_size=32, lr=0.0001, momentum=0.9, decay=0.0, nesterov=False, 
-        loss='categorical_crossentropy', activation_conv='relu', activation_dense='tanh', 
+        loss='binary_crossentropy', activation_conv='relu', activation_dense='relu', 
         regularizer='local_response', padding='same', pooling_1='max', pooling_2='max', pooling_3='max', 
         pool_size_1=3, pool_stride_1=2, pool_size_2=3, pool_stride_2=2, pool_size_3=3, pool_stride_3=2, 
         filter_1=96, filter_size_1=11, strides_1=4, filter_2=256, filter_size_2=5, strides_2=1,

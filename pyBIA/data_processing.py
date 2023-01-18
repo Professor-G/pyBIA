@@ -9,6 +9,38 @@ import copy
 import numpy as np
 from tensorflow.keras.utils import to_categorical
 
+def find_duplicate_features(features):
+    """
+    This function will check if there are any duplicate columns 
+    within the array by comparing each column with the next columns. 
+
+    Args:
+        features (ndarray): 2D array of features, column-wise.
+
+    Returns:
+        A set of duplicate indices.
+    """
+    # Initialize a set to store the unique feature indices
+    unique_indices = set()
+    # Initialize a set to store the duplicate feature indices
+    duplicate_indices = set()
+    # Get the transpose of the features array
+    features_T = features.T
+    # Get the number of columns
+    num_cols = features_T.shape[0]
+    for i in range(num_cols):
+        column = features_T[i]
+        for j in range(i+1, num_cols):
+            if np.array_equal(column, features_T[j]):
+                if i not in unique_indices:
+                    unique_indices.add(i)
+                    duplicate_indices.add(i)
+                if j not in unique_indices:
+                    unique_indices.add(j)
+                    duplicate_indices.add(j)
+
+    return duplicate_indices
+
 def crop_image(data, x, y, size=50, invert=False):
     """
     This function takes a 2D array and returns a sub-array

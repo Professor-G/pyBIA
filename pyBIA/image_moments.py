@@ -1,5 +1,37 @@
+from astropy.table import Table
 import numpy as np
 import cv2
+
+def make_moments_table(image):
+	"""
+	This function takes a 2D image array as input and 
+	calculates the image moments, central moments, Hu moments, 
+	and legendre moments to third order. The fourier descriptors
+	are also computed but only the first ten are kept.
+	These 47 features are concatenated and then saved in an astropy Table.
+
+	Args:
+		image (ndarray): A 2D array representing an image.
+
+	Returns:
+		A astropy table with 47 columns, one for each moment or descriptor and their corresponding values as rows."
+    """
+
+	moments, central_moments, hu_moments = calculate_moments(image), calculate_central_moments(image), calculate_hu_moments(image)
+	legendre_moments, fourier_descriptors = calculate_legendre_moments(image), calculate_fourier_descriptors(image, k=3)
+	features = moments + central_moments + hu_moments + fourier_descriptors + legendre_moments
+
+	col_names = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',
+	             'mu00','mu10','mu01','mu20','mu11','mu02','mu30','mu21','mu12','mu03',
+	             'hu1','hu2','hu3','hu4','hu5','hu6','hu7',
+	             'fourier_1','fourier_2','fourier_3',
+	             'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6','legendre_7','legendre_8','legendre_9','legendre_10']
+
+	features, col_names = np.array(features), np.array(col_names)
+	dtype = ('f8',) * len(col_names)
+	features_table = Table(data=features, names=col_names, dtype=dtype)
+	
+	return features_table
 
 def calculate_moments(image):
 	"""
@@ -28,7 +60,6 @@ def calculate_moments(image):
 	m03 = np.sum((y**3) * image)
 
 	return [m00, m10, m01, m20, m11, m02, m30, m21, m12, m03]
-
 
 def calculate_central_moments(image):
 	"""
@@ -61,7 +92,6 @@ def calculate_central_moments(image):
 	mu03 = np.sum((y - y_bar)**3 * image)
 
 	return [mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03]
-
 
 def calculate_hu_moments(image):
 	"""
@@ -97,6 +127,67 @@ def calculate_hu_moments(image):
 
 	return [hu1, hu2, hu3, hu4, hu5, hu6, hu7]
 
+def calculate_legendre_moments(image, order=3):
+	"""
+	This function takes a 2D image array calculates 
+	the Legendre moments.
+
+	If the order is set to 3, there would be 10 Legendre moments in total. 
+	They would be represented by the monomials x^3, y^3, x^2y, xy^2, x^2, y^2, xy, x, y, 1.
+
+	Args:
+		image (ndarray): A 2D array representing an image.
+		order (int): The order of the Legendre moments to calculate.
+
+	Returns:
+		A list of Legendre moments.
+	"""
+
+	x, y = np.meshgrid(np.arange(image.shape[1]), np.arange(image.shape[0]))
+	x = x - np.mean(x)
+	y = y - np.mean(y)
+	moments = []
+	for i in range(order+1):
+		for j in range(i+1):
+			moment = np.sum(np.power(x, i-j) * np.power(y, j) * image)
+			moments.append(moment)
+	
+	return moments
+
+def calculate_fourier_descriptors(image, k=10):
+	"""
+	Calculates the Fourier Descriptors which are a set of complex 
+	numbers that represent the shape of an object, which are calculated 
+	by taking the Fourier Transform of the object's boundary. 
+	The number of Fourier Descriptors is equal to the number of points 
+	on the boundary of the object, as it's calculated by applying the 
+	Fourier Transform on the complex representation of the object's boundary.
+
+	Args:
+		image (ndarray): A 2D array representing an image.
+		k (int): Number of Fourier Descriptors to keep. Defaults to 3.
+
+	Returns:
+		The fourier descriptors.
+	"""
+
+	rows, cols = image.shape
+	# Create a grid of x and y coordinates
+	x, y = np.meshgrid(np.arange(cols), np.arange(rows))
+	# Create binary image
+	binary_image = image > 0
+	# Find contour of the binary image
+	contours, _ = cv2.findContours(binary_image.astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+	# Select the longest contour
+	contour = max(contours, key=len)
+	# Convert contour to complex number
+	contour_complex = contour[:, 0, 0] + 1j * contour[:, 0, 1]
+	# Apply Fourier Transform
+	fourier_descriptors = np.fft.fft(contour_complex)
+	# Keep k largest magnitude Fourier Descriptors
+	fourier_descriptors = np.abs(fourier_descriptors)
+	fourier_descriptors = [i for i in np.sort(fourier_descriptors)[-k:]]
+	return fourier_descriptors
 
 def zernike_moments(image, r_max=3):
 	"""
@@ -146,71 +237,6 @@ def zernike_moments(image, r_max=3):
 			moment = np.sum(image * Znm)
 			moments.append(moment)
 	return moments
-
-
-def legendre_moments(image, order=3):
-	"""
-	This function takes a 2D image array calculates 
-	the Legendre moments.
-
-	If the order is set to 3, there would be 10 Legendre moments in total. 
-	They would be represented by the monomials x^3, y^3, x^2y, xy^2, x^2, y^2, xy, x, y, 1.
-
-	Args:
-		image (ndarray): A 2D array representing an image.
-		order (int): The order of the Legendre moments to calculate.
-
-	Returns:
-		A list of Legendre moments.
-	"""
-
-	x, y = np.meshgrid(np.arange(image.shape[1]), np.arange(image.shape[0]))
-	x = x - np.mean(x)
-	y = y - np.mean(y)
-	moments = []
-	for i in range(order+1):
-		for j in range(i+1):
-			moment = np.sum(np.power(x, i-j) * np.power(y, j) * image)
-			moments.append(moment)
-	
-	return moments
-
-
-def fourier_descriptors(image, k=10):
-	"""
-	Calculates the Fourier Descriptors which are a set of complex 
-	numbers that represent the shape of an object, which are calculated 
-	by taking the Fourier Transform of the object's boundary. 
-	The number of Fourier Descriptors is equal to the number of points 
-	on the boundary of the object, as it's calculated by applying the 
-	Fourier Transform on the complex representation of the object's boundary.
-
-	Args:
-		image (ndarray): A 2D array representing an image.
-		k (int): Number of Fourier Descriptors to keep. Defaults to 3.
-
-	Returns:
-		The fourier descriptors.
-	"""
-
-	rows, cols = image.shape
-	# Create a grid of x and y coordinates
-	x, y = np.meshgrid(np.arange(cols), np.arange(rows))
-	# Create binary image
-	binary_image = image > 0
-	# Find contour of the binary image
-	contours, _ = cv2.findContours(binary_image.astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-	# Select the longest contour
-	contour = max(contours, key=len)
-	# Convert contour to complex number
-	contour_complex = contour[:, 0, 0] + 1j * contour[:, 0, 1]
-	# Apply Fourier Transform
-	fourier_descriptors = np.fft.fft(contour_complex)
-	# Keep k largest magnitude Fourier Descriptors
-	fourier_descriptors = np.abs(fourier_descriptors)
-	fourier_descriptors = np.sort(fourier_descriptors)[-k:]
-	return fourier_descriptors
-
 
 def harris_corner_descriptors(image, block_size=2, ksize=3):
 	"""

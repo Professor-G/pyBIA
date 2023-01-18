@@ -81,8 +81,8 @@ def calculate_central_moments(image):
 	y_bar = np.sum(y * image) / m00
 
 	mu00 = m00
-	mu10 = 0
-	mu01 = 0
+	mu10 = np.sum((x - x_bar) * image)
+	mu01 = np.sum((y - y_bar) * image)
 	mu20 = np.sum((x - x_bar)**2 * image)
 	mu11 = np.sum((x - x_bar) * (y - y_bar) * image)
 	mu02 = np.sum((y - y_bar)**2 * image)

@@ -446,7 +446,7 @@ def make_table(props, moments):
     """
 
     moment_list = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',             
-        'mu20','mu11','mu02','mu30','mu21','mu12','mu03', 'hu1','hu2',
+        'mu10', 'mu01', 'mu20','mu11','mu02','mu30','mu21','mu12','mu03', 'hu1','hu2',
         'hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',             
         'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6',
         'legendre_7','legendre_8','legendre_9','legendre_10'] #Removes mu00
@@ -545,7 +545,7 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
         filename = 'pyBIA_catalog'
 
     prop_list = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',             
-        'mu20','mu11','mu02','mu30','mu21','mu12','mu03', 'hu1','hu2',
+        'mu10', 'mu01', 'mu20','mu11','mu02','mu30','mu21','mu12','mu03', 'hu1','hu2',
         'hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',             
         'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6',
         'legendre_7','legendre_8','legendre_9','legendre_10', 'area', 'covar_sigx2', 'covar_sigy2', 

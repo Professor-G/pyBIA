@@ -13,7 +13,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 #plt.rc('font', family='serif')
-plt.style.use('/Users/daniel/Documents/plot_style.txt') 
+plt.style.use('/Users/daniel/Documents/plot_style.txt')
+import matplotlib.colors as mcolors 
 from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
 from warnings import warn
 from pathlib import Path
@@ -29,6 +30,7 @@ from sklearn.manifold import TSNE
 
 from pyBIA.optimization import hyper_opt, borutashap_opt, KNN_imputation, MissForest_imputation
 from optuna.visualization.matplotlib import plot_optimization_history, plot_param_importances
+from optuna.importance import get_param_importances, FanovaImportanceEvaluator
 from xgboost import XGBClassifier
 import scikitplot as skplt
 
@@ -259,6 +261,9 @@ class Classifier:
         if self.feature_history is not None:
             joblib.dump(self.feature_history, path+'FeatureOpt_Results')
         print('Files saved in: {}'.format(path))
+
+        self.path = path
+
         return 
 
     def load(self, path=None):
@@ -324,6 +329,8 @@ class Classifier:
 
         print('Successfully loaded the following class attributes: {}, {}, {}, {}, {}, {}'.format(model, imputer, feats_to_use, best_params, feature_opt_results, optimization_results))
         
+        self.path = path
+
         return
 
     def predict(self, data):
@@ -721,7 +728,8 @@ class Classifier:
         plt.scatter(range(len(trials)), trial_values, c='b', marker='+', s=35, alpha=0.45, label='Trial')
         plt.xlabel('Trial #', alpha=1, color='k')
         plt.ylabel('Accuracy', alpha=1, color='k')
-        plt.title('XGBoost Hyperparameter Optimization')#, size=18)
+       # if self.clf == 'xgb':
+        plt.title('XGBoost Hyperparameter Optimization')#, size=18) Make this a f" string option!!
         #plt.xticks(fontsize=14)#, color='k')
         #plt.yticks(fontsize=14)#, color='k')
         #plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
@@ -746,7 +754,7 @@ class Classifier:
             plt.show()
 
     def plot_feature_opt(self, feat_names=None, top=3, include_other=True, include_shadow=True, 
-        flip_axes=True, save_data=False, savefig=False):
+        include_rejected=False, flip_axes=True, save_data=False, savefig=False):
         """
         Returns whisker plot displaying the z-score distribution of each feature
         across all trials.
@@ -774,16 +782,28 @@ class Classifier:
         fname = str(Path.home())+'/__borutaimportances__' #Temporary file
         self.feature_history.results_to_csv(filename=fname)
         csv_data = pd.read_csv(fname+'.csv')
+        #os.remove(fname+'.csv')
+        accepted_indices = np.where(csv_data.Decision == 'Accepted')[0]
+        if top > len(accepted_indices):
+            top = len(accepted_indices)
+            print('The top parameter exceeds the number of accepted variables, setting to the maximum value of {}'.format(str(top)))
+
         x, y, y_err = [], [], []
-        for i in range(top):
-            x.append(int(csv_data.iloc[i].Features))
+
+        for i in accepted_indices[:top]:
+            if feat_names is None:
+                x.append(int(i))
+            else:
+                x.append(int(csv_data.iloc[i].Features))
             y.append(float(csv_data.iloc[i]['Average Feature Importance']))
             y_err.append(float(csv_data.iloc[i]['Standard Deviation Importance']))
             
+        if len(accepted_indices) == top:
+            include_other = False
+
         if include_other:
             mean = []
             std = []
-            accepted_indices = np.where(csv_data.Decision == 'Accepted')[0]
             for j in accepted_indices[top:]:
                 mean.append(float(csv_data.iloc[j]['Average Feature Importance']))
                 std.append(float(csv_data.iloc[j]['Standard Deviation Importance']))
@@ -802,47 +822,65 @@ class Classifier:
                 if include_other is False:
                     x_names = feat_names[x] #By default x is the index of the feature
                 else:
-                    x_names = np.r_[feat_names[x[:-1]], ['Other Features']]
+                    x_names = np.r_[feat_names[x[:-1]], ['Other Accepted']]
             else:
                 if include_other is False:
                     x_names = np.r_[feat_names[x[:-1]], ['Max Shadow']]
                 else:
-                    x_names = np.r_[feat_names[x[:-2]], ['Other Features'], ['Max Shadow']]
+                    x_names = np.r_[feat_names[x[:-2]], ['Other Accepted'], ['Max Shadow']]
         else:
             if include_other is False:
-                x_names = csv_data.iloc[x[:top]].Features
+                if include_shadow is False:
+                    x_names = csv_data.iloc[x].Features
+                else:
+                    x_names = np.r_[feat_names[x[:-1]], ['Max Shadow']]
             else:
-                x_names = np.r_[csv_data.iloc[:len(x)].iloc[:-1].Features, ['Other Features']]
+                if include_shadow is False:
+                    x_names = np.r_[csv_data.iloc[x[:-1]].Features, ['Max Shadow']]
+                else:
+                    x_names = np.r_[csv_data.iloc[x[:-2]].Features, ['Other Accepted'], ['Max Shadow']]
 
+        if include_rejected:
+            x = []
+            rejected_indices = np.where(csv_data.Decision == 'Rejected')[0]
+            for i in rejected_indices:
+                if feat_names is None:
+                    x.append(int(i))
+                else:
+                    x.append(int(csv_data.iloc[i].Features))
+                y.append(float(csv_data.iloc[i]['Average Feature Importance']))
+                y_err.append(float(csv_data.iloc[i]['Standard Deviation Importance']))
+            if feat_names is not None:
+                x_names = np.r_[x_names, feat_names[x]]
+            else:
+                x_names = np.r_[x_names, csv_data.iloc[x].Features]
         
-        fig, ax = plt.subplots()
-
         y, y_err = np.array(y), np.array(y_err)
-
+        fig, ax = plt.subplots()
         if flip_axes:
-            lns, = ax.plot(y, np.arange(len(x)), 'k*--', lw=0.77)
-            lns_sigma = ax.fill_betweenx(np.arange(len(x)), y-y_err, y+y_err, color="grey", alpha=0.2)
+            lns, = ax.plot(y, np.arange(len(x_names)), 'k*--', lw=0.77)
+            lns_sigma = ax.fill_betweenx(np.arange(len(x_names)), y-y_err, y+y_err, color="grey", alpha=0.2)
             ax.set_xlabel('Z Score', alpha=1, color='k')
-            ax.set_yticks(np.arange(len(x)), x_names)#, rotation=90)
+            ax.set_yticks(np.arange(len(x_names)), x_names)#, rotation=90)
             for t in ax.get_yticklabels():
                 txt = t.get_text()
                 if 'Max Shadow' in txt:
                     t.set_color('red')
-                    ax.plot(y[-1], np.arange(len(x))[-1], marker='*', color='red')
-            ax.set_ylim((np.arange(len(x))[0]-0.5, np.arange(len(x))[-1]+0.5))
+                    ax.plot(y[-1], np.arange(len(x_names))[-1], marker='*', color='red')
+            ax.set_ylim((np.arange(len(x_names))[0]-0.5, np.arange(len(x_names))[-1]+0.5))
             ax.set_xlim((np.min(y)-1, np.max(y)+1))
             ax.invert_yaxis(), ax.invert_xaxis()
         else:
-            lns, = ax.plot(np.arange(len(x)), y, 'k*--', lw=0.77)#, label='XGBoost', lw=0.77)
-            lns_sigma = ax.fill_between(np.arange(len(x)), y-y_err, y+y_err, color="grey", alpha=0.2)
+            lns, = ax.plot(np.arange(len(x_names)), y, 'k*--', lw=0.77)#, label='XGBoost', lw=0.77)
+            lns_sigma = ax.fill_between(np.arange(len(x_names)), y-y_err, y+y_err, color="grey", alpha=0.2)
             ax.set_ylabel('Z Score', alpha=1, color='k')
-            ax.set_xticks(np.arange(len(x)), x_names, rotation=90)
+            ax.set_xticks(np.arange(len(x_names)), x_names, rotation=90)
             for t in ax.get_xticklabels():
                 txt = t.get_text()
                 if 'Max Shadow' in txt:
                     t.set_color('red')
-                    ax.plot(np.arange(len(x))[-1], y[-1], marker='*', color='red')
-            ax.set_xlim((np.arange(len(x))[0]-0.5, np.arange(len(x))[-1]+0.5))
+                    ax.plot(np.arange(len(x_names))[-1], y[-1], marker='*', color='red')
+            ax.set_xlim((np.arange(len(x_names))[0]-0.5, np.arange(len(x_names))[-1]+0.5))
             ax.set_ylim((np.min(y)-1, np.max(y)+1))
 
         ax.set_title('Feature Importance')#, size=18)
@@ -854,10 +892,7 @@ class Classifier:
         else:
             plt.show()
 
-        if save_data is False:
-            os.remove(fname+'.csv')
-
-    def plot_hyper_param_importance(self, plot_time=False, savefig=False):
+    def plot_hyper_param_importance(self, plot_time=True, savefig=False):
         """
         Plots the hyperparameter optimization history.
     
@@ -869,13 +904,47 @@ class Classifier:
             AxesImage
         """
 
-        if plot_time is False:
-            fig = plot_param_importances(self.optimization_results)
-            plt.title('Hyperparameter Importance')#, size=16)
-        else:
-            fig = plot_param_importances(self.optimization_results, target=lambda t: t.duration.total_seconds(), target_name="duration")
-            plt.title('Hyperparameter Duration Importance')#, size=16)
-        plt.tight_layout()
+        try:
+            if isinstance(self.path, str):
+                try:
+                    hyper_importances = joblib.load(self.path+'Hyperparameter_Importance')
+                except FileNotFoundError:
+                    raise ValueError('Could not find the importance file in the '+self.path+' folder')
+
+                try:
+                    duration_importances = joblib.load(self.path+'Duration_Importance')
+                except FileNotFoundError:
+                    raise ValueError('Could not find the importance file in the '+self.path+' folder')
+            else:
+                raise ValueError('Call the save_hyper_importance() attribute first.')
+        except:
+            raise ValueError('Call the save_hyper_importance() attribute first.')
+
+        params, importance, duration_importance = [], [], []
+        for key in hyper_importances:       
+            params.append(key)
+
+        for name in params:
+            importance.append(hyper_importances[name])
+            duration_importance.append(duration_importances[name])
+
+        xtick_labels = format_labels(params)
+
+        fig, ax = plt.subplots()
+        #fig.subplots_adjust(top=0.8)
+        ax.barh(xtick_labels, importance, label='Importance for Classification', color=mcolors.TABLEAU_COLORS["tab:blue"], alpha=0.87)
+        if plot_time:
+            ax.barh(xtick_labels, duration_importance, label='Impact on Engine Speed', color=mcolors.TABLEAU_COLORS["tab:orange"], alpha=0.7, hatch='/')
+
+        ax.set_ylabel("Hyperparameter")
+        ax.set_xlabel("Importance Evaluation")
+        ax.legend(ncol=2, frameon=False, handlelength=2, bbox_to_anchor=(0.5, 1.1), loc='upper center')
+        ax.set_xscale('log')
+        plt.gca().invert_yaxis()
+        plt.xlim((0, 1.))#np.max(importance+duration_importance)))#np.max(importance+duration_importance)))
+        #fig = plot_param_importances(self.optimization_results)
+        #fig = plot_param_importances(self.optimization_results, target=lambda t: t.duration.total_seconds(), target_name="duration")
+        #plt.tight_layout()
         if savefig:
             if plot_time:
                 plt.savefig('Ensemble_Hyperparameter_Importance.png', bbox_inches='tight', dpi=300)
@@ -885,8 +954,73 @@ class Classifier:
         else:
             plt.show()
 
+    def save_hyper_importance(self):
+        """
+        Calculates and saves binary files containing
+        dictionaries with importance information, one
+        for the importance and one for the duration importance
+
+        Note:
+            This procedure is time-consuming but must be run once before
+            plotting the importances. This function will save
+            two files in the model folder for future use. 
+
+        Returns:
+            Saves two binary files, importance and duration importance.
+        """
+        print('Calculating and saving importances, this could take up to an hour...')
+
+        try:
+            if isinstance(self.path, str):
+                path = self.path  
+            else:
+                path = str(Path.home())
+        except:
+            path = str(Path.home())
+
+        hyper_importance = get_param_importances(self.optimization_results)
+        joblib.dump(hyper_importance, path+'Hyperparameter_Importance')
+
+        importance = FanovaImportanceEvaluator()
+        duration_importance = importance.evaluate(self.optimization_results, target=lambda t: t.duration.total_seconds())
+        joblib.dump(duration_importance, path+'Duration_Importance')
+        
+        print(f"Files saved in: {path}")
+
+        self.path = path
+
+        return  
+
 
 #Helper functions below to generate confusion matrix
+def format_labels(labels: list) -> list:
+    """
+    Takes a list of labels and returns the list with all words capitalized and underscores removed.
+    Also replaces 'eta' with 'Learning Rate' and 'n_estimators' with 'Number of Trees'.
+    
+    Args:
+        labels (list): A list of strings.
+    
+    Returns:
+        Reformatted list, of same lenght.
+    """
+
+    new_labels = []
+    for label in labels:
+        label = label.replace("_", " ")
+        if label == "eta":
+            new_labels.append("Learning Rate")
+            continue
+        if label == "n estimators":
+            new_labels.append("Num of Trees")
+            continue
+        if label == "colsample bytree":
+            new_labels.append("ColSample ByTree")
+            continue
+        new_labels.append(label.title())
+
+    return new_labels
+
 def evaluate_model(classifier, data_x, data_y, normalize=True, k_fold=10):
     """
     Cross-checks model accuracy and outputs both the predicted

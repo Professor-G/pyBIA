@@ -23,6 +23,7 @@ from astropy.stats import sigma_clipped_stats, SigmaClip, gaussian_fwhm_to_sigma
 from astropy.convolution import Gaussian2DKernel, convolve
 
 from pyBIA import data_processing, data_augmentation
+from pyBIA.image_moments import make_moment_table
 from pathlib import Path
 from progress import bar
 
@@ -73,7 +74,7 @@ class Catalog:
             need individual class instance. Defaults to None.
     """
 
-    def __init__(self, data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0.7, threshold=10, 
+    def __init__(self, data, x=None, y=None, bkg=None, error=None, zp=None, morph_params=True, nsig=0.7, threshold=10, 
         deblend=False, obj_name=None, field_name=None, flag=None, aperture=15, annulus_in=20, annulus_out=35, 
         kernel_size=21, invert=False, cat=None):
 
@@ -82,6 +83,7 @@ class Catalog:
         self.y = y 
         self.bkg = bkg 
         self.error = error 
+        self.zp = zp 
         self.morph_params = morph_params
         self.kernel_size = kernel_size
         self.nsig = nsig
@@ -219,14 +221,14 @@ class Catalog:
                 flux_err = aper_stats.sum_err
 
             if self.morph_params == True:
-                prop_list = morph_parameters(data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=None, 
+                prop_list, moment_list = morph_parameters(data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=None, 
                     invert=self.invert, deblend=self.deblend)
-                tbl = make_table(prop_list)
-                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
+                tbl = make_table(prop_list, moment_list)
+                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
                     flux=aper_stats.sum, flux_err=flux_err, median_bkg=None, save=save_file, path=path, filename=filename)
                 return 
 
-            self.cat = make_dataframe(table=None, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
+            self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=aper_stats.sum, flux_err=flux_err, median_bkg=None, save=save_file, path=path, filename=filename)
             return 
 
@@ -248,26 +250,26 @@ class Catalog:
 
         if self.error is None:
             if self.morph_params == True:
-                prop_list = morph_parameters(self.data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
+                prop_list, moment_list = morph_parameters(self.data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
                     invert=self.invert, deblend=self.deblend, threshold=self.threshold)
-                tbl = make_table(prop_list)
-                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
+                tbl = make_table(prop_list, moment_list)
+                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
                     flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
                 return 
 
-            self.cat = make_dataframe(table=None, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
+            self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
             return 
            
         if self.morph_params == True:
-            prop_list = morph_parameters(self.data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
+            prop_list, moment_list = morph_parameters(self.data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
                     invert=self.invert, deblend=self.deblend, threshold=self.threshold)
-            tbl = make_table(prop_list)
-            self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
+            tbl = make_table(prop_list, moment_list)
+            self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=flux, flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
             return 
 
-        self.cat = make_dataframe(table=None, x=self.x, y=self.y, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, flux=flux, 
+        self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, flux=flux, 
             flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
         return 
 
@@ -375,7 +377,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
 
     size = size if data.shape[0] > size and data.shape[1] > size else min(data.shape[0],data.shape[1])
 
-    prop_list=[]
+    prop_list, moment_list = [], []
     progess_bar = bar.FillingSquaresBar('Applying image segmentation...', max=len(x))
 
     for i in range(len(x)):
@@ -417,15 +419,19 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
         if len(inx) > 1: #In case objects can't be deblended
             inx = inx[0] 
 
-        prop_list.append(props[inx])
+        ##### Image Moments #####
+        new_data[segm.data!=props[inx].label] = 0
+        moments_table = make_moment_table(new_data)
+
+        prop_list.append(props[inx]), moment_list.append(moments_table)
         progess_bar.next()
     progess_bar.finish()
 
     if -999 in prop_list:
         print('NOTE: At least one object could not be detected in segmentation, perhaps the object is too faint. The morphological features have been set to -999.')
-    return np.array(prop_list, dtype=object)
+    return np.array(prop_list, dtype=object), moment_list
 
-def make_table(props):
+def make_table(props, moments):
     """
     Returns the morphological parameters calculated from the sementation image.
     A list of the parameters and their function is available in the Photutils
@@ -439,21 +445,30 @@ def make_table(props):
 
     """
 
-    prop_list = ['area', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'bbox',
-        'covar_sigx2', 'covar_sigxy', 'covar_sigy2', 'covariance_eigvals', 'cxx', 'cxy', 
-        'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm',
-        'gini', 'isscalar', 'max_value', 'maxval_xindex', 'maxval_yindex', 'min_value', 
-        'minval_xindex', 'minval_yindex', 'moments', 'moments_central', 'orientation', 
-        'perimeter', 'segment_flux', 'semimajor_sigma', 'semiminor_sigma']
+    moment_list = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',             
+        'mu10','mu01','mu20','mu11','mu02','mu30','mu21','mu12','mu03', 'hu1','hu2',
+        'hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3','fourier_4',
+        'fourier_5','fourier_6','fourier_7','fourier_8','fourier_9','fourier_10',             
+        'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6',
+        'legendre_7','legendre_8','legendre_9','legendre_10']
 
+    prop_list = ['area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigvals', 
+        'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 
+        'fwhm', 'gini', 'orientation', 'perimeter', 'segment_flux', 'semimajor_sigma', 'semiminor_sigma'] 
+        #moments, moments_central, isscalar, 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'max_value', 'maxval_xindex', 'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex',
+    
     table = []
     print('Writing catalog...')
     for i in range(len(props)):
+
         morph_feats = []
+
         try:
-            props[i][0].area
+            props[i][0].area #To avoid when this is None
+            for moment in moment_list:
+                morph_feats.append(float(moments[i][moment]))
         except:
-            for j in range(len(prop_list)+31): #+31 because covariance eigenvalue param is actually 2 params, and the moments to 3rd order are each 16
+            for j in range(len(prop_list+moment_list)+1): #+1 because covariance eigenvalue param is actually 2 params
                 morph_feats.append(-999)
             table.append(morph_feats)
             continue
@@ -463,9 +478,9 @@ def make_table(props):
             if param == 'moments' or param == 'moments_central': #To 3rd order there are 16 image moments (4x4)
                 for moment in np.ravel(QTable[param]):
                     morph_feats.append(moment)
-            elif param == 'covariance_eigvals': #Data is 2D therefore we get two eigenvalues
-                morph_feats.append(np.ravel(QTable[param])[0].value)
+            elif param == 'covariance_eigvals': 
                 morph_feats.append(np.ravel(QTable[param])[1].value)
+                morph_feats.append(np.ravel(QTable[param])[0].value) #This is the second eigval
             elif param == 'isscalar':
                 if QTable[param] == True: #Checks whether it's a single source, 1 for true, 0 for false
                     morph_feats.append(1)
@@ -480,7 +495,7 @@ def make_table(props):
 
     return np.array(table, dtype=object)
 
-def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_bkg=None, 
+def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None, median_bkg=None, 
     obj_name=None, field_name=None, flag=None, save=True, path=None, filename=None):
     """
     This function takes as input the catalog of morphological features
@@ -516,8 +531,8 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
 
     Example:
 
-        >>> props = morph_parameters(data, x=xpix, y=ypix)
-        >>> table = make_table(props)
+        >>> props, moments = morph_parameters(data, x=xpix, y=ypix)
+        >>> table = make_table(props, moments)
         >>> dataframe = make_dataframe(table, x=xpix, y=ypix)
 
     Returns:
@@ -530,17 +545,15 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
     if filename is None:
         filename = 'pyBIA_catalog'
 
-    prop_list = ['area', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'bbox',
-        'covar_sigx2', 'covar_sigxy', 'covar_sigy2', 'covariance_eigvals1', 'covariance_eigvals2',
-        'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm',
-        'gini', 'isscalar', 'max_value', 'maxval_xindex', 'maxval_yindex', 'min_value', 'minval_xindex', 
-        'minval_yindex', 'moments_1', 'moments_2', 'moments_3', 'moments_4', 'moments_5', 'moments_6', 
-        'moments_7', 'moments_8', 'moments_9', 'moments_10', 'moments_11', 'moments_12', 'moments_13', 
-        'moments_14', 'moments_15', 'moments_16', 'moments_central_1', 'moments_central_2', 'moments_central_3', 
-        'moments_central_4', 'moments_central_5', 'moments_central_6', 'moments_central_7', 'moments_central_8', 
-        'moments_central_9', 'moments_central_10', 'moments_central_11', 'moments_central_12', 'moments_central_13', 
-        'moments_central_14', 'moments_central_15', 'moments_central_16', 'orientation', 'perimeter', 'segment_flux', 
-        'semimajor_sigma', 'semiminor_sigma']
+    prop_list = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',             
+        'mu10','mu01','mu20','mu11','mu02','mu30','mu21','mu12','mu03', 'hu1','hu2',
+        'hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3','fourier_4',
+        'fourier_5','fourier_6','fourier_7','fourier_8','fourier_9','fourier_10',             
+        'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6',
+        'legendre_7','legendre_8','legendre_9','legendre_10', 'area', 'covar_sigx2', 'covar_sigy2', 
+        'covar_sigxy', 'covariance_eigvals', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 
+        'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 'segment_flux', 
+        'semimajor_sigma', 'semiminor_sigma'] 
 
     data_dict = {}
 
@@ -557,9 +570,15 @@ def make_dataframe(table=None, x=None, y=None, flux=None, flux_err=None, median_
     if median_bkg is not None:
         data_dict['median_bkg'] = median_bkg
     if flux is not None:
-        data_dict['flux'] = flux
+        if zp is None:
+            data_dict['flux'] = flux
+        else:
+            data_dict['mag'] = float(-2.5*np.log10(flux)+zp) 
     if flux_err is not None:
-        data_dict['flux_err'] = flux_err
+        if zp is None:
+            data_dict['flux_err'] = flux_err
+        else:
+            data_dict['mag_err'] = float((2.5/np.log(10))*(flux_err/flux)) 
     
     if table is None:
         df = pd.DataFrame(data_dict)
@@ -1227,168 +1246,3 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
                 return
             plt.show()
 
-
-### Standalone function for creating the catalog ###
-def create_cat(data, x=None, y=None, bkg=None, error=None, morph_params=True, nsig=0.6, deblend=False, 
-    obj_name=None, field_name=None, flag=None, aperture=15, annulus_in=20, annulus_out=35, 
-    invert=False, save_file=True, path=None, filename=None):
-    """
-    Creates a photometric and morphological catalog containing the object(s) in 
-    the given position(s) at the given order. The parameters x and y should be 1D 
-    arrays containing the pixel location of each source. The input can be for a 
-    single source or multiple objects.
-
-    If data is background subtracted, set bkg=0. If no positions are input
-    then a catalog is automatically generated using the segmentation threshold
-    parameters (nsig). 
-
-    Example:
-        We can use the world coordinate system in astropy
-        to convert ra/dec to pixels and then call pyBIA.catalog:
-
-        >>> import astropy
-        >>> from pyBIA import catalog
-
-        >>> hdu = astropy.io.fits.open(name)
-        >>> wcsobj= astropy.wcs.WCS(header = hdu[0].header)
-
-        >>> x_pix, y_pix = wcsobj.all_world2pix(ra, dec, 0) 
-        >>> catalog.create(data, x_pix, y_pix)
-
-    Args:
-        data (ndarray): 2D array.
-        x (ndarray, optional): 1D array or list containing the x-pixel position.
-            Can contain one position or multiple samples.
-        y (ndarray, optional): 1D array or list containing the y-pixel position.
-            Can contain one position or multiple samples.
-        bkg (None, optional): If bkg=0 the data is assumed to be background-subtracted.
-            The other optional is bkg=None, in which case the background will be
-            automatically calculated for local regions.
-        error (ndarray, optional): 2D array containing the rms error map.
-        morph_params (bool, optional): If True, image segmentation is performed and
-            morphological parameters are computed. Defaults to True. 
-        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
-            deviations from the background will be detected during segmentation. Defaults to 0.6.
-        deblend (bool, optional): If True, the objects are deblended during the segmentation
-            procedure, thus deblending the objects before the morphological features
-            are computed. Defaults to False so as to keep blobs as one segmentation object.
-        obj_name (ndarray, str, optional): 1D array containing the name of each object
-            corresponding to the x & y position. This will be appended to the first
-            column of the output catalog. Defaults to None.
-        field_name (ndarray, str, optional): 1D array containing the field name of each object
-            corresponding to the x & y positions. This will be appended to the first
-            column of the output catalog. Defaults to None.
-        flag (ndarray, optional): 1D array containing a flag value for each object corresponding
-            to the x & y positions. Defaults to None. 
-        aperture (int): The radius of the photometric aperture. Defaults to 15.
-        annulus_in (int): The inner radius of the circular aperture
-            that will be used to calculate the background. Defaults to 20.
-        annulus_out (int): The outer radius of the circular aperture
-                that will be used to calculate the background. Defaults to 35.
-        invert (bool, optional): If True, the x & y coordinates will be switched
-            when cropping out the object during the image segmentation step. For
-            more information see the morph_parameters function. Defaults to False.
-        save_file (bool): If set to False then the catalog will not be saved to the machine. 
-            You can always save manually, for example, if df = catalog(), then you can save 
-            with: df.to_csv('filename'). Defaults to True.
-        path (str, optional): By default the text file containing the photometry will be
-            saved to the local directory, unless an absolute path to a directory is entered here.
-        filename(str, optional): Name of the output catalog. Default name is 'pyBIA_catalog'.
-
-    Note:
-        As Lyman-alpha nebulae are diffuse sources with
-        extended emission features, the default radius of
-        the circular photometric aperture is 15 pixels. This 
-        large aperture allows us to encapsulate the largest blobs.
-    
-        The background is calculated as the median pixel value
-        within the area of the annulus. Increasing the size of the
-        annulus may yield more robust background measurements. This
-        is especially important when extracting photometry in crowded fields
-        where surrounding sources may skew the median background.
-                
-    Returns:
-        A catalog of all objects input (or automatically detected if there were no position arguments), 
-        containing both photometric and morphological information. A CSV file titled "pyBIA_catalog" 
-        will also be saved to the local directory, unless an absolute path argument is specified.
-    """
-    if isinstance(x, np.ndarray) is False:
-        x = np.array(x)
-    if isinstance(y, np.ndarray) is False:
-        y = np.array(y)
-
-    if bkg is not None and bkg != 0:
-        raise ValueError('Invalid background input -- if data is background subtracted set bkg=0, otherwise if bkg=None the background will be approximated.')
-    if error is not None:
-        if data.shape != error.shape:
-            raise ValueError("The rms error map must be the same shape as the data array.")
-    if aperture > annulus_in or annulus_in > annulus_out:
-        raise ValueError('The radius of the inner and out annuli must be larger than the aperture radius.')
-    if x is not None:
-        try: #If position array is a single number it will be converted to a list of unit length
-            len(x)
-        except TypeError:
-            x, y = [x], [y]
-        if len(x) != len(y):
-            raise ValueError("The two position arrays (x & y) must be the same size.")
-    if invert == False:
-        warn('If data is from .fits file you may need to set invert=True if (x,y) = (0,0) is at the top left corner of the image instead of the bottom left corner.')
-    """
-    #Apply DAOFIND (Stetson 1987) to detect sources in the image
-    if x is None: 
-        x, y = DAO(data, fwhm)
-        #print('{} objects found!'.format(len(x)))
-    """
-    if x is None: #Background approximation to create preliminary source positions
-        Nx, Ny = data.shape[1], data.shape[0]
-        length = annulus_out*2*2. #The sub-array when padding will be be a square encapsulating the outer annuli
-        
-        if Nx < length or Ny < length: #Small image, no need to pad just take robust median
-            if bkg is None:
-                data -= sigma_clipped_stats(data)[1] #Sigma clipped median
-        else:
-            if bkg is None:
-                data = subtract_background(data, length=length)
-
-        segm, convolved_data = segm_find(data, nsig=nsig, kernel_size=kernel_size, deblend=deblend)
-        props = segmentation.SourceCatalog(data, segm, convolved_data=convolved_data)
-        x, y = props.centroid[0], props.centroid[1]
-     
-    positions = []
-    for j in range(len(x)):
-        positions.append((x[j], y[j]))
-
-    apertures = CircularAperture(positions, r=aperture)
-    aper_stats = ApertureStats(data, apertures, error=error)
-
-    if bkg is None:
-        annulus_apertures = CircularAnnulus(positions, r_in=annulus_in, r_out=annulus_out)
-        bkg_stats = ApertureStats(data, annulus_apertures, error=error, sigma_clip=SigmaClip())
-        background = bkg_stats.median
-        flux = aper_stats.sum - (background * apertures.area)
-    elif bkg == 0:
-        flux = aper_stats.sum 
-        background = None 
-
-    if error is None:
-        if morph_params == True:
-            prop_list = morph_parameters(data, x, y, nsig=nsig, median_bkg=background, invert=invert, deblend=deblend)
-            tbl = make_table(prop_list)
-            df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag,
-                flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
-            return df
-
-        df = make_dataframe(table=None, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
-            flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
-        return df
-       
-    if morph_params == True:
-        prop_list = morph_parameters(data, x, y, nsig=nsig, median_bkg=background, invert=invert, deblend=deblend)
-        tbl = make_table(prop_list)
-        df = make_dataframe(table=tbl, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, 
-            flux=flux, flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
-        return df
-
-    df = make_dataframe(table=None, x=x, y=y, obj_name=obj_name, field_name=field_name, flag=flag, flux=flux, 
-        flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
-    return df, prop_list

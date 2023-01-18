@@ -316,7 +316,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
     invert=False, deblend=False):
     """
     Applies image segmentation on each object to calculate morphological 
-    parameters calculated from the moment-based properties (see: ). These parameters 
+    parameters calculated from the moment-based properties. These parameters 
     can be used to train a machine learning classifier.
 
     By default the data is assumed to be background subtracted, otherwise the
@@ -549,7 +549,7 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
         'hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',             
         'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6',
         'legendre_7','legendre_8','legendre_9','legendre_10', 'area', 'covar_sigx2', 'covar_sigy2', 
-        'covar_sigxy', 'covariance_eigvals', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 
+        'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 
         'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 
         'semimajor_sigma', 'semiminor_sigma'] 
 

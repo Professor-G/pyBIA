@@ -389,7 +389,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
         try:
             props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
         except:
-            prop_list.append(-999) #If there are no segmented objects in the image
+            prop_list.append(-999), moment_list.append(-999) #If there are no segmented objects in the image
             progess_bar.next()
             continue
 
@@ -405,7 +405,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
         anglemask = theta <= (tmax-tmin)
         mask = circmask*anglemask
         if np.count_nonzero(segm.data[mask]) == 0: 
-            prop_list.append(-999) 
+            prop_list.append(-999), moment_list.append(-999)
             progess_bar.next()
             continue
 
@@ -422,13 +422,16 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
         ##### Image Moments #####
         new_data[segm.data!=props[inx].label] = 0
         moments_table = make_moments_table(new_data)
-
+        
         prop_list.append(props[inx]), moment_list.append(moments_table)
         progess_bar.next()
     progess_bar.finish()
 
-    if -999 in prop_list:
-        print('NOTE: At least one object could not be detected in segmentation, perhaps the object is too faint. The morphological features have been set to -999.')
+    #if -999 in prop_list:
+    #    print('NOTE: At least one object could not be detected in segmentation, perhaps the object is too faint. The morphological features have been set to -999.')
+    if len(prop_list) != len(moment_list):
+        raise ValueError('The properties list does not match the image moments list.')
+        
     return np.array(prop_list, dtype=object), moment_list
 
 def make_table(props, moments):
@@ -474,7 +477,7 @@ def make_table(props, moments):
 
         QTable = props[i][0].to_table(columns=prop_list)
         for param in prop_list:
-            if param == 'moments' or param == 'moments_central': #To 3rd order there are 16 image moments (4x4)
+            if param == 'moments' or param == 'moments_central': #To 3rd order photutils outputs a 4x4 matrix (obselete?)
                 for moment in np.ravel(QTable[param]):
                     morph_feats.append(moment)
             elif param == 'covariance_eigvals': 

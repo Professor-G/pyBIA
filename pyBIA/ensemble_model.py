@@ -516,7 +516,8 @@ class Classifier:
         Returns:
             AxesImage.
         """
-        
+        if self.data_x is None or self.data_y is None:
+            raise ValueError('Input data_x and data_y!')
         if self.model is None:
             raise ValueError('No model has been created! Run .create() first.')
 
@@ -1040,8 +1041,8 @@ def evaluate_model(classifier, data_x, data_y, normalize=True, k_fold=10):
         The second output is the 1D array of the predicted class labels.
     """
 
-    #k_fold = KFold(k_fold, shuffle=False)#, random_state=1)
-    k_fold = StratifiedKFold(k_fold, shuffle=True)#, random_state=1)
+    k_fold = KFold(k_fold, shuffle=True)#, random_state=1)
+    #k_fold = StratifiedKFold(k_fold, shuffle=True, random_state=8)
 
     predicted_targets = np.array([])
     actual_targets = np.array([])
@@ -1115,7 +1116,7 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
 
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, alpha=1, color='k')#rotation=45, fontsize=14,
-    plt.yticks(tick_marks, classes, alpha=1, color='k')#fontsize=14,
+    plt.yticks(tick_marks, classes, alpha=1, color='k', rotation=90)#fontsize=14,
     #plt.xticks(tick_marks, ['DIFFUSE','OTHER'], rotation=45, fontsize=14)
     #plt.yticks(tick_marks, ['DIFFUSE','OTHER'], fontsize=14)
 

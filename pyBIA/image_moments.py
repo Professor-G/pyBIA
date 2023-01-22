@@ -14,13 +14,16 @@ def make_moments_table(image):
 		image (ndarray): A 2D array representing an image.
 
 	Returns:
-		A astropy table with 47 columns, one for each moment or descriptor and their corresponding values as rows."
+		A astropy table with 40 columns, one for each moment or descriptor."
     """
 
+	if len(image.shape) != 2:
+		raise ValueError("Input image must be 2D.")
+  
 	moments, central_moments, hu_moments = calculate_moments(image), calculate_central_moments(image), calculate_hu_moments(image)
 	legendre_moments, fourier_descriptors = calculate_legendre_moments(image), calculate_fourier_descriptors(image, k=3)
+	
 	features = moments + central_moments + hu_moments + fourier_descriptors + legendre_moments
-
 	col_names = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',
 		'mu00','mu10','mu01','mu20','mu11','mu02','mu30','mu21','mu12','mu03',
 		'hu1','hu2','hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',
@@ -45,6 +48,9 @@ def calculate_moments(image):
 		A tuple of 10 values representing the calculated image moments (m00, m10, m01, m20, m11, m02, m30, m21, m12, m03)
 	"""
 
+	if len(image.shape) != 2:
+		raise ValueError("Input image must be 2D.")
+    
 	rows, cols = image.shape
 	x, y = np.meshgrid(np.arange(cols), np.arange(rows))
 
@@ -73,6 +79,9 @@ def calculate_central_moments(image):
 		A tuple of 10 values representing the calculated central moments (mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03)
 	"""
 
+	if len(image.shape) != 2:
+		raise ValueError("Input image must be 2D.")
+    
 	rows, cols = image.shape
 	x, y = np.meshgrid(np.arange(cols), np.arange(rows))
 
@@ -105,6 +114,9 @@ def calculate_hu_moments(image):
 		A tuple of 7 values representing the calculated Hu moments (hu1, hu2, hu3, hu4, hu5, hu6, hu7)
 	"""
 
+	if len(image.shape) != 2:
+		raise ValueError("Input image must be 2D.")
+
 	mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03 = calculate_central_moments(image)
 	s = np.sqrt(mu20 + mu02)
 
@@ -129,19 +141,24 @@ def calculate_hu_moments(image):
 
 def calculate_legendre_moments(image, order=3):
 	"""
-	This function takes a 2D image array calculates 
-	the Legendre moments.
+	This function takes a 2D image array and calculates the Legendre moments of the input image.
 
-	If the order is set to 3, there would be 10 Legendre moments in total. 
-	They would be represented by the monomials x^3, y^3, x^2y, xy^2, x^2, y^2, xy, x, y, 1.
+	The order of the moments can be specified as an optional input parameter. The default is set to 3.
+	Each moment is represented by a monomial of x and y, where x and y are the spatial coordinates of the image.
+	The returned list of moments will be in the format of [1, x, y, x^2, xy, y^2, x^3, x^2y, xy^2, y^3] for order 3.
 
 	Args:
-		image (ndarray): A 2D array representing an image.
-		order (int): The order of the Legendre moments to calculate.
+	    image (ndarray): A 2D array representing an image.
+	    order (int, optional): The order of the Legendre moments to calculate. Must be a non-negative integer.
 
 	Returns:
-		A list of Legendre moments.
+	    A list of Legendre moments.
 	"""
+
+	if len(image.shape) != 2:
+		raise ValueError("Input image must be 2D.")
+	if not isinstance(order, int) or order < 0:
+		raise ValueError("Order must be a non-negative integer.")
 
 	x, y = np.meshgrid(np.arange(image.shape[1]), np.arange(image.shape[0]))
 	x = x - np.mean(x)
@@ -151,10 +168,11 @@ def calculate_legendre_moments(image, order=3):
 		for j in range(i+1):
 			moment = np.sum(np.power(x, i-j) * np.power(y, j) * image)
 			moments.append(moment)
-	
+
 	return moments
 
-def calculate_fourier_descriptors(image, k=10):
+
+def calculate_fourier_descriptors(image, k=3):
 	"""
 	Calculates the Fourier Descriptors which are a set of complex 
 	numbers that represent the shape of an object, which are calculated 
@@ -162,6 +180,17 @@ def calculate_fourier_descriptors(image, k=10):
 	The number of Fourier Descriptors is equal to the number of points 
 	on the boundary of the object, as it's calculated by applying the 
 	Fourier Transform on the complex representation of the object's boundary.
+
+	The [-k:] notation is used to select the last k elements of the sorted fourier_descriptors array. 
+	The sorting is done to put the elements in ascending order, so that the last k elements will be 
+	the k largest magnitude Fourier Descriptors. The reason to only keep the k largest magnitude Fourier 
+	Descriptors is that they carry the most important shape information of the object, and discarding the 
+	rest of the descriptors can simplify the representation of the object without losing much information.
+
+	Note:
+		The image is turned to binary, and depending on the image segmentation,
+		not all k fourier descriptors may be returned. The default is set to 3 in
+		an attempt to include objects with smaller boundaries. 
 
 	Args:
 		image (ndarray): A 2D array representing an image.
@@ -171,6 +200,11 @@ def calculate_fourier_descriptors(image, k=10):
 		The fourier descriptors.
 	"""
 
+	if len(image.shape) != 2:
+		raise ValueError("Input image must be 2D.")
+	if not isinstance(k, int) or k < 0:
+		raise ValueError("Order must be a non-negative integer.")
+
 	rows, cols = image.shape
 	# Create a grid of x and y coordinates
 	x, y = np.meshgrid(np.arange(cols), np.arange(rows))
@@ -179,7 +213,11 @@ def calculate_fourier_descriptors(image, k=10):
 	# Find contour of the binary image
 	contours, _ = cv2.findContours(binary_image.astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 	# Select the longest contour
-	contour = max(contours, key=len)
+	try:
+		contour = max(contours, key=len)
+	except:
+		print('No contours detected, returning zeros...')
+		return [0]*k
 	# Convert contour to complex number
 	contour_complex = contour[:, 0, 0] + 1j * contour[:, 0, 1]
 	# Apply Fourier Transform
@@ -187,6 +225,11 @@ def calculate_fourier_descriptors(image, k=10):
 	# Keep k largest magnitude Fourier Descriptors
 	fourier_descriptors = np.abs(fourier_descriptors)
 	fourier_descriptors = [i for i in np.sort(fourier_descriptors)[-k:]]
+	if len(fourier_descriptors) != k:
+		print('Only {} fourier descriptors could be calculated for this object, returning zeros...'.format(len(fourier_descriptors)))
+		for i in range(k-len(fourier_descriptors)):
+			fourier_descriptors = fourier_descriptors + [0]
+
 	return fourier_descriptors
 
 def zernike_moments(image, r_max=3):
@@ -213,6 +256,11 @@ def zernike_moments(image, r_max=3):
 		A tuple of (r_max+1)*(r_max+1) values representing the calculated Zernike moments.
 	"""
 
+	if len(image.shape) != 2:
+		raise ValueError("Input image must be 2D.")
+	if not isinstance(r_max, int) or r_max < 0:
+		raise ValueError("r_max must be a non-negative integer.")
+
 	rows, cols = image.shape
 	# Create a grid of x and y coordinates
 	x, y = np.meshgrid(np.arange(cols), np.arange(rows))
@@ -236,6 +284,7 @@ def zernike_moments(image, r_max=3):
 			Znm = Rnm * np.exp(1j * m * theta)
 			moment = np.sum(image * Znm)
 			moments.append(moment)
+
 	return moments
 
 def harris_corner_descriptors(image, block_size=2, ksize=3):
@@ -249,6 +298,9 @@ def harris_corner_descriptors(image, block_size=2, ksize=3):
 	The Harris Corner Descriptors are returned as a 2D array, 
 	where each element represents the corner response at that particular pixel. 
 	The higher the value of a pixel, the more likely it is to be a corner.
+	
+	Note:
+		Only available in paid version of cv2?
 
 	Args:
 		image (ndarray): A 2D array representing an image.
@@ -270,9 +322,8 @@ def harris_corner_descriptors(image, block_size=2, ksize=3):
 	corners = cv2.cornerHarris(gray, block_size, ksize, 0.04)
 	# Normalize corner responses
 	corners = cv2.normalize(corners, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+	
 	return corners
-
-
 
 def zernike_radial(n, m, rho):
 	"""

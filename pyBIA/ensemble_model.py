@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 #plt.rc('font', family='serif')
-plt.style.use('/Users/daniel/Documents/plot_style.txt')
+#plt.style.use('/Users/daniel/Documents/plot_style.txt')
 import matplotlib.colors as mcolors 
 from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
 from warnings import warn
@@ -90,14 +90,16 @@ class Classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, data_x=None, data_y=None, clf='rf', optimize=True, opt_cv=10, limit_search=True, impute=False, imp_method='KNN', 
-        n_iter=25, boruta_trials=50, boruta_model='rf', balance=True):
+    def __init__(self, data_x=None, data_y=None, clf='rf', optimize=True, opt_cv=10, 
+        test_size=None, limit_search=True, impute=False, imp_method='KNN', n_iter=25, 
+        boruta_trials=50, boruta_model='rf', balance=True):
 
         self.data_x = data_x
         self.data_y = data_y
         self.clf = clf
         self.optimize = optimize 
         self.opt_cv = opt_cv 
+        self.test_size = test_size
         self.limit_search = limit_search
         self.impute = impute
         self.imp_method = imp_method
@@ -204,7 +206,7 @@ class Classifier:
             data_x = self.data_x[:,self.feats_to_use]
 
         self.model, self.best_params, self.optimization_results = hyper_opt(data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, 
-            balance=self.balance, return_study=True, limit_search=self.limit_search, opt_cv=self.opt_cv)
+            balance=self.balance, return_study=True, limit_search=self.limit_search, opt_cv=self.opt_cv, test_size=self.test_size)
         print("Fitting and returning final model...")
         self.model.fit(data_x, self.data_y)
         

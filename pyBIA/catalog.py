@@ -456,8 +456,9 @@ def make_table(props, moments):
 
     prop_list = ['area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigvals', 
         'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 
-        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma'] 
-        #moments, moments_central, isscalar, 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'max_value', 'maxval_xindex', 'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex',
+        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', #\\
+        'isscalar', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'max_value', 'maxval_xindex', 
+        'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex', 'moments', 'moments_central']
     
     table = []
     print('Writing catalog...')
@@ -548,13 +549,20 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
         filename = 'pyBIA_catalog'
 
     prop_list = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',             
-        'mu10', 'mu01', 'mu20','mu11','mu02','mu30','mu21','mu12','mu03', 'hu1','hu2',
-        'hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',             
+        'mu10', 'mu01', 'mu20','mu11','mu02','mu30','mu21','mu12','mu03', 
+        'hu1','hu2', 'hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',             
         'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6',
-        'legendre_7','legendre_8','legendre_9','legendre_10', 'area', 'covar_sigx2', 'covar_sigy2', 
-        'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 
-        'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 
-        'semimajor_sigma', 'semiminor_sigma'] 
+        'legendre_7','legendre_8','legendre_9','legendre_10', 'area', 'covar_sigx2', 
+        'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 
+        'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 
+        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', #\\
+        'isscalar', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'max_value', 'maxval_xindex', 
+        'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex']
+
+    for i in range(16): #Photutils API returns 4x4 matrix
+        prop_list = prop_list + ['moments_'+str(i)]
+    for i in range(16):
+        prop_list = prop_list + ['moments_central_'+str(i)]
 
     data_dict = {}
 
@@ -574,11 +582,13 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
         if zp is None:
             data_dict['flux'] = flux
         else:
+            data_dict['flux'] = flux
             data_dict['mag'] = -2.5*np.log10(np.array(flux))+zp 
     if flux_err is not None:
         if zp is None:
             data_dict['flux_err'] = flux_err
         else:
+            data_dict['flux_err'] = flux_err
             data_dict['mag_err'] = (2.5/np.log(10))*(np.array(flux_err)/np.array(flux))
     
     if table is None:

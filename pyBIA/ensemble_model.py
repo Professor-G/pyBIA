@@ -145,11 +145,11 @@ class Classifier:
                         print('Unbalanced dataset detected, to apply weights set optimize=True.')
 
         if self.clf == 'rf':
-            model = RandomForestClassifier()
+            model = RandomForestClassifier(random_state=1909)
         elif self.clf == 'nn':
-            model = MLPClassifier()
+            model = MLPClassifier(random_state=1909)
         elif self.clf == 'xgb':
-            model = XGBClassifier()
+            model = XGBClassifier(random_state=1909)
             if all(isinstance(val, (int, str)) for val in self.data_y):
                 print('XGBoost classifier requires numerical class labels! Converting class labels as follows:')
                 print('________________________________')
@@ -180,9 +180,7 @@ class Classifier:
                 raise ValueError('Invalid imputation method, currently only k-NN and MissForest algorithms are supported.')
             
             if self.optimize is False:
-                if data.max() > 1e7 or data.min() < 1e-7:
-                    print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
-                    data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
+                data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
                 print("Returning base {} model...".format(self.clf))
                 model.fit(data, self.data_y)
                 self.model = model 
@@ -190,9 +188,7 @@ class Classifier:
                 
         else:
             data = self.data_x[:]
-            if data.max() > 1e7 or data.min() < 1e-7:
-                print('NOTE: Data values higher than 1e7 or lower than 1e-7 will be set to these limits.')
-                data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
+            data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
 
         self.feats_to_use, self.feature_history = borutashap_opt(data, self.data_y, boruta_trials=self.boruta_trials, model=self.boruta_model)
         if len(self.feats_to_use) == 0:
@@ -1041,8 +1037,8 @@ def evaluate_model(classifier, data_x, data_y, normalize=True, k_fold=10):
         The second output is the 1D array of the predicted class labels.
     """
 
-    k_fold = KFold(k_fold, shuffle=True)#, random_state=1)
-    #k_fold = StratifiedKFold(k_fold, shuffle=True, random_state=8)
+    #k_fold = KFold(k_fold, shuffle=True)#, random_state=1)
+    k_fold = StratifiedKFold(k_fold, shuffle=False)#, random_state=8)
 
     predicted_targets = np.array([])
     actual_targets = np.array([])

@@ -13,7 +13,7 @@ from pathlib import Path
 from warnings import warn
 import matplotlib.pyplot as plt
 import numpy as np
-np.random.seed(1000)
+np.random.seed(1909)
 
 import tensorflow as tf 
 from tensorflow.keras import backend as K

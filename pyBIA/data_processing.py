@@ -9,14 +9,13 @@ import copy
 import numpy as np
 from tensorflow.keras.utils import to_categorical
 
-def find_duplicate_features(features):
+def find_duplicate_features(features, tolerance=1e-9):
     """
     This function will check if there are any duplicate columns 
     within the array by comparing each column with the next columns. 
-
     Args:
         features (ndarray): 2D array of features, column-wise.
-
+        tolerance (float): tolerance level for comparison of values.
     Returns:
         A set of duplicate indices.
     """
@@ -29,16 +28,16 @@ def find_duplicate_features(features):
     # Get the number of columns
     num_cols = features_T.shape[0]
     for i in range(num_cols):
-        column = features_T[i]
+        column1 = features_T[i]
         for j in range(i+1, num_cols):
-            if np.array_equal(column, features_T[j]):
+            column2 = features_T[j]
+            if np.all(np.isclose(column1, column2, atol=tolerance)):
                 if i not in unique_indices:
                     unique_indices.add(i)
                     duplicate_indices.add(i)
                 if j not in unique_indices:
                     unique_indices.add(j)
                     duplicate_indices.add(j)
-
     return duplicate_indices
 
 def crop_image(data, x, y, size=50, invert=False):

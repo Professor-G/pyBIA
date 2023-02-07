@@ -471,7 +471,7 @@ def make_table(props, moments):
             for moment in moment_list:
                 morph_feats.append(float(moments[i][moment]))
         except:
-            for j in range(len(prop_list+moment_list)+1): #+1 because covariance eigenvalue param is actually 2 params
+            for j in range(len(prop_list+moment_list)+31): #+1 because covariance eigenvalue param is actually 2 params, and +30 for the 2 4x4 moment matrices 
                 morph_feats.append(-999)
             table.append(morph_feats)
             continue

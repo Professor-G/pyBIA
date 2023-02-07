@@ -146,7 +146,11 @@ def calculate_legendre_moments(image, order=3):
 	The order of the moments can be specified as an optional input parameter. The default is set to 3.
 	Each moment is represented by a monomial of x and y, where x and y are the spatial coordinates of the image.
 	The returned list of moments will be in the format of [1, x, y, x^2, xy, y^2, x^3, x^2y, xy^2, y^3] for order 3.
-
+	
+	Note:
+		The first Legendre moment is the sum of the pixels, and therefore
+		is equivalent to the zeroth central moment.
+		
 	Args:
 	    image (ndarray): A 2D array representing an image.
 	    order (int, optional): The order of the Legendre moments to calculate. Must be a non-negative integer.

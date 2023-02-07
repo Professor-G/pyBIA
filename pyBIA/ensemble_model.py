@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 #plt.rc('font', family='serif')
-#plt.style.use('/Users/daniel/Documents/plot_style.txt')
+plt.style.use('/Users/daniel/Documents/plot_style.txt')
 import matplotlib.colors as mcolors 
 from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
 from warnings import warn
@@ -717,6 +717,14 @@ class Classifier:
                 else:
                     best_value.append(value)
 
+        best_value, trial_values = np.array(best_value), np.array(trial_values)
+        best_value[1] = trial_values[1] #Make the first trial the best model, since technically it is.
+        for i in range(2, len(trial_values)):
+            if trial_values[i] < best_value[1]:
+                best_value[i] = best_value[1]
+            else:
+                break
+
         if baseline is not None:
             plt.axhline(y=baseline, color='k', linestyle='--', label='Baseline Model')
             ncol=3
@@ -735,6 +743,8 @@ class Classifier:
         plt.grid(False)
         if xlim is not None:
             plt.xlim(xlim)
+        else:
+            plt.xlim((1, len(trials)))
         if ylim is not None:
             plt.ylim(ylim)
         if xlog:
@@ -1039,8 +1049,8 @@ def evaluate_model(classifier, data_x, data_y, normalize=True, k_fold=10):
         The second output is the 1D array of the predicted class labels.
     """
 
-    #k_fold = KFold(k_fold, shuffle=True)#, random_state=1)
-    k_fold = StratifiedKFold(k_fold, shuffle=False)#, random_state=8)
+    k_fold = KFold(k_fold, shuffle=True)#, random_state=1)
+    #k_fold = StratifiedKFold(k_fold, shuffle=False)#, random_state=8)
 
     predicted_targets = np.array([])
     actual_targets = np.array([])

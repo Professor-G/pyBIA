@@ -74,17 +74,16 @@ class Classifier:
         Trained machine learning model.
 
     """
-    def __init__(self, blob_data=None, other_data=None, val_blob=None, val_other=None, cnn_model=1, img_num_channels=1, 
+    def __init__(self, blob_data=None, other_data=None, val_blob=None, val_other=None, img_num_channels=1, 
         optimize=True, n_iter=25, normalize=True, min_pixel=638, max_pixel=3000, epochs=100, train_epochs=25, 
-        patience=5, opt_model=True, opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=90, balance_val=True,
-        opt_max_min_pix=None, opt_max_max_pix=None, metric='loss'):
+        patience=5, opt_model=True, opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=90, 
+        balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss'):
 
         self.blob_data = blob_data
         self.other_data = other_data
         self.optimize = optimize 
         self.metric = metric 
         self.n_iter = n_iter
-        self.cnn_model = cnn_model
         self.img_num_channels = img_num_channels
         self.normalize = normalize 
         self.min_pixel = min_pixel
@@ -132,7 +131,7 @@ class Classifier:
             balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, 
             val_X=self.val_blob, val_Y=self.val_other, train_epochs=self.train_epochs, patience=self.patience, opt_model=self.opt_model, opt_aug=self.opt_aug, batch_min=self.batch_min, 
             batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val,
-            opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, pyBIA_model=self.pyBIA_model)
+            opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix)
 
         if self.epochs != 0:
             print("Fitting and returning final model...")
@@ -220,26 +219,26 @@ class Classifier:
                 val_class_1, val_class_2 = self.val_blob, self.val_other
 
             if self.opt_model:
-                if self.cnn_model == 'alexnet':
-                    self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
-                        min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, batch_size=self.best_params['batch_size'], 
-                        lr=self.best_params['lr'], momentum=self.best_params['momentum'], decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], 
-                        activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'], pooling_1=self.best_params['pooling_1'], 
-                        pooling_2=self.best_params['pooling_2'], pooling_3=self.best_params['pooling_3'], pool_size_1=self.best_params['pool_size_1'], 
-                        pool_stride_1=self.best_params['pool_stride_1'], pool_size_2=self.best_params['pool_size_2'], pool_stride_2=self.best_params['pool_stride_2'], 
-                        pool_size_3=self.best_params['pool_size_3'], pool_stride_3=self.best_params['pool_stride_3'], filter_1=self.best_params['filter_1'], 
-                        filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'], filter_2=self.best_params['filter_2'], 
-                        filter_size_2=self.best_params['filter_size_2'], strides_2=self.best_params['strides_2'], filter_3=self.best_params['filter_3'], 
-                        filter_size_3=self.best_params['filter_size_3'], strides_3=self.best_params['strides_3'], filter_4=self.best_params['filter_4'], 
-                        filter_size_4=self.best_params['filter_size_4'], strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], 
-                        filter_size_5=self.best_params['filter_size_5'], strides_5=self.best_params['strides_5'], dense_neurons_1=self.best_params['dense_neurons_1'], 
-                        dense_neurons_2=self.best_params['dense_neurons_2'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'])
-            
+                self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
+                    normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, 
+                    epochs=self.train_epochs, batch_size=self.best_params['batch_size'], lr=self.best_params['lr'], 
+                    momentum=self.best_params['momentum'], decay=self.best_params['decay'], nesterov=self.best_params['nesterov'], 
+                    loss=self.best_params['loss'], regularizer=self.best_params['regularizer'], activation_conv=self.best_params['activation_conv'], 
+                    activation_dense=self.best_params['activation_dense'], pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], 
+                    pooling_3=self.best_params['pooling_3'], pool_size_1=self.best_params['pool_size_1'], pool_stride_1=self.best_params['pool_stride_1'], 
+                    pool_size_2=self.best_params['pool_size_2'], pool_stride_2=self.best_params['pool_stride_2'], pool_size_3=self.best_params['pool_size_3'], 
+                    pool_stride_3=self.best_params['pool_stride_3'], filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], 
+                    strides_1=self.best_params['strides_1'], filter_2=self.best_params['filter_2'], filter_size_2=self.best_params['filter_size_2'], 
+                    strides_2=self.best_params['strides_2'], filter_3=self.best_params['filter_3'], filter_size_3=self.best_params['filter_size_3'], 
+                    strides_3=self.best_params['strides_3'], filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], 
+                    strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], 
+                    strides_5=self.best_params['strides_5'], dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], 
+                    dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'])
+        
             else: 
-                if self.cnn_model == 'alexnet':
-                    self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                        min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.epochs)
-           
+                self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                    min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.epochs)
+       
         return 
 
     def save(self, path=None, overwrite=False):

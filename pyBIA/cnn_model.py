@@ -81,12 +81,13 @@ class Classifier:
     def __init__(self, blob_data=None, other_data=None, val_blob=None, val_other=None, img_num_channels=1, 
         optimize=True, n_iter=25, normalize=True, min_pixel=638, max_pixel=3000, epochs=100, train_epochs=25, 
         patience=5, opt_model=True, opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=90, 
-        balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss'):
+        balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True):
 
         self.blob_data = blob_data
         self.other_data = other_data
         self.optimize = optimize 
         self.metric = metric 
+        self.average = average
         self.n_iter = n_iter
         self.img_num_channels = img_num_channels
         self.normalize = normalize 
@@ -128,8 +129,8 @@ class Classifier:
             
             return      
 
-        self.best_params, self.optimization_results = optimization.hyper_opt(self.blob_data, self.other_data, clf='cnn', metric=self.metric, n_iter=self.n_iter, 
-            balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, 
+        self.best_params, self.optimization_results = optimization.hyper_opt(self.blob_data, self.other_data, clf='cnn', metric=self.metric, average=self.average, 
+            n_iter=self.n_iter, balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, 
             val_X=self.val_blob, val_Y=self.val_other, train_epochs=self.train_epochs, patience=self.patience, opt_model=self.opt_model, opt_aug=self.opt_aug, 
             batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val,
             opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix)

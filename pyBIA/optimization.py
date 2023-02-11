@@ -86,7 +86,7 @@ class objective_cnn(object):
         max_pixel=100, val_blob=None, val_other=None, train_epochs=25, patience=20, 
         opt_model=True, opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, 
         image_size_max=100, balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, 
-        metric='loss'):
+        metric='loss', average=True):
 
         self.class1 = class1
         self.class2 = class2
@@ -108,6 +108,7 @@ class objective_cnn(object):
         self.opt_max_min_pix = opt_max_min_pix
         self.opt_max_max_pix = opt_max_max_pix
         self.metric = metric 
+        self.average = average
 
         if self.metric == 'val_loss' or self.metric == 'val_accuracy':
             if self.val_blob is None and self.val_other is None:
@@ -139,6 +140,8 @@ class objective_cnn(object):
             mode = 'min'
         elif self.metric == 'accuracy' or self.metric == 'val_accuracy':
             mode = 'max'
+        else:
+            raise ValueError('Invalid metric input! Options are: "loss", "val_loss", "accuracy", "val_accuracy".')
 
         if self.opt_aug:
             batch = trial.suggest_int('batch', self.batch_min, self.batch_max, step=5)
@@ -214,7 +217,7 @@ class objective_cnn(object):
             val_class_1, val_class_2 = self.val_blob, self.val_other
 
         if self.opt_max_min_pix is not None:
-            self.normalize=True #Just in case it's set to False by the user 
+            self.normalize = True #Just in case it's set to False by the user 
             min_pix, max_pix = 0.0, []
             if self.img_num_channels >= 1:
                 max_pix_1 = trial.suggest_int('max_pixel_1', self.opt_max_min_pix, self.opt_max_max_pix, step=5)
@@ -309,10 +312,17 @@ class objective_cnn(object):
                 min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
                 batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, checkpoint=False)
                      
-        final_score = history.history[self.metric][-1]
-
         if self.metric == 'loss' or self.metric == 'val_loss':
+            if self.average:
+                final_score = np.mean([history.history['loss'][-1], history.history['val_loss'][-1]])
+            else:
+                final_score = history.history[self.metric][-1]
             final_score = 1 - final_score
+        else:
+            if self.average:
+                final_score = np.mean([history.history['accuracy'][-1], history.history['val_accuracy'][-1]])
+            else:
+                final_score = history.history[self.metric][-1]
 
         return final_score
 
@@ -499,7 +509,7 @@ class objective_rf(object):
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, img_num_channels=1, 
     normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='loss', 
     limit_search=True, opt_model=True, opt_aug=False, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance_val=True,
-    opt_max_min_pix=None, opt_max_max_pix=None, opt_cv=10, test_size=None):
+    opt_max_min_pix=None, opt_max_max_pix=None, opt_cv=10, test_size=None, average=True):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy, unless a CNN
     is being optimized, in which case no cross-validation is performed during trial assesment.
@@ -726,8 +736,9 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
        
     else:
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
-            val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, opt_model=opt_model, opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, 
-            image_size_min=image_size_min, image_size_max=image_size_max, balance_val=balance_val, opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix)
+            val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, average=average, opt_model=opt_model, 
+            opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, image_size_min=image_size_min, image_size_max=image_size_max, balance_val=balance_val, 
+            opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix)
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True, gc_after_trial=True)#, n_jobs=1)
         params = study.best_trial.params
 

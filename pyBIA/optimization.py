@@ -71,6 +71,10 @@ class objective_cnn(object):
         If class2 does not contain 20000 samples, then all will be used.
 
         To use the entire class2 sample regardless of the number augmentations performed, set balance_val=False.
+    
+        The min_pixel and max_pixel value will be used to normalize the images if Normalize=True. The opt_max_min_pix
+        and opt_max_max_pix, when set, will be used instead during the optimization. If optimizing the normalization
+        scheme the default min_pixel will be set to zero, as such only the optimal max_pixel for every band will be output.
 
     Args:
         class1
@@ -80,12 +84,12 @@ class objective_cnn(object):
 
     def __init__(self, class1, class2, img_num_channels=1, normalize=True, min_pixel=0,
         max_pixel=100, val_blob=None, val_other=None, train_epochs=25, patience=20, 
-        opt_model=True, opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=100, 
-        balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss'):
+        opt_model=True, opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, 
+        image_size_max=100, balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, 
+        metric='loss'):
 
         self.class1 = class1
         self.class2 = class2
-        self.model = model 
         self.img_num_channels = img_num_channels
         self.normalize = normalize 
         self.min_pixel = min_pixel
@@ -210,9 +214,19 @@ class objective_cnn(object):
             val_class_1, val_class_2 = self.val_blob, self.val_other
 
         if self.opt_max_min_pix is not None:
-            min_pix = 0.0
-            max_pix = trial.suggest_int('max_pixel', self.opt_max_min_pix, self.opt_max_max_pix, step=5)
-            self.normalize=True
+            self.normalize=True #Just in case it's set to False by the user 
+            min_pix, max_pix = 0.0, []
+            if self.img_num_channels >= 1:
+                max_pix_1 = trial.suggest_int('max_pixel_1', self.opt_max_min_pix, self.opt_max_max_pix, step=5)
+                max_pix.append(max_pix_1)
+            if self.img_num_channels >= 2:
+                max_pix_2 = trial.suggest_int('max_pixel_2', self.opt_max_min_pix, self.opt_max_max_pix, step=5)
+                max_pix.append(max_pix_2)
+            if self.img_num_channels == 3:
+                max_pix_3 = trial.suggest_int('max_pixel_3', self.opt_max_min_pix, self.opt_max_max_pix, step=5)
+                max_pix.append(max_pix_3)
+            elif self.img_num_channels > 3:
+                raise ValueError('Only up to three channels are currently supported!')
         else:
             min_pix, max_pix = self.min_pixel, self.max_pixel
 
@@ -235,7 +249,7 @@ class objective_cnn(object):
             activation_conv = trial.suggest_categorical('activation_conv', ['relu',  'sigmoid', 'tanh'])            
             activation_dense = trial.suggest_categorical('activation_dense', ['relu', 'sigmoid', 'tanh'])
             regularizer = trial.suggest_categorical('regularizer', ['local_response', 'batch_norm'])
-            loss = trial.suggest_int('loss', ['binary_crossentropy', 'squared_hinge'])
+            loss = trial.suggest_categorical('loss', ['binary_crossentropy', 'squared_hinge'])
 
             ### Filter and layer hyperparameters ###
             filter_1 = trial.suggest_int('filter_1', 12, 408, step=12)

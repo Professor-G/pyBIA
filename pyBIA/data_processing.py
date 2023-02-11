@@ -13,6 +13,7 @@ def find_duplicate_features(features, tolerance=1e-9):
     """
     This function will check if there are any duplicate columns 
     within the array by comparing each column with the next columns. 
+
     Args:
         features (ndarray): 2D array of features, column-wise.
         tolerance (float): tolerance level for comparison of values.
@@ -58,7 +59,6 @@ def crop_image(data, x, y, size=50, invert=False):
         left of the image, for this reason we switched x and y when cropping out individual
         objects. The parameter invert=True performs the coordinate switch for us. This is only
         required because pyBIA's cropping function assumes standard convention.
-
 
     Args:
         data (array): 2D array.
@@ -121,15 +121,19 @@ def concat_channels(channel1, channel2, channel3=None):
     return np.concatenate(colorized, axis=-1)
 
 
-def normalize_pixels(channel, min_pixel=0, max_pixel=100):
+def normalize_pixels(channels, min_pixel, max_pixel, img_num_channels):
     """
-    This function will apply min-max normalization. 
+    This function will apply min-max normalization. It returns a 4-d array.
+    
+    Note:
+        min_pixel must be a single input, but the max_pixel can either be 
+        an int/float or a list. If it is an int/float then
 
-    NDWFS min 0.01% : 638.186
-
-    NDWFS max 99.99% : 7350.639
-
-    Max intensity of expected blobs : ~3000
+        Non-subtracted images in the NDWFS Bootes survey data (Bw):
+        NDWFS min 0.01% : 638.186
+        NDWFS max 99.99% : 7350.639
+        Max intensity of expected blobs : ~3000
+    
 
     Args:
         channel (array): 2D array for one image, 3D array for multiple images.
@@ -148,20 +152,58 @@ def normalize_pixels(channel, min_pixel=0, max_pixel=100):
         will result in more robust classification performance.
         
     """
-        
-    norm_channel = (channel - min_pixel) /  (max_pixel - min_pixel)
 
-    return norm_channel
+    if isinstance(max_pixel, int) and img_num_channels != 1:
+        raise ValueError('The max_pixel parameter should be a list containing the value for each band!')
+    if isinstance(max_pixel, int) is False and img_num_channels == 1:
+        if isinstance(max_pixel, list):
+            max_pixel = max_pixel[0]
+        else:
+            raise ValueError('If img_num_channels is 1 the max_pixel input must be an integer/float or list.')
 
-def process_class(channel, img_num_channels=1, label=None, normalize=True, min_pixel=638, max_pixel=3000):
+    images = copy.deepcopy(channels)
+
+    #The min pixel replaces NaN and below threshold values.
+    images[np.isfinite(images) == False] = min_pixel 
+    images[images < min_pixel] = min_pixel
+
+    if img_num_channels == 1:
+        images[images > max_pixel] = max_pixel
+        return (images - min_pixel) /  (max_pixel - min_pixel)
+
+    #Setting array dimensions for consistency#
+    if len(images.shape) == 4:
+        axis = images.shape[0]
+        if images.shape[-1] != img_num_channels:
+            raise ValueError('img_num_channels parameter must match the number of filters! Number of filters detected: '+str(channel.shape[-1]))
+        img_width, img_height = images[0].shape[1], images[0].shape[0]
+    elif len(images.shape) == 3:
+        if img_num_channels == 1:
+            axis, img_width, img_height = images.shape[0], images.shape[1],images.shape[2]
+        else:
+            axis, img_width, img_height = 1, images.shape[0], images.shape[1]
+    elif len(images.shape) == 2:
+        axis, img_width, img_height = 1, images.shape[1], images.shape[0]
+    else:
+        raise ValueError("Channel must either be 2D for a single sample, 3D for multiple samples or single sample with multiple filters, or 4D for multifilter images.")
+
+    images = images.reshape(axis, img_width, img_height, img_num_channels)
+
+    for i in range(img_num_channels):
+        images[:,:,:,i][images[:,:,:,i] > max_pixel[i]] = max_pixel[i]
+        images[:,:,:,i] = (images[:,:,:,i] - min_pixel) /  (max_pixel[i] - min_pixel)
+
+    return images 
+
+def process_class(channel, label=None, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000):
     """
     Takes image data and returns the reshaped data array, which is required when 
     entering data into the CNN classifier. Note that if using multiple bands, the filters
     must be processed individually, and concatenated afterwards.
     
     If label is set to either 0 or 1, then the reshaped data is
-    returned along with an array containing the label array, also reshaped. 
-    This is used for creating training or validations sets of appropriate shape.
+    returned along with an array containing the label array. 
+    This is used for generating training or validations sets of appropriate shape.
     
     Note:
         Image anomalies can be removed by setting normalize=True, as the 
@@ -182,50 +224,48 @@ def process_class(channel, img_num_channels=1, label=None, normalize=True, min_p
         Reshaped data and label arrays.
     """
 
-    images = copy.deepcopy(channel)
-    if normalize is True:
-        images[np.isnan(images) == True] = min_pixel 
-        images[images > max_pixel] = max_pixel
-        images[images < min_pixel] = min_pixel
-        images = normalize_pixels(images, min_pixel=min_pixel, max_pixel=max_pixel)
-
-    if len(images.shape) == 4:
-        axis = images.shape[0]
-        if images.shape[-1] != img_num_channels:
-            raise ValueError('img_num_channels parameter must match the number of filters! Number of filters detected: '+str(channel.shape[-1]))
-        img_width = images[0].shape[1]
-        img_height = images[0].shape[0]
-    elif len(images.shape) == 3:
-        if img_num_channels == 1 :
-            axis = images.shape[0]
-            img_width = images.shape[1]
-            img_height = images.shape[2]
-        else:
-            axis = 1
-            img_width = images.shape[0]
-            img_height = images.shape[1]
-    elif len(images.shape) == 2:
-        img_width = images.shape[1]
-        img_height = images.shape[0]
-        axis = 1
+    if normalize:
+        data = normalize_pixels(channel, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
     else:
-        raise ValueError("Channel must either be 2D for a single sample, 3D for multiple samples or single sample with multiple filters, or 4D for multifilter images.")
-
-    data = images.reshape(axis, img_width, img_height, img_num_channels)
+        images = copy.deepcopy(channel)
+        if len(images.shape) == 4:
+            axis = images.shape[0]
+            if images.shape[-1] != img_num_channels:
+                raise ValueError('img_num_channels parameter must match the number of filters! Number of filters detected: '+str(channel.shape[-1]))
+            img_width = images[0].shape[1]
+            img_height = images[0].shape[0]
+        elif len(images.shape) == 3:
+            if img_num_channels == 1 :
+                axis = images.shape[0]
+                img_width = images.shape[1]
+                img_height = images.shape[2]
+            else:
+                axis = 1
+                img_width = images.shape[0]
+                img_height = images.shape[1]
+        elif len(images.shape) == 2:
+            img_width = images.shape[1]
+            img_height = images.shape[0]
+            axis = 1
+        else:
+            raise ValueError("Channel must either be 2D for a single sample, 3D for multiple samples or single sample with multiple filters, or 4D for multifilter images.")
+        data = images.reshape(axis, img_width, img_height, img_num_channels)
+    
     if label is None:
         return data
 
     #reshape
-    label = np.expand_dims(np.array([label]*len(images)), axis=1)
+    label = np.expand_dims(np.array([label]*len(data)), axis=1)
     label = to_categorical(label, 2)
     
     return data, label
 
-
 def create_training_set(blob_data, other_data, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000):
     """
     Combines image data of known class to create a training set.
-    This is used for training the machine learning models. 
+    This is used for training the machine learning models. The 
+    max_pixel parameter can be a single value corresponding to a single channel
+    or to a list containing the value for each individual band.
 
     Note: 
         This function is for binary classification only, the manual procedure for multiclass
@@ -255,8 +295,8 @@ def create_training_set(blob_data, other_data, img_num_channels=1, normalize=Tru
         Reshaped data and label arrays.
     """
 
-    class1_data, class1_label = process_class(blob_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
-    class2_data, class2_label = process_class(other_data, label=1, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+    class1_data, class1_label = process_class(blob_data, label=1, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+    class2_data, class2_label = process_class(other_data, label=0, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
     
     training_data = np.r_[class1_data, class2_data]
     training_labels = np.r_[class1_label, class2_label]

@@ -6,16 +6,20 @@ Created on Thu Sep 16 22:40:39 2021
 @author: daniel
 """
 import os
+import tensorflow as tf
+os.environ['PYTHONHASHSEED'], os.environ["TF_DETERMINISTIC_OPS"] = '0', '1'
 os.environ['CUDA_VISIBLE_DEVICES'], os.environ['TF_CPP_MIN_LOG_LEVEL'] = '-1', '3'
-import pkg_resources
+
 import joblib
+import numpy as np
+import pkg_resources
 from pathlib import Path
 from warnings import warn
 import matplotlib.pyplot as plt
-import numpy as np
-np.random.seed(1909)
+import random as python_random
+##https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development##
+np.random.seed(1909), python_random.seed(1909), tf.random.set_seed(1909)
 
-import tensorflow as tf 
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.backend import clear_session 
@@ -118,19 +122,16 @@ class Classifier:
         """
 
         if self.optimize is False:
-            print("Returning base {}mmodel...".format(self.cnn_model))
-            if self.cnn_model == 'alexnet':
-                self.model, self.history = AlexNet(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, epochs=self.epochs)
-            else:
-                raise ValueError('Invalid input -- cnn_model parameter must be')
+            print("Returning base AlexNet model...")
+            self.model, self.history = AlexNet(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, epochs=self.epochs)
             
             return      
 
         self.best_params, self.optimization_results = optimization.hyper_opt(self.blob_data, self.other_data, clf='cnn', metric=self.metric, n_iter=self.n_iter, 
             balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, 
-            val_X=self.val_blob, val_Y=self.val_other, train_epochs=self.train_epochs, patience=self.patience, opt_model=self.opt_model, opt_aug=self.opt_aug, batch_min=self.batch_min, 
-            batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val,
+            val_X=self.val_blob, val_Y=self.val_other, train_epochs=self.train_epochs, patience=self.patience, opt_model=self.opt_model, opt_aug=self.opt_aug, 
+            batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val,
             opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix)
 
         if self.epochs != 0:
@@ -138,8 +139,14 @@ class Classifier:
             clear_session()
 
             if self.opt_max_min_pix is not None:
-                min_pix, max_pix = 0.0, self.best_params['max_pixel']
-                self.normalize=True
+                self.normalize=True #In case it's mistakenly set to False by user
+                min_pix, max_pix = 0.0, []
+                if self.img_num_channels >= 1:
+                    max_pix.append(self.best_params['max_pixel_1'])
+                if self.img_num_channels >= 2:
+                    max_pix.append(self.best_params['max_pixel_2'])
+                if self.img_num_channels == 3:
+                    max_pix.append(self.best_params['max_pixel_3'])
             else:
                 min_pix, max_pix = self.min_pixel, self.max_pixel
 
@@ -175,41 +182,41 @@ class Classifier:
                     class_2 = self.other_data   
 
                 if self.img_num_channels == 1:
-                    class_2 = resize(class_2, size=image_size)
+                    class_2 = resize(class_2, size=self.best_params['image_size'])
                 else:
-                    channel1 = resize(class_2[:,:,:,0], size=image_size)
-                    channel2 = resize(class_2[:,:,:,1], size=image_size)
+                    channel1 = resize(class_2[:,:,:,0], size=self.best_params['image_size'])
+                    channel2 = resize(class_2[:,:,:,1], size=self.best_params['image_size'])
                     if self.img_num_channels == 2:
                         class_2 = concat_channels(channel1, channel2)
                     else:
-                        channel3 = resize(class_2[:,:,:,2], size=image_size)
+                        channel3 = resize(class_2[:,:,:,2], size=self.best_params['image_size'])
                         class_2 = concat_channels(channel1, channel2, channel3)
 
                 #Need to also crop the validation images
                 if self.val_blob is not None:
                     if self.img_num_channels == 1:
-                        val_class_1 = resize(self.val_blob, size=image_size)
+                        val_class_1 = resize(self.val_blob, size=self.best_params['image_size'])
                     else:
-                        val_channel1 = resize(self.val_blob[:,:,:,0], size=image_size)
-                        val_channel2 = resize(self.val_blob[:,:,:,1], size=image_size)
+                        val_channel1 = resize(self.val_blob[:,:,:,0], size=self.best_params['image_size'])
+                        val_channel2 = resize(self.val_blob[:,:,:,1], size=self.best_params['image_size'])
                         if self.img_num_channels == 2:
                             val_class_1 = concat_channels(val_channel1, val_channel2)
                         else:
-                            val_channel3 = resize(self.val_blob[:,:,:,2], size=image_size)
+                            val_channel3 = resize(self.val_blob[:,:,:,2], size=self.best_params['image_size'])
                             val_class_1 = concat_channels(val_channel1, val_channel2, val_channel3)
                 else:
                     val_class_1 = None 
 
                 if self.val_other is not None:
                     if self.img_num_channels == 1:
-                        val_class_2 = resize(self.val_other, size=image_size)
+                        val_class_2 = resize(self.val_other, size=self.best_params['image_size'])
                     elif self.img_num_channels > 1:
-                        val_channel1 = resize(self.val_other[:,:,:,0], size=image_size)
-                        val_channel2 = resize(self.val_other[:,:,:,1], size=image_size)
+                        val_channel1 = resize(self.val_other[:,:,:,0], size=self.best_params['image_size'])
+                        val_channel2 = resize(self.val_other[:,:,:,1], size=self.best_params['image_size'])
                         if self.img_num_channels == 2:
                             val_class_2 = concat_channels(val_channel1, val_channel2)
                         else:
-                            val_channel3 = resize(self.val_other[:,:,:,2], size=image_size)
+                            val_channel3 = resize(self.val_other[:,:,:,2], size=self.best_params['image_size'])
                             val_class_2 = concat_channels(val_channel1, val_channel2, val_channel3)
                 else:
                     val_class_2 = None 
@@ -534,17 +541,17 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
         if batch_size < 16:
             warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.", stacklevel=2)
         if val_blob is not None:
-            val_X1, val_Y1 = process_class(val_blob, label=0, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+            val_X1, val_Y1 = process_class(val_blob, label=1, img_num_channels=img_num_channels, min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
             if val_other is None:
                 val_X, val_Y = val_X1, val_Y1
             else:
-                val_X2, val_Y2 = process_class(val_other, label=1, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+                val_X2, val_Y2 = process_class(val_other, label=0, img_num_channels=img_num_channels, min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
                 val_X, val_Y = np.r_[val_X1, val_X2], np.r_[val_Y1, val_Y2]
         else:
             if val_other is None:
                 val_X, val_Y = None, None
             else:
-                val_X2, val_Y2 = process_class(val_other, label=1, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+                val_X2, val_Y2 = process_class(val_other, label=0, img_num_channels=img_num_channels, min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
                 val_X, val_Y = val_X2, val_Y2
 
         img_width = blob_data[0].shape[0]
@@ -584,7 +591,7 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
         elif pooling_1 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding)) 
         if regularizer == 'local_response':
-            model.add(Lambda(tf.nn.local_response_normalization(depth_radius=5, bias=2, alpha=1e-4, beta=0.75)))
+            model.add(Lambda(lambda x: tf.nn.local_response_normalization(x, depth_radius=5, bias=2, alpha=1e-4, beta=0.75)))
         elif regularizer == 'batch_norm':
             model.add(BatchNormalization())
 
@@ -595,7 +602,7 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
         elif pooling_2 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))            
         if regularizer == 'local_response':
-            model.add(Lambda(tf.nn.local_response_normalization(depth_radius=5, bias=2, alpha=1e-4, beta=0.75)))
+            model.add(Lambda(lambda x: tf.nn.local_response_normalization(x, depth_radius=5, bias=2, alpha=1e-4, beta=0.75)))
         elif regularizer == 'batch_norm':
             model.add(BatchNormalization())
 

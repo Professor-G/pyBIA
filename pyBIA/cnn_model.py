@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import random as python_random
 ##https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development##
 np.random.seed(1909), python_random.seed(1909), tf.random.set_seed(1909)
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -162,8 +163,7 @@ class Classifier:
                     raise ValueError('Only three filters are supported!')
 
                 augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.best_params['batch'], 
-                    width_shift=self.best_params['shift'], height_shift=self.best_params['shift'], horizontal=self.best_params['horizontal'], 
-                    vertical=self.best_params['vertical'], rotation=self.best_params['rotation'], image_size=self.best_params['image_size'])
+                    width_shift=10, height_shift=10, horizontal=True, vertical=True, rotation=True, image_size=self.best_params['image_size'])
 
                 if self.img_num_channels > 1:
                     class_1=[]
@@ -287,11 +287,13 @@ class Classifier:
         
         path += 'pyBIA_cnn_model/'
         if self.model is not None:      
-            np.savetxt(path+'model_acc', self.history.history['accuracy'])
+            np.savetxt(path+'model_acc', self.history.history['binary_accuracy'])
             np.savetxt(path+'model_loss', self.history.history['loss'])
+            np.savetxt(path+'model_f1', self.history.history['f1_score'])
             if self.val_blob is not None:
-                np.savetxt(path+'model_val_acc', self.history.history['val_accuracy'])
+                np.savetxt(path+'model_val_acc', self.history.history['val_binary_accuracy'])
                 np.savetxt(path+'model_val_loss', self.history.history['val_loss'])
+                np.savetxt(path+'model_val_f1', self.history.history['val_f1_score'])
 
             save_model(self.model, path+'Keras_Model.h5')
 
@@ -461,9 +463,6 @@ class Classifier:
     #   print('Note: Input data when using this model must be 50x50.')
     #   return 
 
-
-
-
 def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True, 
         min_pixel=0, max_pixel=100, val_blob=None, val_other=None, epochs=100, 
         batch_size=32, lr=0.0001, momentum=0.9, decay=0.0, nesterov=False, 
@@ -539,8 +538,9 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
         
         if len(blob_data.shape) != len(other_data.shape):
             raise ValueError("Shape of blob and other data must be the same.")
-        if batch_size < 16:
+        if batch_size < 16 and regularizer == 'batch_norm':
             warn("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.", stacklevel=2)
+        
         if val_blob is not None:
             val_X1, val_Y1 = process_class(val_blob, label=1, img_num_channels=img_num_channels, min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
             if val_other is None:
@@ -644,7 +644,7 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
             model.add(BatchNormalization())
 
         optimizer = SGD(learning_rate=lr, momentum=momentum, decay=decay, nesterov=nesterov)
-        model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
+        model.compile(loss=loss, optimizer=optimizer, metrics=[tf.keras.metrics.BinaryAccuracy(), f1_score])
         
         path = str(Path.home())+'/'
         callbacks_list = []
@@ -662,390 +662,27 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
         return model, history
 
 
-
-"""
-Implementation of Inception Network v4 [Inception Network v4 Paper](http://arxiv.org/pdf/1602.07261v1.pdf) in Keras.
-"""
-
-def Inception_v4(nb_classes=1001, load_weights=True):
-    '''
-    Creates a inception v4 network
-    :param nb_classes: number of classes.txt
-    :return: Keras Model with 1 input and 1 output
-    '''
-
-    init = Input((299, 299, 3))
-
-    # Input Shape is 299 x 299 x 3 (tf) or 3 x 299 x 299 (th)
-    x = inception_stem(init)
-
-    # 4 x Inception A
-    for i in range(4):
-        x = inception_A(x)
-
-    # Reduction A
-    x = reduction_A(x)
-
-    # 7 x Inception B
-    for i in range(7):
-        x = inception_B(x)
-
-    # Reduction B
-    x = reduction_B(x)
-
-    # 3 x Inception C
-    for i in range(3):
-        x = inception_C(x)
-
-    # Average Pooling
-    x = AveragePooling2D((8, 8))(x)
-
-    # Dropout
-    x = Dropout(0.2)(x)
-    x = Flatten()(x)
-
-    ## Output
-    out = Dense(units=nb_classes, activation='softmax')(x)
-
-    model = Model(init, out, name='Inception-v4')
-
-    return model
-
-
-
-def conv_block(x, nb_filter, kernel_size, padding='same', strides=(1, 1), use_bias=False):
-    x = Conv2D(nb_filter, kernel_size, strides=strides, padding=padding, use_bias=use_bias)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    return x
-
-
-def inception_stem(input):
-
-    # Input Shape is 299 x 299 x 3 (th) or 3 x 299 x 299 (th)
-    x = conv_block(input, 32, (3, 3), strides=(2, 2), padding='valid')
-    x = conv_block(x, 32, (3, 3), padding='valid')
-    x = conv_block(x, 64, (3, 3))
-
-    x1 = MaxPool2D((3, 3), strides=(2, 2), padding='valid')(x)
-    x2 = conv_block(x, 96, (3, 3), strides=(2, 2), padding='valid')
-
-    x = concatenate([x1, x2])
-
-    x1 = conv_block(x, 64, (1, 1))
-    x1 = conv_block(x1, 96, (3, 3), padding='valid')
-
-    x2 = conv_block(x, 64, (1, 1))
-    x2 = conv_block(x2, 64, (1, 7))
-    x2 = conv_block(x2, 64, (7, 1))
-    x2 = conv_block(x2, 96, (3, 3), padding='valid')
-
-    x = concatenate([x1, x2])
-
-    x1 = conv_block(x, 192, (3, 3), strides=(2, 2), padding='valid')
-    x2 = MaxPool2D((3, 3), strides=(2, 2), padding='valid')(x)
-
-    x = concatenate([x1, x2])
-    return x
-
-def inception_block(block=1):
+# Define the custom F1-score metrics for validation data
+def f1_score(y_true, y_pred):
     """
-    Returns the inception modules 
+    Computes the F1 score between true and predicted labels.
 
     Args:
-        block (int): Integer indicating the block number.
-            There are three inception block 
+        y_true (tensor): The true labels.
+        y_pred (tensor): The predicted labels.
+
+    Returns:
+        The F1 score between true and predicted labels.
     """
 
-    if block == 1:
-        a1 = conv_block(input, 96, (1, 1))
-        a2 = conv_block(input, 64, (1, 1))
-
-        a2 = conv_block(a2, 96, (3, 3))
-
-        a3 = conv_block(input, 64, (1, 1))
-
-        a3 = conv_block(a3, 96, (3, 3))
-        a3 = conv_block(a3, 96, (3, 3))
-
-        a4 = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(input)
-        a4 = conv_block(a4, 96, (1, 1))
-
-        m = concatenate([a1, a2, a3, a4])
-
-    elif block == 2:
-        b1 = conv_block(input, 384, (1, 1))
-        b2 = conv_block(input, 192, (1, 1))
-
-        b2 = conv_block(b2, 224, (1, 7))
-        b2 = conv_block(b2, 256, (7, 1))
-
-        b3 = conv_block(input, 192, (1, 1))
-
-        b3 = conv_block(b3, 192, (7, 1))
-        b3 = conv_block(b3, 224, (1, 7))
-        b3 = conv_block(b3, 224, (7, 1))
-        b3 = conv_block(b3, 256, (1, 7))
-
-        b4 = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(input)
-        b4 = conv_block(b4, 128, (1, 1))
-
-        m = concatenate([b1, b2, b3, b4])
-
-    elif block == 3:
-        c1 = conv_block(input, 256, (1, 1))
-        c2 = conv_block(input, 384, (1, 1))
-
-        c2_1 = conv_block(c2, 256, (1, 3))
-        c2_2 = conv_block(c2, 256, (3, 1))
-
-        c2 = concatenate([c2_1, c2_2])
-
-        c3 = conv_block(input, 384, (1, 1))
-
-        c3 = conv_block(c3, 448, (3, 1))
-        c3 = conv_block(c3, 512, (1, 3))
-
-        c3_1 = conv_block(c3, 256, (1, 3))
-        c3_2 = conv_block(c3, 256, (3, 1))
-        c3 = concatenate([c3_1, c3_2])
-
-        c4 = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(input)
+    tp = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_true * y_pred, 0, 1)))
+    fp = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_pred - y_true, 0, 1)))
+    fn = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_true - y_pred, 0, 1)))
+    precision = tp / (tp + fp + tf.keras.backend.epsilon())
+    recall = tp / (tp + fn + tf.keras.backend.epsilon())
+    f1_score = 2.0 * precision * recall / (precision + recall + tf.keras.backend.epsilon())
     
-        c4 = conv_block(c4, 256, (1, 1))
-
-        m = concatenate([c1, c2, c3, c4])
-
-    return m
-
-
-def inception_A(input):
-
-    a1 = conv_block(input, 96, (1, 1))
-    a2 = conv_block(input, 64, (1, 1))
-
-    a2 = conv_block(a2, 96, (3, 3))
-
-    a3 = conv_block(input, 64, (1, 1))
-
-    a3 = conv_block(a3, 96, (3, 3))
-    a3 = conv_block(a3, 96, (3, 3))
-
-    a4 = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(input)
-    a4 = conv_block(a4, 96, (1, 1))
-
-    m = concatenate([a1, a2, a3, a4])
-    return m
-
-
-def inception_B(input):
-    b1 = conv_block(input, 384, (1, 1))
-    b2 = conv_block(input, 192, (1, 1))
-
-    b2 = conv_block(b2, 224, (1, 7))
-    b2 = conv_block(b2, 256, (7, 1))
-
-    b3 = conv_block(input, 192, (1, 1))
-
-    b3 = conv_block(b3, 192, (7, 1))
-    b3 = conv_block(b3, 224, (1, 7))
-    b3 = conv_block(b3, 224, (7, 1))
-    b3 = conv_block(b3, 256, (1, 7))
-
-    b4 = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(input)
-    b4 = conv_block(b4, 128, (1, 1))
-
-    m = concatenate([b1, b2, b3, b4])
-
-    return m
-
-
-def inception_C(input):
-    c1 = conv_block(input, 256, (1, 1))
-    c2 = conv_block(input, 384, (1, 1))
-
-    c2_1 = conv_block(c2, 256, (1, 3))
-    c2_2 = conv_block(c2, 256, (3, 1))
-
-    c2 = concatenate([c2_1, c2_2])
-
-    c3 = conv_block(input, 384, (1, 1))
-
-    c3 = conv_block(c3, 448, (3, 1))
-    c3 = conv_block(c3, 512, (1, 3))
-
-    c3_1 = conv_block(c3, 256, (1, 3))
-    c3_2 = conv_block(c3, 256, (3, 1))
-    c3 = concatenate([c3_1, c3_2])
-
-    c4 = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(input)
-    
-    c4 = conv_block(c4, 256, (1, 1))
-
-    m = concatenate([c1, c2, c3, c4])
-
-    return m
-
-
-def reduction_A(input):
-    r1 = conv_block(input, 384, (3, 3), strides=(2, 2), padding='valid')
-    r2 = conv_block(input, 192, (1, 1))
-
-    r2 = conv_block(r2, 224, (3, 3))
-    r2 = conv_block(r2, 256, (3, 3), strides=(2, 2), padding='valid')
-
-    r3 = MaxPool2D((3, 3), strides=(2, 2), padding='valid')(input)
-
-    m = concatenate([r1, r2, r3])
-
-    return m
-
-
-def reduction_B(input):
-
-    r1 = conv_block(input, 192, (1, 1))
-
-    r1 = conv_block(r1, 192, (3, 3), strides=(2, 2), padding='valid')
-
-    r2 = conv_block(input, 256, (1, 1))
-
-    r2 = conv_block(r2, 256, (1, 7))
-    r2 = conv_block(r2, 320, (7, 1))
-    r2 = conv_block(r2, 320, (3, 3), strides=(2, 2), padding='valid')
-
-    r3 = MaxPool2D((3, 3), strides=(2, 2), padding='valid')(input)
-
-    m = concatenate([r1, r2, r3])
-
-    return m
-
-
-
-
-##########################
-
-def Inception_v1():
-    """
-    “The Inception deep convolutional architecture was introduced as GoogLeNet in (Szegedy et al. 2015a), 
-    here named Inception-v1. Later the Inception architecture was refined in various ways, first by the 
-    introduction of batch normalization (Ioffe and Szegedy 2015) (Inception-v2). Later by additional factorization 
-    ideas in the third iteration (Szegedy et al. 2015b) which will be referred to as Inception-v3 in this report.”
-    """
-    # input layer 
-    input_layer = Input(shape = (224, 224, 3))
-
-    # convolutional layer: filters = 64, kernel_size = (7,7), strides = 2
-    X = Conv2D(filters = 64, kernel_size = (7,7), strides = 2, padding = 'valid', activation = 'relu')(input_layer)
-
-    # max-pooling layer: pool_size = (3,3), strides = 2
-    X = MaxPool2D(pool_size = (3,3), strides = 2)(X)
-
-    # convolutional layer: filters = 64, strides = 1
-    X = Conv2D(filters = 64, kernel_size = (1,1), strides = 1, padding = 'same', activation = 'relu')(X)
-
-    # convolutional layer: filters = 192, kernel_size = (3,3)
-    X = Conv2D(filters = 192, kernel_size = (3,3), padding = 'same', activation = 'relu')(X)
-
-    # max-pooling layer: pool_size = (3,3), strides = 2
-    X = MaxPool2D(pool_size= (3,3), strides = 2)(X)
-
-    # 1st Inception block
-    X = Inception_block(X, f1 = 64, f2_conv1 = 96, f2_conv3 = 128, f3_conv1 = 16, f3_conv5 = 32, f4 = 32)
-
-    # 2nd Inception block
-    X = Inception_block(X, f1 = 128, f2_conv1 = 128, f2_conv3 = 192, f3_conv1 = 32, f3_conv5 = 96, f4 = 64)
-
-    # max-pooling layer: pool_size = (3,3), strides = 2
-    X = MaxPool2D(pool_size= (3,3), strides = 2)(X)
-
-    # 3rd Inception block
-    X = Inception_block(X, f1 = 192, f2_conv1 = 96, f2_conv3 = 208, f3_conv1 = 16, f3_conv5 = 48, f4 = 64)
-
-    # Extra network 1:
-    X1 = AveragePooling2D(pool_size = (5,5), strides = 3)(X)
-    X1 = Conv2D(filters = 128, kernel_size = (1,1), padding = 'same', activation = 'relu')(X1)
-    X1 = Flatten()(X1)
-    X1 = Dense(1024, activation = 'relu')(X1)
-    X1 = Dropout(0.7)(X1)
-    X1 = Dense(5, activation = 'softmax')(X1)
-
-  
-    # 4th Inception block
-    X = Inception_block(X, f1 = 160, f2_conv1 = 112, f2_conv3 = 224, f3_conv1 = 24, f3_conv5 = 64, f4 = 64)
-
-    # 5th Inception block
-    X = Inception_block(X, f1 = 128, f2_conv1 = 128, f2_conv3 = 256, f3_conv1 = 24, f3_conv5 = 64, f4 = 64)
-
-    # 6th Inception block
-    X = Inception_block(X, f1 = 112, f2_conv1 = 144, f2_conv3 = 288, f3_conv1 = 32, f3_conv5 = 64, f4 = 64)
-
-    # Extra network 2:
-    X2 = AveragePooling2D(pool_size = (5,5), strides = 3)(X)
-    X2 = Conv2D(filters = 128, kernel_size = (1,1), padding = 'same', activation = 'relu')(X2)
-    X2 = Flatten()(X2)
-    X2 = Dense(1024, activation = 'relu')(X2)
-    X2 = Dropout(0.7)(X2)
-    X2 = Dense(1000, activation = 'softmax')(X2)
-  
-  
-    # 7th Inception block
-    X = Inception_block(X, f1 = 256, f2_conv1 = 160, f2_conv3 = 320, f3_conv1 = 32, 
-                      f3_conv5 = 128, f4 = 128)
-
-    # max-pooling layer: pool_size = (3,3), strides = 2
-    X = MaxPool2D(pool_size = (3,3), strides = 2)(X)
-
-    # 8th Inception block
-    X = Inception_block(X, f1 = 256, f2_conv1 = 160, f2_conv3 = 320, f3_conv1 = 32, f3_conv5 = 128, f4 = 128)
-
-    # 9th Inception block
-    X = Inception_block(X, f1 = 384, f2_conv1 = 192, f2_conv3 = 384, f3_conv1 = 48, f3_conv5 = 128, f4 = 128)
-
-    # Global Average pooling layer 
-    X = GlobalAveragePooling2D(name = 'GAPL')(X)
-
-    # Dropoutlayer 
-    X = Dropout(0.4)(X)
-
-    # output layer 
-    X = Dense(1000, activation = 'softmax')(X)
-  
-    # model
-    model = Model(input_layer, [X, X1, X2], name = 'GoogLeNet')
-
-    return model
-     
-
-
-def Inception_block(input_layer, f1, f2_conv1, f2_conv3, f3_conv1, f3_conv5, f4): 
-    """
-    
-
-    Args: 
-        f1: number of filters of the 1x1 convolutional layer in the first path
-        f2_conv1, f2_conv3 are number of filters corresponding to the 1x1 and 3x3 convolutional layers in the second path
-        f3_conv1, f3_conv5 are the number of filters corresponding to the 1x1 and 5x5  convolutional layer in the third path
-        f4: number of filters of the 1x1 convolutional layer in the fourth path
-
-    """
-    # 1st path:
-    path1 = Conv2D(filters=f1, kernel_size = (1,1), padding = 'same', activation = 'relu')(input_layer)
-
-    # 2nd path
-    path2 = Conv2D(filters = f2_conv1, kernel_size = (1,1), padding = 'same', activation = 'relu')(input_layer)
-    path2 = Conv2D(filters = f2_conv3, kernel_size = (3,3), padding = 'same', activation = 'relu')(path2)
-
-    # 3rd path
-    path3 = Conv2D(filters = f3_conv1, kernel_size = (1,1), padding = 'same', activation = 'relu')(input_layer)
-    path3 = Conv2D(filters = f3_conv5, kernel_size = (5,5), padding = 'same', activation = 'relu')(path3)
-
-    # 4th path
-    path4 = MaxPool2D((3,3), strides= (1,1), padding = 'same')(input_layer)
-    path4 = Conv2D(filters = f4, kernel_size = (1,1), padding = 'same', activation = 'relu')(path4)
-
-    output_layer = concatenate([path1, path2, path3, path4], axis = -1)
-
-    return output_layer
+    return f1_score
 
 
 

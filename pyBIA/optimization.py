@@ -30,7 +30,8 @@ from skopt import BayesSearchCV, plots, gp_minimize
 from skopt.plots import plot_convergence, plot_objective
 from skopt.space import Real, Integer, Categorical 
 from tensorflow.keras.backend import clear_session 
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, Callback
+
 from boruta import BorutaPy
 from BorutaShap import BorutaShap
 from xgboost import XGBClassifier, DMatrix, train
@@ -110,9 +111,15 @@ class objective_cnn(object):
         self.metric = metric 
         self.average = average
 
-        if self.metric == 'val_loss' or self.metric == 'val_accuracy':
+        #if self.val_blob is None and self.val_other is None and self.average:
+        #   print('Cannot average metrics without validation data, setting average=False.')
+        #   self.average = False 
+        if 'all' not in self.metric and 'loss' not in self.metric and 'f1_score' not in self.metric and 'binary_accuracy' not in self.metric:
+            raise ValueError("Invalid metric input, options are: 'loss', 'binary_accuracy', 'f1_score', or 'all', and the validation equivalents (add val_ at the beginning).")
+        
+        if self.metric == 'val_loss' or self.metric == 'val_binary_accuracy':
             if self.val_blob is None and self.val_other is None:
-                raise ValueError('No validation data input, change the metric to either "loss" or "accuracy".')
+                raise ValueError('No validation data input, change the metric to either "loss" or "binary_accuracy".')
 
         if self.opt_max_min_pix is not None:
             if self.opt_max_max_pix is None:
@@ -136,21 +143,17 @@ class objective_cnn(object):
 
         clear_session()
 
-        if self.metric == 'loss' or self.metric == 'val_loss':
+        if 'loss' in self.metric:
             mode = 'min'
-        elif self.metric == 'accuracy' or self.metric == 'val_accuracy':
-            mode = 'max'
         else:
-            raise ValueError('Invalid metric input! Options are: "loss", "val_loss", "accuracy", "val_accuracy".')
+            mode = 'max'
 
         if self.opt_aug:
-            batch = trial.suggest_int('batch', self.batch_min, self.batch_max, step=5)
+            batch = trial.suggest_int('batch', self.batch_min, self.batch_max, step=1)
             image_size = trial.suggest_int('image_size', self.image_size_min, self.image_size_max, step=1)
-            shift = trial.suggest_int('shift', 0, 25)
-            horizontal = trial.suggest_categorical('horizontal', [True, False])
-            vertical = trial.suggest_categorical('vertical', [True, False])
-            rotation = trial.suggest_categorical('rotation', [True, False])
-
+            shift = 10 #trial.suggest_int('shift', 0, 10)
+            horizontal = vertical = rotation = True #trial.suggest_categorical('horizontal', [True, False])
+      
             augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=batch, 
                 width_shift=shift, height_shift=shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
                 image_size=image_size)
@@ -234,7 +237,11 @@ class objective_cnn(object):
             min_pix, max_pix = self.min_pixel, self.max_pixel
 
         if self.patience != 0:
-            callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience), TFKerasPruningCallback(trial, monitor=self.metric),]
+            if self.metric == 'all' or self.metric == 'val_all':
+                print('Cannot use callbacks if averaging out all performance metrics for evaluation, setting patience=0.')
+                callbacks = None
+            else:
+                callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience), TFKerasPruningCallback(trial, monitor=self.metric),]
         else:
             callbacks = None
 
@@ -256,33 +263,33 @@ class objective_cnn(object):
 
             ### Filter and layer hyperparameters ###
             filter_1 = trial.suggest_int('filter_1', 12, 408, step=12)
-            filter_size_1 = trial.suggest_int('filter_size_1', 1, 11, step=2)
-            strides_1 = trial.suggest_int('strides_1', 1, 15)
+            filter_size_1 = trial.suggest_int('filter_size_1', 1, 7, step=2)
+            strides_1 = trial.suggest_int('strides_1', 1, 3)
             pooling_1 = trial.suggest_categorical('pooling_1', ['max', 'average'])
-            pool_size_1 = trial.suggest_int('pool_size_1', 2, 25)
-            pool_stride_1 = trial.suggest_int('pool_stride_1', 1, 15)
+            pool_size_1 = trial.suggest_int('pool_size_1', 2, 7)
+            pool_stride_1 = trial.suggest_int('pool_stride_1', 1, 3)
 
             filter_2 = trial.suggest_int('filter_2', 12, 408, step=12)
-            filter_size_2 = trial.suggest_int('filter_size_2', 1, 11, step=2)
-            strides_2 = trial.suggest_int('strides_2', 1, 15)
+            filter_size_2 = trial.suggest_int('filter_size_2', 1, 7, step=2)
+            strides_2 = trial.suggest_int('strides_2', 1, 3)
             pooling_2 = trial.suggest_categorical('pooling_2', ['max', 'average'])
-            pool_size_2 = trial.suggest_int('pool_size_2', 2, 25)
-            pool_stride_2 = trial.suggest_int('pool_stride_2', 1, 15)
+            pool_size_2 = trial.suggest_int('pool_size_2', 2, 7)
+            pool_stride_2 = trial.suggest_int('pool_stride_2', 1, 3)
 
             filter_3 = trial.suggest_int('filter_3', 12, 408, step=12)
-            filter_size_3 = trial.suggest_int('filter_size_3', 1, 11, step=2)
-            strides_3 = trial.suggest_int('strides_3', 1, 15)
+            filter_size_3 = trial.suggest_int('filter_size_3', 1, 7, step=2)
+            strides_3 = trial.suggest_int('strides_3', 1, 3)
             pooling_3 = trial.suggest_categorical('pooling_3', ['max', 'average'])
-            pool_size_3 = trial.suggest_int('pool_size_3', 2, 25)
-            pool_stride_3 = trial.suggest_int('pool_stride_3', 1, 15)
+            pool_size_3 = trial.suggest_int('pool_size_3', 2, 7)
+            pool_stride_3 = trial.suggest_int('pool_stride_3', 1, 3)
 
             filter_4 = trial.suggest_int('filter_4', 12, 408, step=12)
-            filter_size_4 = trial.suggest_int('filter_size_4', 1, 11, step=2)
-            strides_4 = trial.suggest_int('strides_4', 1, 15)
+            filter_size_4 = trial.suggest_int('filter_size_4', 1, 7, step=2)
+            strides_4 = trial.suggest_int('strides_4', 1, 3)
 
             filter_5 = trial.suggest_int('filter_5', 12, 408, step=12)
-            filter_size_5 = trial.suggest_int('filter_size_5', 1, 11, step=2)
-            strides_5 = trial.suggest_int('strides_5', 1, 15) 
+            filter_size_5 = trial.suggest_int('filter_size_5', 1, 7, step=2)
+            strides_5 = trial.suggest_int('strides_5', 1, 3) 
 
             ### Dense Layers ###
             dense_neurons_1 = trial.suggest_int('dense_neurons_1', 128, 6400, step=128)
@@ -290,39 +297,51 @@ class objective_cnn(object):
             dropout_1 = trial.suggest_float('dropout_1', 0, 0.5, step=0.05)
             dropout_2 = trial.suggest_float('dropout_2', 0, 0.5, step=0.05) 
 
-            try:
-                model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
-                    normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, 
-                    epochs=self.train_epochs, batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
-                    loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, regularizer=regularizer, 
-                    pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pool_size_1=pool_size_1, 
-                    pool_stride_1=pool_stride_1, pool_size_2=pool_size_2, pool_stride_2=pool_stride_2, 
-                    pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, 
-                    strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, 
-                    filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, filter_4=filter_4, 
-                    filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, 
-                    strides_5=strides_5, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, 
-                    dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False)    
-            except:
-                print("Invalid hyperparameter combination, skipping trial.")
-                return 0.0
-
+            #try:
+            model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
+                normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, 
+                epochs=self.train_epochs, batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, regularizer=regularizer, 
+                pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pool_size_1=pool_size_1, 
+                pool_stride_1=pool_stride_1, pool_size_2=pool_size_2, pool_stride_2=pool_stride_2, 
+                pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, 
+                strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, 
+                filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, filter_4=filter_4, 
+                filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, 
+                strides_5=strides_5, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, 
+                dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False)    
+            #except:
+                #print("Invalid hyperparameter combination, skipping trial.")
+                #return 0.0
         else:
             model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                 min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
                 batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, checkpoint=False)
-                     
-        if self.metric == 'loss' or self.metric == 'val_loss':
+
+        metrics = ['loss', 'binary_accuracy', 'f1_score']
+        if self.metric == 'all': #Average all the training metrics
             if self.average:
-                final_score = np.mean([history.history['loss'][-1], history.history['val_loss'][-1]])
+                training_metrics_mean = np.mean([np.mean(history.history[metric]) for metric in metrics if 'loss' not in metric])
+                training_loss_mean = 1 - np.mean(history.history['loss']) # negative sign because loss is being minimized
             else:
-                final_score = history.history[self.metric][-1]
-            final_score = 1 - final_score
+                training_metrics_mean = np.mean([history.history[metric][-1] for metric in metrics if 'loss' not in metric])
+                training_loss_mean = 1 - history.history['loss'][-1] 
+            final_score = np.mean([training_metrics_mean, training_loss_mean])
+        elif self.metric == 'val_all': #Average all the validation metrics
+            if self.average:
+                val_metrics_mean = np.mean([np.mean(history.history['val_'+metric]) for metric in metrics if 'loss' not in metric])
+                val_loss_mean = 1 - np.mean(history.history['val_loss']) 
+            else:
+                val_metrics_mean = np.mean([history.history['val_'+metric][-1] for metric in metrics if 'loss' not in metric])
+                val_loss_mean = 1 - history.history['val_loss'][-1]
+            final_score = np.mean([val_metrics_mean, val_loss_mean])
         else:
             if self.average:
-                final_score = np.mean([history.history['accuracy'][-1], history.history['val_accuracy'][-1]])
+                final_score = np.mean(history.history[self.metric])
             else:
                 final_score = history.history[self.metric][-1]
+            if 'loss' in self.metric: 
+                final_score = 1 - final_score
 
         return final_score
 
@@ -505,6 +524,7 @@ class objective_rf(object):
         final_score = np.mean(cv['test_score'])
 
         return final_score
+
 
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, img_num_channels=1, 
     normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='loss', 

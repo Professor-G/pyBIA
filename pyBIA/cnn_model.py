@@ -31,7 +31,7 @@ from tensorflow.keras.losses import categorical_crossentropy, SquaredHinge
 from tensorflow.keras.layers import Input, Activation, Dense, Dropout, Conv2D, MaxPool2D, \
     AveragePooling2D, GlobalAveragePooling2D, Flatten, BatchNormalization, Lambda, concatenate
 
-from optuna.visualization.matplotlib import plot_optimization_history
+from optuna.importance import get_param_importances, FanovaImportanceEvaluator
 from pyBIA.data_processing import process_class, create_training_set, concat_channels
 from pyBIA.data_augmentation import augmentation, resize
 from pyBIA import optimization
@@ -303,6 +303,8 @@ class Classifier:
             joblib.dump(self.optimization_results, path+'HyperOpt_Results')
         print('Files saved in: {}'.format(path))
 
+        self.path = path
+
         return 
 
     def load(self, path=None):
@@ -347,6 +349,8 @@ class Classifier:
 
         print('Successfully loaded the following class attributes: {}, {}, {}'.format(model, optimization_results, best_params))
         
+        self.path = path
+        
         return
 
     def predict(self, data, target='DIFFUSE', return_proba=False):
@@ -367,15 +371,14 @@ class Classifier:
         data = process_class(data, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, img_num_channels=self.img_num_channels)
         predictions = self.model.predict(data)
 
-        output=[]
-        probas=[]
+        output, probas = [], [] 
         for i in range(len(predictions)):
-            if np.argmax(predictions[i]) == 0:
+            if np.argmax(predictions[i]) == 1:
                 prediction = target
-                probas.append(predictions[i][0])
+                probas.append(predictions[i][1])
             else:
                 prediction = 'OTHER'
-                probas.append(predictions[i][1])
+                probas.append(predictions[i][0])
 
             output.append(prediction)
 
@@ -384,7 +387,8 @@ class Classifier:
             
         return np.array(output)
 
-    def plot_hyper_opt(self, baseline=None, xlim=None, ylim=None, xlog=True, ylog=False, savefig=False):
+    def plot_hyper_opt(self, baseline=None, xlim=None, ylim=None, xlog=True, ylog=False, 
+        savefig=False):
         """
         Plots the hyperparameter optimization history.
     
@@ -404,10 +408,33 @@ class Classifier:
             AxesImage
         """
 
-        fig = plot_optimization_history(self.optimization_results)
+        trials = self.optimization_results.get_trials()
+        trial_values, best_value = [], []
+        for trial in range(len(trials)):
+            value = trials[trial].values[0]
+            trial_values.append(value)
+            if trial == 0:
+                best_value.append(value)
+            else:
+                if any(y > value for y in best_value): #If there are any numbers in best values that are higher than current one
+                    best_value.append(np.array(best_value)[trial-1])
+                else:
+                    best_value.append(value)
+
+        best_value, trial_values = np.array(best_value), np.array(trial_values)
+        best_value[1] = trial_values[1] #Make the first trial the best model, since technically it is.
+        for i in range(2, len(trial_values)):
+            if trial_values[i] < best_value[1]:
+                best_value[i] = best_value[1]
+            else:
+                break
+
         if baseline is not None:
-            plt.axhline(y=baseline, color='k', linestyle='--', linewidth=3, alpha=0.7, label='Default Model')
-        
+            plt.axhline(y=baseline, color='k', linestyle='--', label='Baseline Model')
+            ncol=3
+        else:
+            ncol=2
+
         if self.metric == 'val_accuracy':
             ylabel = 'Validation Accuracy'
         elif self.metric == 'accuracy':
@@ -419,26 +446,131 @@ class Classifier:
         else:
             ylabel = 'Optimization Metric'
 
-        plt.xlabel('Trial #', size=16, alpha=1, color='k')
-        plt.ylabel(ylabel, size=16, alpha=1, color='k')
-        plt.title(('Hyperparameter Optimization History'), size=18)
-        plt.xticks(fontsize=14, color='k')
-        plt.yticks(fontsize=14, color='k')
-        plt.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
-        plt.legend(prop={'size': 12})
+        plt.plot(range(len(trials)), best_value, color='r', alpha=0.83, linestyle='-', label='Best Model')
+        plt.scatter(range(len(trials)), trial_values, c='b', marker='+', s=35, alpha=0.45, label='Trial')
+        plt.xlabel('Trial #', alpha=1, color='k')
+        plt.ylabel(ylabel, alpha=1, color='k')
+        plt.title('CNN Hyperparameter Optimization')#, size=18) Make this a f" string option!!
+        plt.grid(False)
         if xlim is not None:
             plt.xlim(xlim)
+        else:
+            plt.xlim((1, len(trials)))
         if ylim is not None:
             plt.ylim(ylim)
         if xlog:
             plt.xscale('log')
         if ylog:
             plt.yscale('log')
-        plt.tight_layout()
+        #plt.tight_layout()
+        #plt.legend(prop={'size': 12}, loc='upper left')
+        plt.legend(loc='upper center', ncol=ncol, frameon=False)#, handlelength=4)#prop={'size': 14}
+        plt.rcParams['axes.facecolor']='white'
+        
         if savefig:
             plt.savefig('CNN_Hyperparameter_Optimization.png', bbox_inches='tight', dpi=300)
+            plt.clf()
         else:
             plt.show()
+
+    def plot_hyper_param_importance(self, plot_time=True, savefig=False):
+        """
+        Plots the hyperparameter optimization history.
+    
+        Args:
+            plot_tile (bool):
+            savefig (bool): 
+
+        Returns:
+            AxesImage
+        """
+
+        try:
+            if isinstance(self.path, str):
+                try:
+                    hyper_importances = joblib.load(self.path+'Hyperparameter_Importance')
+                except FileNotFoundError:
+                    raise ValueError('Could not find the importance file in the '+self.path+' folder')
+
+                try:
+                    duration_importances = joblib.load(self.path+'Duration_Importance')
+                except FileNotFoundError:
+                    raise ValueError('Could not find the importance file in the '+self.path+' folder')
+            else:
+                raise ValueError('Call the save_hyper_importance() attribute first.')
+        except:
+            raise ValueError('Call the save_hyper_importance() attribute first.')
+
+        params, importance, duration_importance = [], [], []
+        for key in hyper_importances:       
+            params.append(key)
+
+        for name in params:
+            importance.append(hyper_importances[name])
+            duration_importance.append(duration_importances[name])
+
+        xtick_labels = format_labels(params)
+
+        fig, ax = plt.subplots()
+        #fig.subplots_adjust(top=0.8)
+        ax.barh(xtick_labels, importance, label='Importance for Classification', color=mcolors.TABLEAU_COLORS["tab:blue"], alpha=0.87)
+        if plot_time:
+            ax.barh(xtick_labels, duration_importance, label='Impact on Engine Speed', color=mcolors.TABLEAU_COLORS["tab:orange"], alpha=0.7, hatch='/')
+
+        ax.set_ylabel("Hyperparameter")
+        ax.set_xlabel("Importance Evaluation")
+        ax.legend(ncol=2, frameon=False, handlelength=2, bbox_to_anchor=(0.5, 1.1), loc='upper center')
+        ax.set_xscale('log')
+        plt.gca().invert_yaxis()
+        plt.xlim((0, 1.))#np.max(importance+duration_importance)))#np.max(importance+duration_importance)))
+        #fig = plot_param_importances(self.optimization_results)
+        #fig = plot_param_importances(self.optimization_results, target=lambda t: t.duration.total_seconds(), target_name="duration")
+        #plt.tight_layout()
+        if savefig:
+            if plot_time:
+                plt.savefig('CNN_Hyperparameter_Importance.png', bbox_inches='tight', dpi=300)
+            else:
+                plt.savefig('CNN_Hyperparameter_Duration_Importance.png', bbox_inches='tight', dpi=300)
+            plt.clf()
+        else:
+            plt.show()
+
+    def save_hyper_importance(self):
+        """
+        Calculates and saves binary files containing
+        dictionaries with importance information, one
+        for the importance and one for the duration importance
+
+        Note:
+            This procedure is time-consuming but must be run once before
+            plotting the importances. This function will save
+            two files in the model folder for future use. 
+
+        Returns:
+            Saves two binary files, importance and duration importance.
+        """
+        print('Calculating and saving importances, this could take up to an hour...')
+
+        try:
+            if isinstance(self.path, str):
+                path = self.path  
+            else:
+                path = str(Path.home())
+        except:
+            path = str(Path.home())
+
+        hyper_importance = get_param_importances(self.optimization_results)
+        joblib.dump(hyper_importance, path+'Hyperparameter_Importance')
+
+        importance = FanovaImportanceEvaluator()
+        duration_importance = importance.evaluate(self.optimization_results, target=lambda t: t.duration.total_seconds())
+        joblib.dump(duration_importance, path+'Duration_Importance')
+        
+        print(f"Files saved in: {path}")
+
+        self.path = path
+
+        return  
 
     #def load_bw_model(self):
     #    """

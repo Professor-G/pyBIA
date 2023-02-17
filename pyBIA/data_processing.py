@@ -82,16 +82,18 @@ def crop_image(data, x, y, size=50, invert=False):
 
         If your image is 200x200, then x, y = (100,100), and so on.
     """
-    
+
     if invert == True:
         x, y = y, x
+        
+    data_copy = copy.deepcopy(data)
 
     o, r = np.divmod(size, 2)
     l = (int(x)-(o+r-1)).clip(0)
     u = (int(y)-(o+r-1)).clip(0)
-    array = data[l: int(x)+o+1, u:int(y)+o+1]
+    array = data_copy[l: int(x)+o+1, u:int(y)+o+1]
     
-    out = np.full((size, size), np.nan, dtype=data.dtype)
+    out = np.full((size, size), np.nan, dtype=data_copy.dtype)
     out[:array.shape[0], :array.shape[1]] = array
 
     return out

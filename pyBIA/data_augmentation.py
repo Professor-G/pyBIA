@@ -5,15 +5,13 @@ Created on Thu Sep 27 08:28:20 2021
 
 @author: daniel
 """
+from pyBIA.data_processing import crop_image, concat_channels
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from scipy.ndimage import rotate
 import matplotlib.pyplot as plt
+from warnings import warn
 import numpy as np
 import random
-
-from pyBIA.data_processing import crop_image, concat_channels
-from warnings import warn
-
 
 def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5, height_shift=5, 
     horizontal=True, vertical=True, rotation=True, fill='nearest', image_size=50):

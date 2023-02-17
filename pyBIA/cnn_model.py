@@ -80,9 +80,10 @@ class Classifier:
 
     """
     def __init__(self, blob_data=None, other_data=None, val_blob=None, val_other=None, img_num_channels=1, 
-        optimize=True, n_iter=25, normalize=True, min_pixel=638, max_pixel=3000, epochs=100, train_epochs=25, 
-        patience=5, opt_model=True, opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=90, 
-        balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True):
+        optimize=True, n_iter=25, normalize=True, min_pixel=0, max_pixel=1000, epochs=25, train_epochs=25, 
+        patience=5, opt_model=True, opt_aug=False, batch_min=2, batch_max=25, image_size_min=50, image_size_max=100, 
+        balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True, test_blob=None, 
+        test_other=None):
 
         self.blob_data = blob_data
         self.other_data = other_data
@@ -109,7 +110,9 @@ class Classifier:
         self.balance_val = balance_val
         self.opt_max_min_pix = opt_max_min_pix
         self.opt_max_max_pix = opt_max_max_pix
-
+        self.test_blob = test_blob
+        self.test_other = test_other
+        
         self.model = None
         self.history = None 
         self.best_params = None 
@@ -134,14 +137,14 @@ class Classifier:
             n_iter=self.n_iter, balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, 
             val_X=self.val_blob, val_Y=self.val_other, train_epochs=self.train_epochs, patience=self.patience, opt_model=self.opt_model, opt_aug=self.opt_aug, 
             batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val,
-            opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix)
+            opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, test_blob=self.test_blob, test_other=self.test_other)
 
         if self.epochs != 0:
             print("Fitting and returning final model...")
             clear_session()
 
             if self.opt_max_min_pix is not None:
-                self.normalize=True #In case it's mistakenly set to False by user
+                self.normalize = True #In case it's mistakenly set to False by user
                 min_pix, max_pix = 0.0, []
                 if self.img_num_channels >= 1:
                     max_pix.append(self.best_params['max_pixel_1'])
@@ -264,7 +267,7 @@ class Classifier:
         """
 
         if self.model is None:
-            print('The model has not been created! Run classifier.create() first.')
+            print('The model has not been created!')
 
         if path is None:
             path = str(Path.home())
@@ -295,7 +298,7 @@ class Classifier:
                 np.savetxt(path+'model_val_loss', self.history.history['val_loss'])
                 np.savetxt(path+'model_val_f1', self.history.history['val_f1_score'])
 
-            save_model(self.model, path+'Keras_Model.h5')
+            save_model(self.model, path+'Keras_Model.h5')#,  custom_objects={'f1_score': f1_score})
 
         if self.best_params is not None:
             joblib.dump(self.best_params, path+'Best_Params')
@@ -327,15 +330,15 @@ class Classifier:
         path += 'pyBIA_cnn_model/'
 
         try:
-            self.model = load_model(path+'Keras_Model.h5')
-            model = 'model'
+            self.model = load_model(path+'Keras_Model.h5', custom_objects={'f1_score': f1_score})
+            model = 'model,'
         except:
             model = ''
             pass
 
         try:
             self.optimization_results = joblib.load(path+'HyperOpt_Results')
-            optimization_results = 'optimization_results'
+            optimization_results = 'optimization_results,'
         except:
             optimization_results = '' 
             pass
@@ -347,7 +350,7 @@ class Classifier:
             best_params = '' 
             pass        
 
-        print('Successfully loaded the following class attributes: {}, {}, {}'.format(model, optimization_results, best_params))
+        print('Successfully loaded the following class attributes: {} {} {}'.format(model, optimization_results, best_params))
         
         self.path = path
         
@@ -572,6 +575,64 @@ class Classifier:
 
         return  
 
+    def plot_performance(self, metric='acc', combine=False, ylabel=None, title=None,
+        xlim=None, ylim=None, xlog=False, ylog=True, savefig=False):
+        """
+        Plots the training/performance history.
+    
+        Args:
+            
+        Returns:
+            AxesImage
+        """
+
+        metric1 = np.loadtxt(self.path+'model_'+metric)
+
+        if combine:
+            if 'val' not in metric:
+                metric2 = np.loadtxt(self.path+'model_val_'+metric)
+                label1, label2 = 'Training', 'Validation'
+            else:
+                metric2 = np.loadtxt(self.path+'model_'+metric)
+                label1, label2 = 'Validation', 'Training'
+        else:
+            if 'val' not in metric:
+                label1 = 'Training'
+            else:
+                label1 = 'Validation'
+
+        plt.plot(range(1, len(metric1)+1), metric1, color='r', alpha=0.83, linestyle='-', label=label1)
+        if combine:
+            plt.plot(range(1, len(metric2)+1), metric2, color='b', alpha=0.83, linestyle='--', label=label2)
+
+        if ylabel is None:
+            ylabel = metric
+        if title is None:
+            title = metric
+
+        plt.ylabel(ylabel, alpha=1, color='k')
+        plt.title(title)
+        plt.xlabel('Epoch', alpha=1, color='k'), plt.grid(False)
+        if xlim is not None:
+            plt.xlim(xlim)
+        else:
+            plt.xlim((1, len(metric1)))
+        if ylim is not None:
+            plt.ylim(ylim)
+        if xlog:
+            plt.xscale('log')
+        if ylog:
+            plt.yscale('log')
+        plt.legend(loc='upper center', frameon=False) #ncol
+        plt.rcParams['axes.facecolor']='white'
+        
+        if savefig:
+            plt.savefig('CNN_Training_History_'+metric+'.png', bbox_inches='tight', dpi=300)
+            plt.clf()
+        else:
+            plt.show()
+
+
     #def load_bw_model(self):
     #    """
     #    Calling this will load the trained Tensorflow model, trained using NDWFS images
@@ -781,7 +842,7 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
         path = str(Path.home())+'/'
         callbacks_list = []
         if checkpoint:
-            model_checkpoint = ModelCheckpoint(path+'checkpoint.hdf5', monitor='val_accuracy', verbose=2, save_best_only=True, mode='max')
+            model_checkpoint = ModelCheckpoint(path+'checkpoint.hdf5', monitor='val_binary_accuracy', verbose=2, save_best_only=True, mode='max')
             callbacks_list.append(model_checkpoint)
         if early_stop_callback is not None:
             callbacks_list.append(early_stop_callback)
@@ -793,8 +854,6 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
 
         return model, history
 
-
-# Define the custom F1-score metrics for validation data
 def f1_score(y_true, y_pred):
     """
     Computes the F1 score between true and predicted labels.
@@ -810,12 +869,11 @@ def f1_score(y_true, y_pred):
     tp = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_true * y_pred, 0, 1)))
     fp = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_pred - y_true, 0, 1)))
     fn = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_true - y_pred, 0, 1)))
+
     precision = tp / (tp + fp + tf.keras.backend.epsilon())
     recall = tp / (tp + fn + tf.keras.backend.epsilon())
-    f1_score = 2.0 * precision * recall / (precision + recall + tf.keras.backend.epsilon())
-    
-    return f1_score
 
+    return 2.0 * precision * recall / (precision + recall + tf.keras.backend.epsilon())
 
 
 

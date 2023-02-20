@@ -16,10 +16,11 @@ import pkg_resources
 from pathlib import Path
 from warnings import warn
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors 
+
 import random as python_random
 ##https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development##
 np.random.seed(1909), python_random.seed(1909), tf.random.set_seed(1909)
-from sklearn.metrics import precision_score, recall_score, f1_score
 
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -27,7 +28,7 @@ from tensorflow.keras.backend import clear_session
 from tensorflow.keras.models import Sequential, save_model, load_model, Model
 from tensorflow.keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import SGD
-from tensorflow.keras.losses import categorical_crossentropy, SquaredHinge
+from tensorflow.keras.losses import categorical_crossentropy, Hinge, SquaredHinge#, KLDivergence, LogCosh
 from tensorflow.keras.layers import Input, Activation, Dense, Dropout, Conv2D, MaxPool2D, \
     AveragePooling2D, GlobalAveragePooling2D, Flatten, BatchNormalization, Lambda, concatenate
 
@@ -36,6 +37,7 @@ from pyBIA.data_processing import process_class, create_training_set, concat_cha
 from pyBIA.data_augmentation import augmentation, resize
 from pyBIA import optimization
 
+#plt.style.use('/Users/daniel/Documents/plot_style.txt')
 
 class Classifier:
     """
@@ -83,7 +85,7 @@ class Classifier:
         optimize=True, n_iter=25, normalize=True, min_pixel=0, max_pixel=1000, epochs=25, train_epochs=25, 
         patience=5, opt_model=True, opt_aug=False, batch_min=2, batch_max=25, image_size_min=50, image_size_max=100, 
         balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True, test_blob=None, 
-        test_other=None):
+        test_other=None, shift=10, opt_cv=None, mask_size=None, num_masks=None, verbose=0):
 
         self.blob_data = blob_data
         self.other_data = other_data
@@ -112,7 +114,12 @@ class Classifier:
         self.opt_max_max_pix = opt_max_max_pix
         self.test_blob = test_blob
         self.test_other = test_other
-        
+        self.shift = shift  
+        self.opt_cv = opt_cv 
+        self.mask_size = mask_size
+        self.num_masks = num_masks
+        self.verbose = verbose
+
         self.model = None
         self.history = None 
         self.best_params = None 
@@ -137,10 +144,12 @@ class Classifier:
             n_iter=self.n_iter, balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, 
             val_X=self.val_blob, val_Y=self.val_other, train_epochs=self.train_epochs, patience=self.patience, opt_model=self.opt_model, opt_aug=self.opt_aug, 
             batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val,
-            opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, test_blob=self.test_blob, test_other=self.test_other)
+            opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, test_blob=self.test_blob, test_other=self.test_other, shift=self.shift, opt_cv=self.opt_cv, 
+            mask_size=self.mask_size, num_masks=self.num_masks, verbose=self.verbose)
 
         if self.epochs != 0:
             print("Fitting and returning final model...")
+
             clear_session()
 
             if self.opt_max_min_pix is not None:
@@ -166,7 +175,7 @@ class Classifier:
                     raise ValueError('Only three filters are supported!')
 
                 augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.best_params['batch'], 
-                    width_shift=10, height_shift=10, horizontal=True, vertical=True, rotation=True, image_size=self.best_params['image_size'])
+                    width_shift=self.shift, height_shift=self.shift, horizontal=True, vertical=True, rotation=True, image_size=self.best_params['image_size'])
 
                 if self.img_num_channels > 1:
                     class_1=[]
@@ -244,11 +253,11 @@ class Classifier:
                     strides_3=self.best_params['strides_3'], filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], 
                     strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], 
                     strides_5=self.best_params['strides_5'], dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], 
-                    dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'])
+                    dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'], verbose=self.verbose)
         
             else: 
                 self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                    min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.epochs)
+                    min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.epochs, verbose=self.verbose)
        
         return 
 
@@ -414,7 +423,10 @@ class Classifier:
         trials = self.optimization_results.get_trials()
         trial_values, best_value = [], []
         for trial in range(len(trials)):
-            value = trials[trial].values[0]
+            try:
+                value = trials[trial].values[0]
+            except TypeError:
+                value = np.min(trial_values) 
             trial_values.append(value)
             if trial == 0:
                 best_value.append(value)
@@ -665,7 +677,7 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
         filter_1=96, filter_size_1=11, strides_1=4, filter_2=256, filter_size_2=5, strides_2=1,
         filter_3=384, filter_size_3=3, strides_3=1, filter_4=384, filter_size_4=3, strides_4=1,
         filter_5=256, filter_size_5=3, strides_5=1, dense_neurons_1=4096, dense_neurons_2=4096, 
-        dropout_1=0.5, dropout_2=0.5, early_stop_callback=None, checkpoint=True):
+        dropout_1=0.5, dropout_2=0.5, early_stop_callback=None, checkpoint=False, verbose=1):
         """
         The CNN model infrastructure presented by the 2012 ImageNet Large Scale 
         Visual Recognition Challenge, AlexNet. Parameters were adapted for
@@ -724,9 +736,12 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
             early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
                 to None. Should only be used during optimization, refer to pyBIA.optimization.objective_cnn().
             checkpoint (bool, optional): If False no checkpoint will be saved. Defaults to True.
-            
+            mask_size (int, optional): Size of random cutouts, to be used during optimization. This is a data augmentation technique
+                that erases an individual cutout of size (mask_size x mask_size), applied to each image. 
+            num_masks (int, optional): Number of random cutouts.
+
         Returns:
-            The trained CNN model.
+            The trained CNN model and accompanying history.
         """
         
         if len(blob_data.shape) != len(other_data.shape):
@@ -771,12 +786,24 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
         uniform_scaling = VarianceScaling(
             scale=1.0, mode='fan_in', distribution='uniform', seed=None)
 
+        print('Loss Function :'+loss)
+        if loss == 'hinge':
+            loss = Hinge()
         if loss == 'squared_hinge':
             loss = SquaredHinge()
-
+        if loss == 'kld':
+            loss = KLDivergence()
+        if loss == 'logcosh':
+            loss = LogCosh()
+        #if loss == 'focal_loss':
+        #    loss = focal_loss
+        #if loss == 'dice_loss':
+        #    loss = dice_loss
+        #if loss == 'jaccard_loss':
+        #    loss = jaccard_loss
         # Model configuration
         model = Sequential()
-
+        
         #Convolutional layers
         model.add(Conv2D(filter_1, filter_size_1, strides=strides_1, activation=activation_conv, input_shape=input_shape,
                          padding=padding, kernel_initializer=uniform_scaling))
@@ -832,25 +859,24 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
             model.add(BatchNormalization())
 
         #Output layer
-        model.add(Dense(num_classes, activation='softmax', kernel_initializer='TruncatedNormal'))
+        model.add(Dense(num_classes, activation='sigmoid', kernel_initializer='TruncatedNormal'))
         if regularizer == 'batch_norm':
             model.add(BatchNormalization())
 
         optimizer = SGD(learning_rate=lr, momentum=momentum, decay=decay, nesterov=nesterov)
         model.compile(loss=loss, optimizer=optimizer, metrics=[tf.keras.metrics.BinaryAccuracy(), f1_score])
         
-        path = str(Path.home())+'/'
         callbacks_list = []
         if checkpoint:
-            model_checkpoint = ModelCheckpoint(path+'checkpoint.hdf5', monitor='val_binary_accuracy', verbose=2, save_best_only=True, mode='max')
+            model_checkpoint = ModelCheckpoint(str(Path.home())+'/'+'checkpoint.hdf5', monitor='val_binary_accuracy', verbose=2, save_best_only=True, mode='max')
             callbacks_list.append(model_checkpoint)
         if early_stop_callback is not None:
             callbacks_list.append(early_stop_callback)
 
         if val_X is None:
-            history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=1)
+            history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=verbose)
         else:
-            history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=1)
+            history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=verbose)
 
         return model, history
 
@@ -876,4 +902,59 @@ def f1_score(y_true, y_pred):
     return 2.0 * precision * recall / (precision + recall + tf.keras.backend.epsilon())
 
 
+def format_labels(labels: list) -> list:
+    """
+    Takes a list of labels and returns the list with all words capitalized and underscores removed.
+    Also replaces 'eta' with 'Learning Rate' and 'n_estimators' with 'Number of Trees'.
+    
+    Args:
+        labels (list): A list of strings.
+    
+    Returns:
+        Reformatted list.
+    """
+
+    new_labels = []
+    for label in labels:
+        label = label.replace("_", " ")
+        if label == "eta":
+            new_labels.append("Learning Rate")
+            continue
+        if label == "lr":
+            new_labels.append("Learning Rate")
+            continue
+        if label == "n estimators":
+            new_labels.append("Num of Trees")
+            continue
+        if label == "colsample bytree":
+            new_labels.append("ColSample ByTree")
+            continue
+        new_labels.append(label.title())
+
+    return new_labels
+
+"""
+def focal_loss(y_true, y_pred, gamma=2.0, alpha=0.25):
+
+    ce = tf.keras.backend.binary_crossentropy(y_true, y_pred, from_logits=True)
+    pt = tf.math.exp(-ce)
+
+    return alpha * tf.math.pow(1.0 - pt, gamma) * ce
+
+def dice_loss(y_true, y_pred, smooth=1e-7):
+    
+    intersection = tf.reduce_sum(y_true * y_pred)#, axis=[1, 2, 3]) #Tntersection and union of the predicted and true labels
+    union = tf.reduce_sum(y_true) + tf.reduce_sum(y_pred)
+    dice = (2.0 * intersection + smooth) / (union + smooth) #Dice coefficient
+
+    return 1.0 - dice
+
+def jaccard_loss(y_true, y_pred, smooth=1e-7):
+
+    intersection = tf.reduce_sum(y_true * y_pred)
+    union = tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) - intersection
+    jaccard = (intersection + smooth) / (union + smooth)
+
+    return 1.0 - jaccard
+"""
 

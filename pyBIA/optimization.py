@@ -5,6 +5,7 @@ Created on Wed Sep  11 12:04:23 2021
 
 @author: daniel
 """
+import copy
 import os, sys
 import tensorflow as tf
 os.environ['PYTHONHASHSEED'], os.environ["TF_DETERMINISTIC_OPS"] = '0', '1'
@@ -85,8 +86,9 @@ class objective_cnn(object):
 
     def __init__(self, class1, class2, img_num_channels=1, normalize=True, min_pixel=0, max_pixel=100, 
         val_blob=None, val_other=None, test_blob=None, test_other=None, train_epochs=25, patience=20, 
-        opt_model=True, opt_aug=False, batch_min=10, batch_max=250, image_size_min=50, image_size_max=100, 
-        balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True):
+        opt_model=True, opt_aug=False, batch_min=2, batch_max=25, image_size_min=50, image_size_max=100, 
+        balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True, shift=10,
+        mask_size=None, num_masks=None, opt_cv=None, verbose=0):
 
         self.class1 = class1
         self.class2 = class2
@@ -112,6 +114,11 @@ class objective_cnn(object):
         self.opt_max_max_pix = opt_max_max_pix
         self.metric = metric 
         self.average = average
+        self.shift = shift 
+        self.opt_cv = opt_cv
+        self.verbose = verbose
+        self.mask_size = mask_size
+        self.num_masks = num_masks
 
         if 'all' not in self.metric and 'loss' not in self.metric and 'f1_score' not in self.metric and 'binary_accuracy' not in self.metric:
             raise ValueError("Invalid metric input, options are: 'loss', 'binary_accuracy', 'f1_score', or 'all', and the validation equivalents (add val_ at the beginning).")
@@ -132,17 +139,16 @@ class objective_cnn(object):
 
         if self.opt_aug:
             if self.img_num_channels == 1:
-                channel1, channel2, channel3 = self.class1, None, None 
+                channel1, channel2, channel3 = copy.deepcopy(self.class1), None, None 
             elif self.img_num_channels == 2:
-                channel1, channel2, channel3 = self.class1[:,:,:,0], self.class1[:,:,:,1], None 
+                channel1, channel2, channel3 = copy.deepcopy(self.class1[:,:,:,0]), copy.deepcopy(self.class1[:,:,:,1]), None 
             elif self.img_num_channels == 3:
-                channel1, channel2, channel3 = self.class1[:,:,:,0], self.class1[:,:,:,1], self.class1[:,:,:,2]
+                channel1, channel2, channel3 = copy.deepcopy(self.class1[:,:,:,0]), copy.deepcopy(self.class1[:,:,:,1]), copy.deepcopy(self.class1[:,:,:,2])
             else:
                 raise ValueError('Only three filters are supported!')
 
-        clear_session()
 
-        if 'loss' in self.metric:
+        if 'loss' in self.metric: #This sets the model patience during individual training runs
             mode = 'min'
         else:
             mode = 'max'
@@ -150,13 +156,13 @@ class objective_cnn(object):
         if self.opt_aug:
             batch = trial.suggest_int('batch', self.batch_min, self.batch_max, step=1)
             image_size = trial.suggest_int('image_size', self.image_size_min, self.image_size_max, step=1)
-            shift = 10 #trial.suggest_int('shift', 0, 10)
-            horizontal = vertical = rotation = True #trial.suggest_categorical('horizontal', [True, False])
-      
-            augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=batch, 
-                width_shift=shift, height_shift=shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
-                image_size=image_size)
+            horizontal = vertical = rotation = True 
 
+            augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=batch, 
+                width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
+                image_size=image_size, mask_size=self.mask_size, num_masks=self.num_masks)
+
+            #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
             if self.img_num_channels > 1:
                 class_1=[]
                 if self.img_num_channels == 2:
@@ -170,9 +176,9 @@ class objective_cnn(object):
                 class_1 = augmented_images
 
             if self.balance_val:
-                class_2 = self.class2[:len(class_1)]   
+                class_2 = copy.deepcopy(self.class2[:len(class_1)]) 
             else:
-                class_2 = self.class2   
+                class_2 = copy.deepcopy(self.class2)  
 
             if self.img_num_channels == 1:
                 class_2 = resize(class_2, size=image_size)
@@ -215,8 +221,8 @@ class objective_cnn(object):
                 val_class_2 = None 
 
         else:
-            class_1, class_2 = self.class1, self.class2
-            val_class_1, val_class_2 = self.val_blob, self.val_other
+            class_1, class_2 = copy.deepcopy(self.class1), copy.deepcopy(self.class2)
+            val_class_1, val_class_2 = copy.deepcopy(self.val_blob), copy.deepcopy(self.val_other)
 
         if self.opt_max_min_pix is not None:
             self.normalize = True #Just in case it's set to False by the user 
@@ -251,14 +257,16 @@ class objective_cnn(object):
         momentum = trial.suggest_float('momentum', 0.0, 1.0, step=0.01)
         nesterov = trial.suggest_categorical('nesterov', [True, False])
 
+        clear_session()
+
         if self.opt_model:
             """AlexNet hyperparameter search space"""
 
             ### Activation and Loss Functions ### 
-            activation_conv = trial.suggest_categorical('activation_conv', ['relu',  'sigmoid', 'tanh'])            
-            activation_dense = trial.suggest_categorical('activation_dense', ['relu', 'sigmoid', 'tanh'])
+            activation_conv = trial.suggest_categorical('activation_conv', ['relu',  'sigmoid', 'tanh', 'elu', 'selu'])            
+            activation_dense = trial.suggest_categorical('activation_dense', ['relu', 'sigmoid', 'tanh', 'elu', 'selu'])
             regularizer = trial.suggest_categorical('regularizer', ['local_response', 'batch_norm'])
-            loss = trial.suggest_categorical('loss', ['binary_crossentropy', 'squared_hinge'])
+            loss = trial.suggest_categorical('loss', ['binary_crossentropy', 'hinge', 'squared_hinge', 'kld', 'logcosh'])
 
             ### Filter and layer hyperparameters ###
             filter_1 = trial.suggest_int('filter_1', 12, 408, step=12)
@@ -296,7 +304,13 @@ class objective_cnn(object):
             dropout_1 = trial.suggest_float('dropout_1', 0.0, 0.5, step=0.01)
             dropout_2 = trial.suggest_float('dropout_2', 0.0, 0.5, step=0.01) 
 
-            #try:
+            ### Train the model ###
+            if self.opt_cv is not None and self.verbose == 1:
+                print()
+                print()
+                print('    ===== CV 1 =====    ')
+                print()
+
             model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
                 normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, 
                 epochs=self.train_epochs, batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
@@ -308,17 +322,150 @@ class objective_cnn(object):
                 filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, filter_4=filter_4, 
                 filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, 
                 strides_5=strides_5, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, 
-                dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False)    
-            #except:
-                #print("Invalid hyperparameter combination, skipping trial.")
-                #return 0.0
+                dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
         else:
             model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                 min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
-                batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, checkpoint=False)
+                batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
+                checkpoint=False, verbose=self.verbose)
 
+        clear_session()
+
+        #If the training fails just return NaN#
+        if np.isfinite(history.history['loss'][-1]):
+            models, histories = [], []
+            models.append(models), histories.append(history)
+        else:
+            return np.nan 
+
+        ##### Cross-Validation Routine - very specific implementation #####
+        if self.opt_cv is not None:
+            if self.val_blob is None and self.val_other is not None:
+                raise ValueError('CNN cross-validation is currently supported only if validation data is input.')
+            if self.val_blob is not None:
+                if len(self.class1) / len(self.val_blob) < self.opt_cv-1:
+                    raise ValueError('Cannot partition the training/validation data, refer to the API documentation for instructions on how to use the opt_cv parameter.')
+            if self.val_other is not None:
+                if len(self.class2) / len(self.val_other) < self.opt_cv-1:
+                    raise ValueError('Cannot partition the training/validation data, refer to the API documentation for instructions on how to use the opt_cv parameter.')
+            
+            #The first model already ran therefore sutbract 1      
+            for k in range(self.opt_cv-1):          
+                #Make deep copies to avoid overwriting arrays
+                class_1, class_2 = copy.deepcopy(self.class1), copy.deepcopy(self.class2)
+                val_class_1, val_class_2 = copy.deepcopy(self.val_blob), copy.deepcopy(self.val_other)
+
+                #Sort the new data samples, no random shuffling, just a linear sequence
+                if val_class_1 is not None:
+                    val_hold_1 = copy.deepcopy(class_1[k*len(val_class_1):len(val_class_1)*(k+1)]) #The new validation data
+                    class_1[k*len(val_class_1):len(val_class_1)*(k+1)] = copy.deepcopy(val_class_1)
+                    val_class_1 = val_hold_1 #The new validation data
+                if val_class_2 is not None:
+                    val_hold_2 = copy.deepcopy(class_2[k*len(val_class_2):len(val_class_2)*(k+1)]) #The new validation data
+                    class_2[k*len(val_class_2):len(val_class_2)*(k+1)] = copy.deepcopy(val_class_2)
+                    val_class_2 = val_hold_2 #The new validation data
+
+                if self.opt_aug:
+                    if self.img_num_channels == 1:
+                        channel1, channel2, channel3 = class_1, None, None 
+                    elif self.img_num_channels == 2:
+                        channel1, channel2, channel3 = class_1[:,:,:,0], class_1[:,:,:,1], None 
+                    else:
+                        channel1, channel2, channel3 = class_1[:,:,:,0], class_1[:,:,:,1], class_1[:,:,:,2]
+            
+                    augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=batch, 
+                        width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
+                        image_size=image_size, mask_size=self.mask_size, num_masks=self.num_masks)
+   
+                    if self.img_num_channels > 1:
+                        class_1=[]
+                        if self.img_num_channels == 2:
+                            for i in range(len(augmented_images[0])):
+                                class_1.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i]))
+                        else:
+                            for i in range(len(augmented_images[0])):
+                                class_1.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
+                        class_1 = np.array(class_1)
+                    else:
+                        class_1 = augmented_images
+
+                    if self.balance_val:
+                        class_2 = class_2[:len(class_1)]     
+
+                    if self.img_num_channels == 1:
+                        class_2 = resize(class_2, size=image_size)
+                    else:
+                        channel1 = resize(class_2[:,:,:,0], size=image_size)
+                        channel2 = resize(class_2[:,:,:,1], size=image_size)
+                        if self.img_num_channels == 2:
+                            class_2 = data_processing.concat_channels(channel1, channel2)
+                        else:
+                            channel3 = resize(class_2[:,:,:,2], size=image_size)
+                            class_2 = data_processing.concat_channels(channel1, channel2, channel3)
+
+                    if val_class_1 is not None:
+                        if self.img_num_channels == 1:
+                            val_class_1 = resize(val_class_1, size=image_size)
+                        else:
+                            val_channel1 = resize(val_class_1[:,:,:,0], size=image_size)
+                            val_channel2 = resize(val_class_1[:,:,:,1], size=image_size)
+                            if self.img_num_channels == 2:
+                                val_class_1 = data_processing.concat_channels(val_channel1, val_channel2)
+                            else:
+                                val_channel3 = resize(val_class_1[:,:,:,2], size=image_size)
+                                val_class_1 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
+
+                    if val_class_2 is not None:
+                        if self.img_num_channels == 1:
+                            val_class_2 = resize(val_class_2, size=image_size)
+                        elif self.img_num_channels > 1:
+                            val_channel1 = resize(val_class_2[:,:,:,0], size=image_size)
+                            val_channel2 = resize(val_class_2[:,:,:,1], size=image_size)
+                            if self.img_num_channels == 2:
+                                val_class_2 = data_processing.concat_channels(val_channel1, val_channel2)
+                            else:
+                                val_channel3 = resize(val_class_2[:,:,:,2], size=image_size)
+                                val_class_2 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
+                
+                clear_session()
+
+                if self.verbose == 1:
+                    print()
+                    print('    ===== CV {} =====    '.format(k+2))
+                    print()
+
+                clear_session()
+
+                if self.opt_model is False:
+                    model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                        min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, epochs=self.train_epochs, 
+                        batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
+                        checkpoint=False, verbose=self.verbose)
+                else:
+                    model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
+                        normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_blob=val_class_1, val_other=val_class_2, 
+                        epochs=self.train_epochs, batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                        loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, regularizer=regularizer, 
+                        pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pool_size_1=pool_size_1, 
+                        pool_stride_1=pool_stride_1, pool_size_2=pool_size_2, pool_stride_2=pool_stride_2, 
+                        pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, filter_1=filter_1, filter_size_1=filter_size_1, 
+                        strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, 
+                        filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, filter_4=filter_4, 
+                        filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, 
+                        strides_5=strides_5, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, 
+                        dropout_1=dropout_1, dropout_2=dropout_2, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+                    
+                clear_session()
+
+                #If the training fails just return NaN#
+                if np.isfinite(history.history['loss'][-1]):
+                    models.append(model), histories.append(history)
+                else:
+                    return np.nan 
+
+        ###### Additional test data metric ######
         if self.test_blob is not None or self.test_other is not None:
-            ###If after-test data is input### 
+            test = []
             if self.test_blob is not None and self.test_other is not None:
                 blob_test_crop, other_test_crop = resize(self.test_blob, size=image_size), resize(self.test_other, size=image_size)
                 X_test, Y_test = create_training_set(blob_test_crop, other_test_crop, normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, img_num_channels=self.img_num_channels)
@@ -335,45 +482,64 @@ class objective_cnn(object):
                 if self.test_other is not None:
                     other_test_crop = resize(self.test_other, size=image_size)
                     X_test, Y_test = data_processing.process_class(other_test_crop, label=0, normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, img_num_channels=self.img_num_channels)
-            test_loss, test_acc, test_f1_score = model.evaluate(X_test, Y_test, batch_size=len(X_test))
-            if 'loss' in self.metric:
-                test_metric = 1 - test_loss
-            elif 'acc' in self.metric:
-                test_metric = test_acc 
-            elif 'f1' in self.metric:
-                test_metric = test_f1_score 
-            print('test metric: '+str(test_metric))
+            ###Loop through all the models###
+            for i in range(len(models)):
+                test_loss, test_acc, test_f1_score = models[i].evaluate(X_test, Y_test, batch_size=len(X_test))
+                if 'loss' in self.metric:
+                    test_metric = 1 - test_loss
+                elif 'acc' in self.metric:
+                    test_metric = test_acc 
+                elif 'f1' in self.metric:
+                    test_metric = test_f1_score
+                elif 'all' in self.metric:
+                    test_metric = np.mean([1 - test_loss, test_acc, test_f1_score])
+                print('After-Test Metric ('+self.metric+'): '+str(test_metric))
+                test.append(test_metric)
+            test_metric = np.mean(test)
         else:
             test_metric = None
 
+        ### Calculate the final optimization metric ###
         metrics = ['loss', 'binary_accuracy', 'f1_score']
         if self.metric == 'all': #Average all the training metrics
+            training_metrics_mean, training_loss_mean = [], []
             if self.average:
-                training_metrics_mean = np.mean([np.mean(history.history[metric]) for metric in metrics if 'loss' not in metric])
-                training_loss_mean = 1 - np.mean(history.history['loss']) # negative sign because loss is being minimized
+                for i in range(len(histories)):
+                    training_metrics_mean.append(np.mean([np.mean(histories[i].history[metric]) for metric in metrics if 'loss' not in metric]))
+                    training_loss_mean.append(1 - np.mean(histories[i].history['loss']))
             else:
-                training_metrics_mean = np.mean([history.history[metric][-1] for metric in metrics if 'loss' not in metric])
-                training_loss_mean = 1 - history.history['loss'][-1] 
+                for i in range(len(histories)):
+                    training_metrics_mean.append(np.mean([histories[i].history[metric][-1] for metric in metrics if 'loss' not in metric]))
+                    training_loss_mean.append(1 - histories[i].history['loss'][-1])
             if test_metric is None:
                 final_score = np.mean([training_metrics_mean, training_loss_mean])
             else:
                 final_score = np.mean([training_metrics_mean, training_loss_mean, test_metric])
         elif self.metric == 'val_all': #Average all the validation metrics
+            val_metrics_mean, val_loss_mean = [], [] 
             if self.average:
-                val_metrics_mean = np.mean([np.mean(history.history['val_'+metric]) for metric in metrics if 'loss' not in metric])
-                val_loss_mean = 1 - np.mean(history.history['val_loss']) 
+                for i in range(len(histories)):
+                    val_metrics_mean.append(np.mean([np.mean(histories[i].history['val_'+metric]) for metric in metrics if 'loss' not in metric]))
+                    val_loss_mean.append(1 - np.mean(histories[i].history['val_loss']))
             else:
-                val_metrics_mean = np.mean([history.history['val_'+metric][-1] for metric in metrics if 'loss' not in metric])
-                val_loss_mean = 1 - history.history['val_loss'][-1]
+                for i in range(len(histories)):
+                    val_metrics_mean.append(np.mean([histories[i].history['val_'+metric][-1] for metric in metrics if 'loss' not in metric]))
+                    val_loss_mean.append(1 - histories[i].history['val_loss'][-1])
             if test_metric is None:
                 final_score = np.mean([val_metrics_mean, val_loss_mean])
             else:
                 final_score = np.mean([val_metrics_mean, val_loss_mean, test_metric])
         else:
+            final_score = []
             if self.average:
-                final_score = np.mean(history.history[self.metric])
+                for i in range(len(histories)):
+                    final_score.append(np.mean(histories[i].history[self.metric]))
             else:
-                final_score = history.history[self.metric][-1]
+                for i in range(len(histories)):
+                    final_score.append(histories[i].history[self.metric][-1])
+
+            final_score = np.mean(final_score)
+
             if 'loss' in self.metric: 
                 final_score = 1 - final_score
             if test_metric is not None:
@@ -563,7 +729,8 @@ class objective_rf(object):
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, img_num_channels=1, 
     normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, train_epochs=25, patience=5, metric='loss', 
     limit_search=True, opt_model=True, opt_aug=False, batch_min=10, batch_max=300, image_size_min=50, image_size_max=100, balance_val=True,
-    opt_max_min_pix=None, opt_max_max_pix=None, opt_cv=10, test_size=None, average=True, test_blob=None, test_other=None):
+    opt_max_min_pix=None, opt_max_max_pix=None, opt_cv=10, test_size=None, average=True, test_blob=None, test_other=None, shift=10, 
+    mask_size=None, num_masks=None, verbose=0):
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy, unless a CNN
     is being optimized, in which case no cross-validation is performed during trial assesment.
@@ -792,7 +959,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         objective = objective_cnn(data_x, data_y, img_num_channels=img_num_channels, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, 
             val_blob=val_X, val_other=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, average=average, test_blob=test_blob, test_other=test_other,
             opt_model=opt_model, opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, image_size_min=image_size_min, image_size_max=image_size_max, balance_val=balance_val, 
-            opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix)
+            opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix, shift=shift, opt_cv=opt_cv, mask_size=mask_size, num_masks=num_masks, verbose=verbose)
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True, gc_after_trial=True)#, n_jobs=1)
         params = study.best_trial.params
 

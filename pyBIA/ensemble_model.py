@@ -29,7 +29,6 @@ from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.manifold import TSNE
 
 from pyBIA.optimization import hyper_opt, borutashap_opt, KNN_imputation, MissForest_imputation
-from optuna.visualization.matplotlib import plot_optimization_history, plot_param_importances
 from optuna.importance import get_param_importances, FanovaImportanceEvaluator
 from xgboost import XGBClassifier
 import scikitplot as skplt

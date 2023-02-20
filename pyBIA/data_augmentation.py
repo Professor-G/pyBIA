@@ -12,9 +12,10 @@ import matplotlib.pyplot as plt
 from warnings import warn
 import numpy as np
 import random
+import copy
 
 def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5, height_shift=5, 
-    horizontal=True, vertical=True, rotation=True, fill='nearest', image_size=50):
+    horizontal=True, vertical=True, rotation=True, fill='nearest', image_size=50, mask_size=None, num_masks=None):
     """
     This function takes in one image and applies data augmentation techniques.
     Shifts and rotations occur at random, for example, if width_shift is set
@@ -109,7 +110,10 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
         augmented_data = resize(augmented_data, size=image_size)
 
     if channel2 is None:
-        return augmented_data
+        if mask_size is None:
+            return augmented_data
+        else:
+            return random_cutout(augmented_data, mask_size, num_masks)
     else:
         seeds = np.array(seeds)
         if len(channel2.shape) != 4:
@@ -133,7 +137,10 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
             augmented_data2 = resize(augmented_data2, size=image_size)
 
     if channel3 is None:
-        return augmented_data, augmented_data2
+        if mask_size is None:
+            return augmented_data, augmented_data2
+        else:
+            return random_cutout(augmented_data, mask_size, num_masks), random_cutout(augmented_data2, mask_size, num_masks)
     else:
         if len(channel3.shape) != 4:
             if len(channel3.shape) == 3: 
@@ -155,7 +162,10 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
     if augmented_data3 is not None:
         augmented_data3 = resize(augmented_data3, size=image_size)            
 
-    return augmented_data, augmented_data2, augmented_data3
+    if mask_size is None:
+        return augmented_data, augmented_data2, augmented_data3
+    else:
+        return random_cutout(augmented_data, mask_size, num_masks), random_cutout(augmented_data2, mask_size, num_masks), random_cutout(augmented_data3, mask_size, num_masks)
 
 def resize(data, size=50):
     """
@@ -220,6 +230,36 @@ def resize(data, size=50):
     resized_data = np.array(resized_images)
 
     return resized_data
+
+def random_cutout(data, mask_size=16, num_masks=1):
+    """
+    Applies the cutout data augmentation technique to a sample of 2D images.
+    This method applies `num_masks` random positioned (mask_size x mask_size) black squares to each image.
+
+    Args:
+        images (numpy array): A 3D array of shape (num_images, height, width).
+        mask_size (int): The size of the cutout mask. Defaults to 16.
+        num_masks (int): Number of masks to apply to each image. Defaults to 1.
+
+    Returns:
+        A 3D array of the same shape as images, with cutout applied.
+    """
+
+    images = copy.deepcopy(data)
+
+    num_images, height, width = images.shape
+
+    for i in range(num_images):
+        for j in range(num_masks):
+            if height - mask_size > 0:
+                h = np.random.randint(height - mask_size)
+                w = np.random.randint(width - mask_size)
+                images[i, h:h+mask_size, w:w+mask_size] = 0
+            else:
+                pass
+
+    return images
+
 
 def plot(data, cmap='gray', title=''):
     """

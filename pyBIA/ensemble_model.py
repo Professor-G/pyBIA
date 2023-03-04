@@ -223,7 +223,7 @@ class Classifier:
                 and created anew to avoid duplicate files. 
         """
         if self.model is None and self.imputer is None and self.feats_to_use is None:
-            raise ValueError('The models have not been created! Run classifier.create() first.')
+            raise ValueError('The models have not been created! Run the create() method first.')
 
         if path is None:
             path = str(Path.home())

@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 from warnings import warn
 import numpy as np
 import random
-import copy
 
 def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5, height_shift=5, 
     horizontal=True, vertical=True, rotation=True, fill='nearest', image_size=50, mask_size=None, num_masks=None):
@@ -67,6 +66,12 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
 
     if isinstance(width_shift, int) == False or isinstance(height_shift, int) == False:
         raise ValueError("Shift parameters must be integers indicating +- pixel range")
+    if mask_size is not None:
+        if num_masks is None:
+            raise ValueError('Need to input num_masks parameter.')
+    if num_masks is not None:
+        if mask_size is None:
+            raise ValueError('Need to input mask_size parameter.')
 
     if rotation:
         rotation = 360
@@ -74,8 +79,16 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
         rotation = 0
 
     def image_rotation(data):
-        return rotate(data, np.random.choice(range(rotation+1), 1)[0], reshape=False, order=1, prefilter=False)
-    
+        """
+        Function for the image data genereation which hardcodes the rotation parameter of the parent function.
+        The order parameter to 0 to ensure that the rotation is performed using nearest-neighbor interpolation, 
+        which minimizes the amount of distortion introduced into the image. Additionally, the reshape parameter is False, 
+        which will ensure that the rotated image has the same shape as the original image. The prefilter parameter is also 
+        set to False to prevent any additional processing from being performed on the image prior to rotation.
+        """
+        return rotate(data, np.random.choice(range(rotation+1), 1)[0], reshape=False, order=0, prefilter=False)
+        
+    #Tensorflow Image Data Generator with shifts and flips. While fill is also an option, in practice it is best to crop an oversized image 
     datagen = ImageDataGenerator(
         width_shift_range=width_shift,
         height_shift_range=height_shift,
@@ -83,6 +96,7 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
         vertical_flip=vertical,
         fill_mode=fill)
 
+    #The rotation child function is only added to the Image Data Generator if rotation parameter is input
     if rotation != 0:
         datagen.preprocessing_function = image_rotation
 
@@ -95,25 +109,22 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
         else:
             raise ValueError("Input data must be 2D for single sample or 3D for multiple samples")
 
-    augmented_data = []
-    seeds = []
+    augmented_data, seeds = [], []
     for i in np.arange(0, len(data)):
         original_data = data[i].reshape((1,) + data[-i].shape)
         for j in range(batch):
             seed = int(random.sample(range(int(1e6)), 1)[0])
             seeds.append(seed)
             augment = datagen.flow(original_data, batch_size=1, seed=seed)
-            augmented_data.append(augment[0][0])
+            if mask_size is not None:
+                augmented_data.append(random_cutout(augment[0][0], mask_size=mask_size, num_masks=num_masks, seed=seed, augmenting=True))
+            else:
+                augmented_data.append(augment[0][0])
 
-    augmented_data = np.array(augmented_data)
-    if augmented_data is not None:
-        augmented_data = resize(augmented_data, size=image_size)
+    augmented_data = resize(np.array(augmented_data), size=image_size)
 
     if channel2 is None:
-        if mask_size is None:
-            return augmented_data
-        else:
-            return random_cutout(augmented_data, mask_size, num_masks)
+        return augmented_data
     else:
         seeds = np.array(seeds)
         if len(channel2.shape) != 4:
@@ -129,18 +140,16 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
             original_data = data[i].reshape((1,) + data[-i].shape)
             for j in range(batch):
                 augment = datagen.flow(original_data, batch_size=1, seed=seeds[k])
-                augmented_data2.append(augment[0][0])
+                if mask_size is not None:
+                    augmented_data2.append(random_cutout(augment[0][0], mask_size=mask_size, num_masks=num_masks, seed=seeds[k], augmenting=True))
+                else:
+                    augmented_data2.append(augment[0][0])
                 k+=1
 
-        augmented_data2 = np.array(augmented_data2)
-        if augmented_data2 is not None:
-            augmented_data2 = resize(augmented_data2, size=image_size)
+        augmented_data2 = resize(np.array(augmented_data2), size=image_size)
 
     if channel3 is None:
-        if mask_size is None:
-            return augmented_data, augmented_data2
-        else:
-            return random_cutout(augmented_data, mask_size, num_masks), random_cutout(augmented_data2, mask_size, num_masks)
+        return augmented_data, augmented_data2
     else:
         if len(channel3.shape) != 4:
             if len(channel3.shape) == 3: 
@@ -155,17 +164,15 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
             original_data = data[i].reshape((1,) + data[-i].shape)
             for j in range(batch):
                 augment = datagen.flow(original_data, batch_size=1, seed=seeds[k])
-                augmented_data3.append(augment[0][0])
+                if mask_size is not None:
+                    augmented_data3.append(random_cutout(augment[0][0], mask_size=mask_size, num_masks=num_masks, seed=seeds[k], augmenting=True))
+                else:
+                    augmented_data3.append(augment[0][0])
                 k+=1
 
-    augmented_data3 = np.array(augmented_data3)
-    if augmented_data3 is not None:
-        augmented_data3 = resize(augmented_data3, size=image_size)            
+    augmented_data3 = resize(np.array(augmented_data3), size=image_size)
 
-    if mask_size is None:
-        return augmented_data, augmented_data2, augmented_data3
-    else:
-        return random_cutout(augmented_data, mask_size, num_masks), random_cutout(augmented_data2, mask_size, num_masks), random_cutout(augmented_data3, mask_size, num_masks)
+    return augmented_data, augmented_data2, augmented_data3
 
 def resize(data, size=50):
     """
@@ -194,7 +201,7 @@ def resize(data, size=50):
     if width != height:
         raise ValueError("Can only resize square images")
     if width == size:
-        print("No resizing necessary, image shape is already in desired size, returning original data...", stacklevel=2)
+        #print("No resizing necessary, image shape is already in desired size, returning original data...")
         return data 
 
     if len(data.shape) == 2:
@@ -231,23 +238,32 @@ def resize(data, size=50):
 
     return resized_data
 
-def random_cutout(data, mask_size=16, num_masks=1):
+def random_cutout(images, mask_size=16, num_masks=1, seed=None, augmenting=False):
     """
     Applies the cutout data augmentation technique to a sample of 2D images.
     This method applies `num_masks` random positioned (mask_size x mask_size) black squares to each image.
 
     Args:
-        images (numpy array): A 3D array of shape (num_images, height, width).
+        data (numpy array): A 3D array of shape (num_images, height, width).
         mask_size (int): The size of the cutout mask. Defaults to 16.
         num_masks (int): Number of masks to apply to each image. Defaults to 1.
+        seed (int): Seed for the random number generator. Defaults to None.
+        augmenting (bool): If False the image shape is assumed to be (num_img, height, width), if True
+            it is assumed to be reversed. Defaults to False.
 
     Returns:
-        A 3D array of the same shape as images, with cutout applied.
+        A 3D array of the same shape as data, with cutout applied.
     """
 
-    images = copy.deepcopy(data)
+    #images = copy.deepcopy(data)
 
-    num_images, height, width = images.shape
+    if augmenting: #The data augmentation procedure requires the input to be inversed.
+        width, height, num_images = images.shape
+    else:
+        num_images, height, width = images.shape
+
+    if seed is not None:
+        np.random.seed(seed)
 
     for i in range(num_images):
         for j in range(num_masks):
@@ -256,10 +272,11 @@ def random_cutout(data, mask_size=16, num_masks=1):
                 w = np.random.randint(width - mask_size)
                 images[i, h:h+mask_size, w:w+mask_size] = 0
             else:
-                pass
+                raise ValueError('WARNING: Mask size is too large for the image input!')
+
+    np.random.seed(1909) #Set back to pyBIA default
 
     return images
-
 
 def plot(data, cmap='gray', title=''):
     """

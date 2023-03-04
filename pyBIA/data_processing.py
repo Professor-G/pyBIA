@@ -83,7 +83,7 @@ def crop_image(data, x, y, size=50, invert=False):
         If your image is 200x200, then x, y = (100,100), and so on.
     """
 
-    if invert == True:
+    if invert:
         x, y = y, x
         
     data_copy = copy.deepcopy(data)

@@ -9,7 +9,7 @@ from setuptools import setup, find_packages, Extension
 
 setup(
     name="pyBIA",
-    version="1.2.0",
+    version="1.3.0",
     author="Daniel Godines",
     author_email="danielgodinez123@gmail.com",
     description="Convolutional Neural Network for Ly-alpha Blob Detection",
@@ -24,7 +24,7 @@ setup(
 ],
     packages=find_packages('.'),
     install_requires = ['numpy','tensorflow','scikit-learn','scikit-optimize','scipy','photutils', 
-        'matplotlib', 'progress', 'pandas','missingpy', 'optuna', 'boruta', 'astropy', 'xgboost', 'BorutaShap',
+        'matplotlib', 'progress', 'pandas', 'optuna', 'boruta', 'astropy', 'xgboost', 'BorutaShap',
         'scikit-plot', 'dill', 'opencv-python'],
     python_requires='>=3.7,<4',
     include_package_data=True,

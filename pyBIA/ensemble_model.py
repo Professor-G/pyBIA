@@ -82,15 +82,6 @@ class Classifier:
             Defaults to True.        
         csv_file (DataFrame, optional): The csv file output after generating the training set. This can be
             input in lieu of the data_x and data_y arguments.
-        
-    Attributes:
-        model (object): The machine learning model that is created
-        imputer (object): The imputer created during model creation
-        feats_to_use (ndarray): Array of indices containing the metrics
-            that contribute to classification accuracy.
-        feature_history (object): The Boruta feature selection history result.
-        optimization_results (object): The Optuna hyperparameter optimization history result.
-        best_params (dict): The best parameters output from the optimization routine.
     """
 
     def __init__(self, data_x=None, data_y=None, clf='rf', optimize=False, opt_cv=10, 

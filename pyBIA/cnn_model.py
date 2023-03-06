@@ -110,13 +110,6 @@ class Classifier:
         monitor2_thresh (float, optional): The threshold value of the second monitor metric. If the metric is loss-related
             the training will stop early if the value falls below this threshold. Similarly, if the metric is accuracy-related,
             then the training will stop early if the value falls above this threshold. Defaults to None.
-
-        Attributes:
-            model (object): The machine learning model.
-            history (object): The machine learning model history, generated during training.
-            optimization_results (object): The Optuna hyperparameter optimization history result.
-            best_params (dict): The best parameters output from the optimization routine.
-
     """
 
     def __init__(self, positive_class=None, negative_class=None, val_positive=None, val_negative=None, img_num_channels=1, 

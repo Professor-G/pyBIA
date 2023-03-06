@@ -348,43 +348,54 @@ class Classifier:
 
         return
 
-    def predict(self, time, mag, magerr, convert=True, zp=24):
+    def predict(self, data):
         """
         Predics the class label of new, unseen data.
 
         Args:
-            time (ndarray): Array of observation timestamps.
-            mag (ndarray): Array of observed magnitudes.
-            magerr (ndarray): Array of corresponding magnitude errors.
-            model (object): The machine learning model to use for predictions.
-            convert (bool, optional): If False the features are computed with the input magnitudes.
-                Defaults to True to convert and compute in flux. 
-            zp (float): Zeropoint of the instrument, used to convert from magnitude
-                to flux. Defaults to 24.
+            data (ndarray): 2D array of size (n x m), where n is the
+                number of samples, and m the number of features.
 
         Returns:
-            Array containing the classes and the corresponding probability predictions.
+            2D array containing the classes and the corresponding probability prediction
         """
 
-        if len(mag) < 30:
-            warn('The number of data points is low -- results may be unstable')
-
-        #classes = ['CONSTANT', 'CV', 'LPV', 'ML', 'VARIABLE']
+        data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
         classes = self.model.classes_
-        stat_array=[]
-        
-        if self.imputer is None and self.feats_to_use is None:
-            stat_array.append(extract_features.extract_all(time, mag, magerr, convert=convert, zp=zp))
-            pred = self.model.predict_proba(stat_array)
-            return np.c_[classes, pred[0]]
-        
-        stat_array.append(extract_features.extract_all(time, mag, magerr, convert=convert, zp=zp, feats_to_use=self.feats_to_use))
-        
-        if self.imputer is not None:
-            stat_array = self.imputer.transform(stat_array)
-        pred = self.model.predict_proba(stat_array)
+        output = []
 
-        return np.c_[classes, pred[0]]
+        if self.imputer is None and self.feats_to_use is None:
+            proba = self.model.predict_proba(data)
+            for i in range(len(proba)):
+                index = np.argmax(proba[i])
+                output.append([classes[index], proba[i][index]])
+            return np.array(output)
+
+        if self.feats_to_use is not None:
+            if len(data.shape) == 1:
+                data = data[self.feats_to_use].reshape(1,-1)
+            else:
+                data = data[:,self.feats_to_use]
+                
+            if self.imputer is not None:
+                data = self.imputer.transform(data)
+
+            proba = self.model.predict_proba(data)
+
+            for i in range(len(proba)):
+                index = np.argmax(proba[i])
+                output.append([classes[index], proba[i][index]])
+            return np.array(output)
+
+        if self.imputer is not None:
+            data = self.imputer.transform(data)
+
+        proba = self.model.predict_proba(data)
+        for i in range(len(proba)):
+            index = np.argmax(proba[i])
+            output.append([classes[index], proba[i][index]])
+            
+        return np.array(output)
 
     def plot_tsne(self, data_y=None, special_class=None, norm=True, pca=False, 
         legend_loc='upper center', title='Feature Parameter Space', savefig=False):

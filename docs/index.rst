@@ -33,8 +33,8 @@ You can also clone the development version:
 .. code-block:: bash
 
     git clone https://github.com/Professor-G/pyBIA.git
-    python setup.py install
-    pip install -r requirements.txt
+    cd pyBIA
+    pip install .
 
 Importing pyBIA 
 ==================

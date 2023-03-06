@@ -22,12 +22,11 @@ import random as python_random
 np.random.seed(1909), python_random.seed(1909), tf.random.set_seed(1909)
 
 from tensorflow.keras import backend as K
-from tensorflow.keras.regularizers import l2 
-from tensorflow.keras.backend import clear_session 
 from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.backend import clear_session 
+from tensorflow.keras.models import Sequential, save_model, load_model, Model
 from tensorflow.keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import SGD, Adagrad, Adam, RMSprop
-from tensorflow.keras.models import Sequential, save_model, load_model, Model
 from tensorflow.keras.losses import categorical_crossentropy, Hinge, SquaredHinge, KLDivergence, LogCosh
 from tensorflow.keras.layers import Input, Activation, Dense, Dropout, Conv2D, MaxPool2D, \
     AveragePooling2D, GlobalAveragePooling2D, Flatten, BatchNormalization, Lambda, concatenate
@@ -37,59 +36,98 @@ from pyBIA.data_processing import process_class, create_training_set, concat_cha
 from pyBIA.data_augmentation import augmentation, resize
 from pyBIA import optimization
 
-#plt.style.use('/Users/daniel/Documents/plot_style.txt')
 
 class Classifier:
     """
-    Creates and trains the convolutional neural network. 
-    The built-in methods can be used predict new samples, and
-    also optimize the engine and output visualizations.
-
-    Attributes:
-        model: The machine learning model that is created
-        
-        load: load model
-
-        save: save model
-
-        predict: predict new samples
-
-        plot_hyper_opt: Plot hyperparameter optimization history
+    Creates and trains the convolutional neural network. The built-in methods can be used predict new samples, and also optimize the engine and output visualizations.
 
     Args:
-        blob_data (ndarray, optional): 2D array of size (n x m), where n is the
-            number of samples, and m the number of features. Defaults to None,
-            in which case a model can be loaded using the class attributes.
-        other_data (ndarray, optional): 1D array containing the corresponing labels. Defaults to None,
-            in which case a model can be loaded using the class attributes..
-        clf (str): The machine learning classifier to optimize. Can either be
-            'rf' for Random Forest, 'nn' for Neural Network, or 'xgb' for Extreme Gradient Boosting. 
-            Defaults to 'rf'.
+        positive_class (ndarray): The samples for the first class should be passed, which will automatically 
+            be assigned the positive label '1'.
+        negative_class (ndarray, str): The samples for the second class should be passed, which will automatically 
+            be assigned the negative label '0'.
+        val_positive (ndarray, optional): Positive class data to be used for validation. Defaults to None.
+        val_negative (ndarray, optional): Negative class data to be used for validation. Defaults to None.
+        test_positive (ndarray, optional): Positive class data to be used for post-trial testing. Defaults to None.
+        test_negative (ndarray, optional): Negative class data to be used for post-trial testing. Defaults to None.
         optimize (bool): If True the Boruta algorithm will be run to identify the features
-            that contain useful information, after which the optimal Random Forest hyperparameters
-            will be calculated using Bayesian optimization. 
-        impute (bool): If False no data imputation will be performed. Defaults to True,
-            which will result in two outputs, the classifier and the imputer to save
-            for future transformations. 
-        imp_method (str): The imputation techinque to apply, can either be 'KNN' for k-nearest
-            neighbors imputation, or 'MissForest' for the MissForest machine learning imputation
-            algorithm. Defaults to 'KNN'.
-        n_iter (int): The maximum number of iterations to perform during 
-            the hyperparameter search. Defaults to 25. 
+            that contain useful information, after which the optimal Random Forest hyperparameters will be calculated 
+            using Bayesian optimization. 
+        n_iter (int): The maximum number of iterations to perform during the hyperparameter search. Defaults to 25. 
+        train_epochs (int): Number of epochs to the train the CNN to during the optimization trials. Defaults to 25.
+        img_num_channels (int): The number of filters. Defaults to 1.
+        normalize (bool, optional): If True the data will be min-max normalized using the 
+            input min and max pixels. Defaults to True.
+        min_pixel (int, optional): The minimum pixel count, pixels with counts 
+            below this threshold will be set to this limit. Defaults to 0.
+        max_pixel (int, list, optional): The maximum pixel count, pixels with counts 
+            above this threshold will be set to this limit. Defaults to 100. If img_num_channels
+            is not 1, the max_pixel should be a list containing two values, one for each band.
+        metric (str): Assesment metric to use when both pruning and scoring the hyperparameter optimization trial.
+            Defaults to 'loss'. Options include: 'loss' 'binary_accuracy', 'f1_score' 'all' or the validation equivalents (e.g. 'val_loss').
+        patience (int): Number of epochs without improvement before the optimization trial is terminated. Defaults to 0, which
+            disables this feature.
+        average (bool): If False, the designated metric will be calculated according to its value at the end of the train_epochs. 
+            If True, the metric will be averaged out across all train_epochs. Defaults to True.
+        opt_model (bool): If True, the architecture parameters will be optimized. Defaults to True.
+        opt_aug (bool): If True, the augmentation procedure will be optimized. Defaults to False.
+        batch_min (int): The minimum number of augmentations to perform per image on the positive class, only applicable 
+        if opt_aug=True. Defaults to 2.
+        batch_max (int): The maximum number of augmentations to perform per image on the positive class, only applicable 
+        if opt_aug=True. Defaults to 25.
+        image_size_min (int): The minimum image size to assess, only applicable if opt_aug=True. Defaults to 50.
+        image_size_max (int): The maximum image size to assess, only applicable if opt_aug=True. Defaults to 100.
+        opt_max_min_pix (int, optional): The minimum max pixel value to use when tuning the normalization procedure, 
+            only applicable if opt_aug=True. Defaults to None.
+        opt_max_max_pix (int, optional): The maximum max pixel value to use when tuning the normalization procedure, 
+            only applicable if opt_aug=True. Defaults to None.
+        shift (int): The max allowed vertical/horizontal shifts to use during the data augmentation routine, only applicable
+            if opt_aug=True. Defaults to 10 pixels.
+        mask_size (int, optional): If enabled, this will set the pixel length of a square cutout, to be randomly placed
+            somewhere in the augmented image. This cutout will replace the image values with 0, therefore serving as a 
+            regularizear. Only applicable if opt_aug=True. Defaults to None.
+        num_masks (int, optional): The number of masks to create, to be used alongside the mask_size parameter. If 
+            this is set to a value greater than one, overlap may occur. 
+        verbose (int): Controls the amount of output printed during the training process. A value of 0 is for silent mode, 
+            a value of 1 is used for progress bar mode, and 2 for one line per epoch mode. Defaults to 1.
+        opt_cv (int): Cross-validations to perform when assesing the performance at each
+            hyperparameter optimization trial. For example, if cv=3, then each optimization trial
+            will be assessed according to the 3-fold cross validation accuracy. Defaults to 10.
+            NOTE: The higher this number, the longer the optimization will take.
+        balance (bool, optional): This will determine whether the two classes
+            are kept the same size during optimization, applicable if tuning the augmentation
+            parameters. Defaults to True.
+        limit_search (bool): If False, the AlexNet layer paremters will be tuned, including the number of filters to learn
+            as well as the convolution sizes and strides. Defaults to False due to memory allocation issues when handling
+            lots of tunable parameters.
+        train_acc_threshold (float, optional): A value between 0 and 1 that designates the training binary_accuracy threshold that should
+            not be exceeded. As soon as the training exceeds this limit, the trial is stopped early. Defaults to None.
+        monitor1 (str, optional): The first metric to monitor, can take the same values as the metric argument. Defaults to None.
+        monitor2 (str, optional): The second metric to monitor, can take the same values as the metric argument. Defaults to None.
+        monitor1_thresh (float, optional): The threshold value of the first monitor metric. If the metric is loss-related
+            the training will stop early if the value falls below this threshold. Similarly, if the metric is accuracy-related,
+            then the training will stop early if the value falls above this threshold. Defaults to None.
+        monitor2_thresh (float, optional): The threshold value of the second monitor metric. If the metric is loss-related
+            the training will stop early if the value falls below this threshold. Similarly, if the metric is accuracy-related,
+            then the training will stop early if the value falls above this threshold. Defaults to None.
 
-    Returns:
-        Trained machine learning model.
+        Attributes:
+            model (object): The machine learning model.
+            history (object): The machine learning model history, generated during training.
+            optimization_results (object): The Optuna hyperparameter optimization history result.
+            best_params (dict): The best parameters output from the optimization routine.
 
     """
-    def __init__(self, blob_data=None, other_data=None, val_blob=None, val_other=None, img_num_channels=1, 
+
+    def __init__(self, positive_class=None, negative_class=None, val_positive=None, val_negative=None, img_num_channels=1, 
         optimize=True, n_iter=25, normalize=True, min_pixel=0, max_pixel=1000, epochs=25, train_epochs=25, 
         patience=5, opt_model=True, opt_aug=False, batch_min=2, batch_max=25, image_size_min=50, image_size_max=100, 
-        balance_val=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True, test_blob=None, 
-        test_other=None, shift=10, opt_cv=None, mask_size=None, num_masks=None, verbose=0, train_acc_threshold=None,
+        balance=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True, test_positive=None, 
+        test_negative=None, shift=10, opt_cv=None, mask_size=None, num_masks=None, verbose=0, train_acc_threshold=None,
         limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None):
 
-        self.blob_data = blob_data
-        self.other_data = other_data
+        self.positive_class = positive_class
+        self.negative_class = negative_class
         self.optimize = optimize 
         self.metric = metric 
         self.average = average
@@ -98,8 +136,8 @@ class Classifier:
         self.normalize = normalize 
         self.min_pixel = min_pixel
         self.max_pixel = max_pixel
-        self.val_blob = val_blob
-        self.val_other = val_other
+        self.val_positive = val_positive
+        self.val_negative = val_negative
         self.epochs = epochs
         self.train_epochs = train_epochs
         self.patience = patience
@@ -110,11 +148,11 @@ class Classifier:
         self.batch_max = batch_max 
         self.image_size_min = image_size_min
         self.image_size_max = image_size_max
-        self.balance_val = balance_val
+        self.balance = balance
         self.opt_max_min_pix = opt_max_min_pix
         self.opt_max_max_pix = opt_max_max_pix
-        self.test_blob = test_blob
-        self.test_other = test_other
+        self.test_positive = test_positive
+        self.test_negative = test_negative
         self.shift = shift  
         self.opt_cv = opt_cv 
         self.mask_size = mask_size
@@ -133,7 +171,6 @@ class Classifier:
         self.best_params = None 
         self.optimization_results = None 
 
-
     def create(self):
         """
         Creates the CNN machine learning engine.
@@ -144,16 +181,16 @@ class Classifier:
 
         if self.optimize is False and self.best_params is None:
             print("Returning base AlexNet model...")
-            self.model, self.history = AlexNet(self.blob_data, self.other_data, img_num_channels=self.img_num_channels, normalize=self.normalize,
+            self.model, self.history = AlexNet(self.positive_class, self.negative_class, img_num_channels=self.img_num_channels, normalize=self.normalize,
                 min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_blob=self.val_blob, val_other=self.val_other, epochs=self.epochs)
             
             return      
 
         if self.best_params is None:
-            self.best_params, self.optimization_results = optimization.hyper_opt(self.blob_data, self.other_data, clf='cnn', metric=self.metric, average=self.average, 
-                n_iter=self.n_iter, balance=False, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, 
+            self.best_params, self.optimization_results = optimization.hyper_opt(self.positive_class, self.negative_class, clf='cnn', metric=self.metric, average=self.average, 
+                n_iter=self.n_iter, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, 
                 val_X=self.val_blob, val_Y=self.val_other, train_epochs=self.train_epochs, patience=self.patience, opt_model=self.opt_model, opt_aug=self.opt_aug, 
-                batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance_val=self.balance_val,
+                batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance=self.balance,
                 opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, test_blob=self.test_blob, test_other=self.test_other, shift=self.shift, opt_cv=self.opt_cv, 
                 mask_size=self.mask_size, num_masks=self.num_masks, verbose=self.verbose, train_acc_threshold=self.train_acc_threshold, limit_search=self.limit_search,
                 monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, monitor2_thresh=self.monitor2_thresh)
@@ -179,16 +216,16 @@ class Classifier:
 
             if self.opt_aug:
                 if self.img_num_channels == 1:
-                    channel1, channel2, channel3 = copy.deepcopy(self.blob_data), None, None 
+                    channel1, channel2, channel3 = copy.deepcopy(self.positive_class), None, None 
                 elif self.img_num_channels == 2:
-                    channel1, channel2, channel3 = copy.deepcopy(self.blob_data[:,:,:,0]), copy.deepcopy(self.blob_data[:,:,:,1]), None 
+                    channel1, channel2, channel3 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), None 
                 elif self.img_num_channels == 3:
-                    channel1, channel2, channel3 = copy.deepcopy(self.blob_data[:,:,:,0]), copy.deepcopy(self.blob_data[:,:,:,1]), copy.deepcopy(self.blob_data[:,:,:,2])
+                    channel1, channel2, channel3 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), copy.deepcopy(self.positive_class[:,:,:,2])
                 else:
                     raise ValueError('Only three filters are supported!')
 
                 augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.best_params['num_aug'], 
-                    width_shift=self.shift, height_shift=self.shift, horizontal=True, vertical=True, rotation=True,#self.best_params['rotation'], 
+                    width_shift=self.shift, height_shift=self.shift, horizontal=True, vertical=True, rotation=False,#self.best_params['rotation'], 
                     image_size=self.best_params['image_size'], mask_size=self.mask_size, num_masks=self.num_masks)
 
                 if self.img_num_channels > 1:
@@ -205,14 +242,14 @@ class Classifier:
 
                 #Perform same augmentation techniques on other data, batch=1
                 if self.img_num_channels == 1:
-                    channel1, channel2, channel3 = copy.deepcopy(self.other_data), None, None 
+                    channel1, channel2, channel3 = copy.deepcopy(self.negative_class), None, None 
                 elif self.img_num_channels == 2:
-                    channel1, channel2, channel3 = copy.deepcopy(self.other_data[:,:,:,0]), copy.deepcopy(self.other_data[:,:,:,1]), None 
+                    channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), None 
                 elif self.img_num_channels == 3:
-                    channel1, channel2, channel3 = copy.deepcopy(self.other_data[:,:,:,0]), copy.deepcopy(self.other_data[:,:,:,1]), copy.deepcopy(self.other_data[:,:,:,2])
+                    channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), copy.deepcopy(self.negative_class[:,:,:,2])
                 
                 augmented_images_other = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=1, 
-                    width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=True, 
+                    width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=False, 
                     image_size=image_size, mask_size=self.mask_size, num_masks=self.num_masks)
 
                 #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
@@ -229,7 +266,7 @@ class Classifier:
                     class_2 = augmented_images_other
 
                 #Balance the class sizes
-                if self.balance_val:
+                if self.balance:
                     class_2 = class_2[:len(class_1)]     
 
                 if self.img_num_channels == 1:
@@ -271,7 +308,7 @@ class Classifier:
                 else:
                     val_class_2 = None
             else:
-                class_1, class_2 = self.blob_data, self.other_data
+                class_1, class_2 = self.positive_class, self.negative_class
                 val_class_1, val_class_2 = self.val_blob, self.val_other
 
             if self.opt_model:
@@ -316,12 +353,15 @@ class Classifier:
        
         return 
 
-    def save(self, path=None, overwrite=False):
+    def save(self, dirname=None, path=None, overwrite=False):
         """
         Saves the trained classifier in a new directory named 'pyBIA_models', 
         as well as the imputer and the features to use, if applicable.
         
         Args:
+            dirname (str): The name of the directory where the model folder will be saved.
+                This directory will be created, and therefore if it already exists
+                in the system an error will appear.
             path (str): Absolute path where the data folder will be saved
                 Defaults to None, in which case the directory is saved to the
                 local home directory.
@@ -337,6 +377,15 @@ class Classifier:
             path = str(Path.home())
         if path[-1] != '/':
             path+='/'
+
+        if dirname is not None:
+            if dirname[-1] != '/':
+                dirname+='/'
+            path = path+dirname
+            try:
+                os.makedirs(path)
+            except FileExistsError:
+                raise ValueError('The dirname folder already exists!')
 
         try:
             os.mkdir(path+'pyBIA_cnn_model')
@@ -357,7 +406,7 @@ class Classifier:
             np.savetxt(path+'model_acc', self.history.history['binary_accuracy'])
             np.savetxt(path+'model_loss', self.history.history['loss'])
             np.savetxt(path+'model_f1', self.history.history['f1_score'])
-            if self.val_blob is not None:
+            if self.val_positive is not None:
                 np.savetxt(path+'model_val_acc', self.history.history['val_binary_accuracy'])
                 np.savetxt(path+'model_val_loss', self.history.history['val_loss'])
                 np.savetxt(path+'model_val_f1', self.history.history['val_f1_score'])
@@ -395,32 +444,32 @@ class Classifier:
 
         try:
             self.model = load_model(path+'Keras_Model.h5', custom_objects={'f1_score': f1_score})
-            model = 'model,'
+            model = 'model'
         except:
             model = ''
             pass
 
         try:
             self.optimization_results = joblib.load(path+'HyperOpt_Results')
-            optimization_results = 'optimization_results,'
+            optimization_results = ', optimization_results,'
         except:
             optimization_results = '' 
             pass
 
         try:
             self.best_params = joblib.load(path+'Best_Params')
-            best_params = 'best_params'
+            best_params = ', best_params'
         except:
             best_params = '' 
             pass        
 
-        print('Successfully loaded the following class attributes: {} {} {}'.format(model, optimization_results, best_params))
+        print('Successfully loaded the following class attributes: {}{}{}'.format(model, optimization_results, best_params))
         
         self.path = path
         
         return
 
-    def predict(self, data, target='DIFFUSE', return_proba=False):
+    def predict(self, data, target='ML', return_proba=False):
         """
         Returns the class prediction. The input can either be a single 2D array 
         or a 3D array if there are multiple samples.
@@ -428,11 +477,12 @@ class Classifier:
         Args:
             data: 2D array for single image, 3D array for multiple images.
             target (str): The name of the target class, assuming binary classification in 
-                which there is an 'OTHER' class. Defaults to 'DIFFUSE'. 
+                which there is an 'OTHER' class. Defaults to 'ML'. 
             return_proba (bool): If True the output will return the probability prediction.
                 Defaults to False. 
+
         Returns:
-            The class prediction(s), either 'DIFFUSE' or 'OTHER'.
+            The class prediction(s).
         """
       
         data = process_class(data, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, img_num_channels=self.img_num_channels)
@@ -470,6 +520,8 @@ class Classifier:
                 Defaults to True.
             ylog (boolean): If True the y-axis will be log-scaled.
                 Defaults to False.
+            savefig (bool): If True the figure will not disply but will be saved instead.
+                Defaults to False. 
 
         Returns:
             AxesImage
@@ -548,8 +600,8 @@ class Classifier:
         Plots the hyperparameter optimization history.
     
         Args:
-            plot_tile (bool):
-            savefig (bool): 
+            plot_tile (bool): If True, the importance on the duration will also be included. Defaults to True.
+            savefig (bool): If True the figure will not disply but will be saved instead. Defaults to False. 
 
         Returns:
             AxesImage
@@ -619,6 +671,7 @@ class Classifier:
         Returns:
             Saves two binary files, importance and duration importance.
         """
+
         print('Calculating and saving importances, this could take up to an hour...')
 
         try:
@@ -642,13 +695,22 @@ class Classifier:
 
         return  
 
-    def plot_performance(self, metric='acc', combine=False, ylabel=None, title=None,
+    def plot_performance(self, metric='binary_accuracy', combine=False, ylabel=None, title=None,
         xlim=None, ylim=None, xlog=False, ylog=True, savefig=False):
         """
-        Plots the training/performance history.
+        Plots the training/performance histories.
     
         Args:
-            
+            metric (str): Metric to plot, options are: 'binary_accuracy', 'f1_score', 'loss'. Defaults to 'binary_accuracy'
+            combine (bool): If True the validation history will also be included, if applicable.
+            ylabel (str, optional): The y-label of the plot.
+            title (str, optional): The title of the plot.
+            xlim (tuple, optional): The xlim range, matplotlib style.
+            ylim (tuple, optional): The ylim range, matplotlib style.
+            xlog (bool): Whether to log-scale the x-axis. Defaults to False.
+            ylog (bool): Whether to log-scale the y-axis. Defaults to False.
+            savefig (bool): If True the figure will not disply but will be saved instead. Defaults to False. 
+
         Returns:
             AxesImage
         """
@@ -700,31 +762,8 @@ class Classifier:
             plt.show()
 
 
-    #def load_bw_model(self):
-    #    """
-    #    Calling this will load the trained Tensorflow model, trained using NDWFS images
-    #    in the blue broadband.
-    #    
-    #    Note:
-    #        Training new models with 1000 epochs can take over a week, this Bw model
-    #        was trained using NDWFS blue broadband images of the Bootes field. The 
-    #        corresponding .h5 file is located in the data folder inside the pyBIA directory 
-    #       in the Python path. 
-    #
-    #    Returns:
-    #        The pyBIA CNN model used for classifying images in blue broadband surveys.
-
-    #  """
-
-    #   resource_package = __name__
-    #   resource_path = '/'.join(('data', 'Bw_CNN_Model.h5'))
-    #   self.model = load_model(pkg_resources.resource_filename(resource_package, resource_path))
-    #   print('Bw model successfully loaded.')
-    #   print('Note: Input data when using this model must be 50x50.')
-    #   return 
-
-def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True, 
-        min_pixel=0, max_pixel=100, val_blob=None, val_other=None, epochs=100, 
+def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True, 
+        min_pixel=0, max_pixel=100, val_positive=None, val_negative=None, epochs=100, 
         batch_size=32, lr=0.0001, momentum=0.9, decay=0.0, nesterov=False, 
         loss='binary_crossentropy', conv_init='uniform_scaling', dense_init='TruncatedNormal',
         activation_conv='relu', activation_dense='relu', model_reg='local_response', padding='same', 
@@ -732,28 +771,21 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
         pool_stride_2=2, pool_size_3=3, pool_stride_3=2, filter_1=96, filter_size_1=11, strides_1=4, 
         filter_2=256, filter_size_2=5, strides_2=1, filter_3=384, filter_size_3=3, strides_3=1, filter_4=384, 
         filter_size_4=3, strides_4=1, filter_5=256, filter_size_5=3, strides_5=1, dense_neurons_1=4096, 
-        dense_neurons_2=4096, dropout_1=0.5, dropout_2=0.5, conv_reg=0, dense_reg=0, optimizer='sgd', early_stop_callback=None, checkpoint=False, verbose=1):
+        dense_neurons_2=4096, dropout_1=0.5, dropout_2=0.5, conv_reg=0, dense_reg=0, optimizer='sgd', 
+        early_stop_callback=None, checkpoint=False, verbose=1):
         """
         The CNN model infrastructure presented by the 2012 ImageNet Large Scale 
         Visual Recognition Challenge, AlexNet. Parameters were adapted for
         our astronomy case of detecting diffuse emission.
 
-        Note:
-            To avoid exploding gradients we need to normalize our pixels to be 
-            between 0 and 1. By default normalize=True, which will perform
-            min-max normalization using the min_pixel and max_pixel arguments, 
-            which should be set carefully.
+        To avoid exploding gradients we need to normalize our pixels to be 
+        between 0 and 1. By default normalize=True, which will perform
+        min-max normalization using the min_pixel and max_pixel arguments, 
+        which should be set carefully.
 
-            The min_pixel parameter is set to 0 by default as the data is assumed
-            to be background-subtracted. The max_pixel must be adequately brighter
-            than the brighest expected target object. In this example we expected
-            the high redshift Lyman-alpha nebulae to appear diffuse and less bright,
-            so anything brighter than max_pixel=3000 can be categorized as too bright 
-            to be a candidate source.
-        
         Args:
-            blob_data (ndarray): 3D array containing more than one image of diffuse objects.
-            other_data (ndarray): 3D array containing more than one image of non-diffuse objects.
+            positive_class (ndarray): 3D array containing more than one image of diffuse objects.
+            negative_class (ndarray): 3D array containing more than one image of non-diffuse objects.
             img_num_channels (int): The number of filters used. Defaults to 1, as pyBIA version 1
                 has been trained with only blue broadband data.
             normalize (bool, optional): If True the data will be min-max normalized using the 
@@ -762,10 +794,10 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
                 Pixels with counts below this threshold will be set to this limit.
             max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
                 Pixels with counts above this threshold will be set to this limit.
-            val_blob (array, optional): 3D matrix containing the 2D arrays (images)
-                to be used for validationm, for the blob class. Defaults to None.
-            val_other (array, optional): 3D matrix containing the 2D arrays (images)
-                to be used for validationm, for the blob class. Defaults to None.
+            val_positive (array, optional): 3D matrix containing the 2D arrays (images)
+                to be used for validationm, for the positive class. Defaults to None.
+            val_negative(array, optional): 3D matrix containing the 2D arrays (images)
+                to be used for validationm, for the negative class. Defaults to None.
             epochs (int): Number of epochs used for training. 
             batch_size (int): The size of each sub-sample used during the training
                 epoch. Large batches are likely to get stuck in local minima. Defaults to 32.
@@ -776,8 +808,11 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
             nesterov (bool): Whether to apply Nesterov momentum or not. Defaults to False.
             loss (str): The loss function used to calculate the gradients. Defaults to 'categorical_crossentropy'.
                 Loss functions can be set by calling the Keras API losses module.
+            conv_init (str): Weight initializer for the convolutional layers.
+            dense_init (str): Weight initializer for the dense layers.
             activation_conv (str): Activation function to use for the convolutional layer. Default is 'relu'.'
             activation_dense (str): Activation function to use for the dense layers. Default is 'tanh'.
+            model_reg (str): The model regularization technique to use, can be None.
             padding (str): Either 'same' or 'valid'. When set to 'valid', the dimensions reduce as the boundary 
                 that doesn't make it within even convolutions get cuts off. Defaults to 'same', which applies
                 zero-value padding around the boundary, ensuring even convolutional steps across each dimension.
@@ -791,15 +826,14 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
             early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
                 to None. Should only be used during optimization, refer to pyBIA.optimization.objective_cnn().
             checkpoint (bool, optional): If False no checkpoint will be saved. Defaults to True.
-            mask_size (int, optional): Size of random cutouts, to be used during optimization. This is a data augmentation technique
-                that erases an individual cutout of size (mask_size x mask_size), applied to each image. 
-            num_masks (int, optional): Number of random cutouts.
-            model_reg (str): The model regularization technique to use, can be None.
+            verbose (int): Controls the amount of output printed during the training process. A value of 0 is for silent mode, 
+                a value of 1 is used for progress bar mode, and 2 for one line per epoch mode. Defaults to 1.
+
         Returns:
             The trained CNN model and accompanying history.
         """
         
-        if len(blob_data.shape) != len(other_data.shape):
+        if len(positive_class.shape) != len(negative_class.shape):
             raise ValueError("Shape of blob and other data must be the same.")
         if batch_size < 16 and model_reg == 'batch_norm':
             print("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.")
@@ -818,16 +852,16 @@ def AlexNet(blob_data, other_data, img_num_channels=1, normalize=True,
                 val_X2, val_Y2 = process_class(val_other, label=0, img_num_channels=img_num_channels, min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
                 val_X, val_Y = val_X2, val_Y2
 
-        img_width = blob_data[0].shape[0]
-        img_height = blob_data[0].shape[1]
+        img_width = positive_class[0].shape[0]
+        img_height = positive_class[0].shape[1]
         
-        ix = np.random.permutation(len(blob_data))
-        blob_data = blob_data[ix]
+        ix = np.random.permutation(len(positive_class))
+        positive_class = positive_class[ix]
 
-        ix = np.random.permutation(len(other_data))
-        other_data = other_data[ix]
+        ix = np.random.permutation(len(negative_class))
+        negative_class = negative_class[ix]
 
-        X_train, Y_train = create_training_set(blob_data, other_data, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+        X_train, Y_train = create_training_set(positive_class, negative_class, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
 
         if normalize:
             X_train[X_train > 1] = 1
@@ -1111,6 +1145,7 @@ def print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer, mod
         dense_init (str): The initialization method used for the dense layers.
         activation_dense (str): The activation function used for the dense layers.
     """
+
     print()
     print('===== Training Parameters =====')
     print()
@@ -1164,7 +1199,6 @@ def format_labels(labels: list) -> list:
         new_labels.append(label.title())
 
     return new_labels
-
 
 
 

@@ -945,33 +945,14 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
 def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=[0.1, 0.5, 0.9], kernel_size=21, invert=False,
     deblend=False, pix_conversion=5, cmap='viridis', path=None, name='', title='Source Detection Threshold', savefig=False):
     """
-    Returns two subplots: source and segementation object. 
+    This is the function used to generate Figure 1 of the paper, used to visualize
+    how the segmentation object differs when applying varying sigma thresholds.
 
     If no x & y positions are input, the whole image will be used. If there are
     position areguments then a subimage of area size x size will be cropped out 
     first, centered around a given (x, y). By default size=100, although this should
     be a window size that comfortably encapsulates all objects. If this is too large
     the automatic background measurements will be less robust.
-
-    Note:
-        If savefig=True, the image will not outpout, it will only be saved. If path=None
-        the .png will be saved to the local home directory.
-
-        If data is backgrond subtracted, set median_bkg = 0.
-
-    Example:
-        If the data is background subtracted, to plot the entire image and the corresponding
-        segmentation objects, we can do the following:
-
-        >>> from pyBIA.catalog import plot_segm
-        >>> plot_segm(data, median_bkg=0)
-
-        If we wish to isolate a certain object, we input the (x,y) position(s) and a window size.
-        If x & y are arrays that contain multiple positions, then each will plot in sequence.
-        Since image data from .fits files has the (0,0) position on the top left, we will 
-        also set invert=True so that the object is cropped out at the correct pixel position:
-
-        >>> plot_segm(data, x, y, size=50, median_bkg=0, invert=True)
 
     Args:
         data (ndarray): 2D array of a single image.

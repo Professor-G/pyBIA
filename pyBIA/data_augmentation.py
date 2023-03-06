@@ -50,14 +50,8 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
             and shifts. Default is set to 'nearest' which repeats the closest pixel values.
             Can set to: {"constant", "nearest", "reflect", "wrap"}.
         image_size (int, bool): The length/width of the cropped image. This can be used to remove
-            anomalies caused by the fill. Defaults to 50, the pyBIA standard. This can also
+            anomalies caused by the fill (defaults to 50). This can also
             be set to None in which case the image in its original size is returned.
-
-    Note:
-        The training set pyBIA uses includes augmented images. The original image size was
-        100x100 pixels before augmentation, these were cropped to 50x50 after the augmentation
-        procedure so as to remove rotational effects at the outer boundaries of the image.
-        This cropping is controlled via the image_size parameter.
 
     Returns:
         Array containing the augmented images. When input, channel2 and channel3 yield 
@@ -181,12 +175,10 @@ def resize(data, size=50):
 
     Args:
         data (array): 2D array
-        size (int): length/width of the output array. Defaults to
-            50 pixels which is the pyBIA convention.
+        size (int): length/width of the output array. Defaults to 50 pixels.
 
     Returns:
         The cropped out array
-
     """
 
     if len(data.shape) == 3 or len(data.shape) == 4:
@@ -290,7 +282,6 @@ def plot(data, cmap='gray', title=''):
 
     Returns:
         AxesImage.
-        
     """
     
     index = np.where(np.isfinite(data))

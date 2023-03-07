@@ -217,7 +217,7 @@ class Classifier:
         
     def save(self, dirname=None, path=None, overwrite=False):
         """
-        Saves the trained classifier in a new directory named 'pyBIA_models', 
+        Saves the trained classifier in a new directory named 'pyBIA_ensemble_model', 
         as well as the imputer and the features to use attributes, if not None.
         
         Args:
@@ -227,7 +227,7 @@ class Classifier:
             path (str): Absolute path where the data folder will be saved
                 Defaults to None, in which case the directory is saved to the
                 local home directory.
-            overwrite (bool, optional): If True the 'pyBIA_models' folder this
+            overwrite (bool, optional): If True the 'pyBIA_ensemble_model' folder this
                 function creates in the specified path will be deleted if it exists
                 and created anew to avoid duplicate files. 
         """

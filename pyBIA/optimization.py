@@ -1108,8 +1108,7 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
     opt_max_min_pix=None, opt_max_max_pix=None, opt_cv=10, test_size=None, average=True, test_positive=None, test_negative=None, shift=10, 
     mask_size=None, num_masks=None, verbose=1, train_acc_threshold=None, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None):
     """
-    Optimizes hyperparameters using a k-fold cross validation splitting strategy, unless a CNN
-    is being optimized, in which case no cross-validation is performed during trial assesment.
+    Optimizes hyperparameters using a k-fold cross validation splitting strategy.
 
     **IMPORTANT** In the case of CNN optimization, data_x and data_y are not the standard
     data plus labels -- if optimizing a CNN the samples for the first class should be passed

@@ -903,7 +903,6 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
             X_train[X_train < 0] = 0
             
         #Apply SMOTE to oversample the minority class
-        print('1',X_train.shape, Y_train.shape)
         if smote_sampling > 0:
             smote = SMOTE(sampling_strategy=smote_sampling, random_state=1909)
             #Reshape X_train into a 2D array
@@ -912,7 +911,6 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
             #Reshape X_res back into a 4D array
             X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels))
             Y_train_res = to_categorical(Y_train_res, num_classes=2)
-            print('2',X_train_res.shape, Y_train_res.shape)
         elif smote_sampling == 0:
             X_train_res, Y_train_res = X_train, Y_train
         else:

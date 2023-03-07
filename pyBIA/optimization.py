@@ -38,13 +38,13 @@ from BorutaShap import BorutaShap
 from xgboost import XGBClassifier, DMatrix, train
 from optuna.integration import TFKerasPruningCallback
 optuna.logging.set_verbosity(optuna.logging.WARNING)
-from MicroLIA.data_augmentation import augmentation, resize
-from MicroLIA import data_processing, cnn_model
+from pyBIA.data_augmentation import augmentation, resize
+from pyBIA import data_processing, cnn_model
 
 
 class objective_cnn(object):
     """
-    Optimization objective function for MicroLIA's convolutional neural network. 
+    Optimization objective function for pyBIA's convolutional neural network. 
     This is passed through the hyper_opt() function when optimizing with
     Optuna. The Optuna software for hyperparameter optimization was published in 
     2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
@@ -518,7 +518,6 @@ class objective_cnn(object):
                     print('The trial was pruned or the training patience was reached...')#, returning 0.001 times the number of completed epochs...')
                     print()
                     return (len(history.history['loss']) * 0.001) - 999.0
-
 
             models, histories = [], []
             models.append(model), histories.append(history)

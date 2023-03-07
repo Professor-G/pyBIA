@@ -17,6 +17,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors 
 from sklearn.utils import class_weight
+from imblearn.over_sampling import SMOTE
 
 import random as python_random
 ##https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development##
@@ -202,7 +203,7 @@ class Classifier:
                 n_iter=self.n_iter, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, 
                 val_X=self.val_positive, val_Y=self.val_negative, train_epochs=self.train_epochs, patience=self.patience, opt_model=self.opt_model, opt_aug=self.opt_aug, 
                 batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance=self.balance,
-                opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, test_blob=self.test_blob, test_negative=self.test_negative, shift=self.shift, opt_cv=self.opt_cv, 
+                opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, test_positive=self.test_positive, test_negative=self.test_negative, shift=self.shift, opt_cv=self.opt_cv, 
                 mask_size=self.mask_size, num_masks=self.num_masks, verbose=self.verbose, train_acc_threshold=self.train_acc_threshold, limit_search=self.limit_search,
                 monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, monitor2_thresh=self.monitor2_thresh, smote_sampling=self.smote_sampling)
             print("Fitting and returning final model...")
@@ -895,7 +896,6 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
         else:
             raise ValueError('smote_sampling must be a float greater than 0.0!')
 
-
         num_classes, input_shape = 2, (img_width, img_height, img_num_channels)
        
         if verbose == 1:
@@ -914,7 +914,7 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
         loss = get_loss_function(loss)
 
         if apply_weights:
-            class_weights = class_weight.compute_class_weight('balanced', np.unique(Y_train), Y_train)
+            class_weights = class_weight.compute_class_weight('balanced', np.unique(Y_train_res), Y_train_res)
         else:
             class_weights = None 
 

@@ -10,13 +10,14 @@ import tensorflow as tf
 os.environ['PYTHONHASHSEED'], os.environ["TF_DETERMINISTIC_OPS"] = '0', '1'
 os.environ['CUDA_VISIBLE_DEVICES'], os.environ['TF_CPP_MIN_LOG_LEVEL'] = '-1', '3'
 
+import copy 
 import joblib
 import numpy as np
 import pkg_resources
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from keras.utils import to_categorical 
+from tensorflow.keras.utils import to_categorical
 from imblearn.over_sampling import SMOTE
 
 import random as python_random
@@ -115,6 +116,7 @@ class Classifier:
             then the training will stop early if the value falls above this threshold. Defaults to None.
         smote_sampling (float): The smote_sampling parameter is used in the SMOTE algorithm to specify the desired 
             ratio of the minority class to the majority class. Defaults to 0 which disables the procedure.
+        clf (str): The designated cnn model to use, can either be 'cnn' or 'custom_cnn'
     
     Note:
         The smote_sampling parameter is used in the SMOTE algorithm to specify the desired 
@@ -135,7 +137,7 @@ class Classifier:
         patience=5, opt_model=True, opt_aug=False, batch_min=2, batch_max=25, image_size_min=50, image_size_max=100, 
         balance=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True, test_positive=None, 
         test_negative=None, shift=10, opt_cv=None, mask_size=None, num_masks=None, verbose=0, train_acc_threshold=None,
-        limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, smote_sampling=0):
+        clf='cnn', limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, smote_sampling=0):
 
         self.positive_class = positive_class
         self.negative_class = negative_class
@@ -177,6 +179,11 @@ class Classifier:
         self.monitor1_thresh = monitor1_thresh
         self.monitor2_thresh = monitor2_thresh
         self.smote_sampling = smote_sampling
+        self.clf = clf 
+        if self.clf == 'cnn' or self.clf == 'custom_cnn':
+            pass
+        else:
+            raise ValueError('Invalid clf input, options are: "cnn" (AlexNet) or "custom_cnn".')
 
         self.model = None
         self.history = None 
@@ -200,7 +207,7 @@ class Classifier:
             return      
 
         if self.best_params is None:
-            self.best_params, self.optimization_results = optimization.hyper_opt(self.positive_class, self.negative_class, clf='cnn', metric=self.metric, average=self.average, 
+            self.best_params, self.optimization_results = optimization.hyper_opt(self.positive_class, self.negative_class, clf=self.clf, metric=self.metric, average=self.average, 
                 n_iter=self.n_iter, return_study=True, img_num_channels=self.img_num_channels, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, 
                 val_X=self.val_positive, val_Y=self.val_negative, train_epochs=self.train_epochs, patience=self.patience, opt_model=self.opt_model, opt_aug=self.opt_aug, 
                 batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance=self.balance,
@@ -324,47 +331,96 @@ class Classifier:
                 class_1, class_2 = self.positive_class, self.negative_class
                 val_class_1, val_class_2 = self.val_positive, self.val_negative
 
-            if self.opt_model:
-                if self.best_params['optimizer'] != 'adam' and self.best_params['optimizer'] != 'adagrad':
-                    decay = self.best_params['decay']
-                    if self.best_params['optimizer'] == 'sgd':
-                        momentum = self.best_params['momentum']
-                        nesterov = self.best_params['nesterov']
-                    else:
-                        momentum, nesterov = 0.0, False
-                else:
-                    decay, momentum, nesterov = 0.0, 0.0, False
 
-                if self.limit_search:
-                    self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
-                        normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
-                        epochs=self.train_epochs, batch_size=self.best_params['batch_size'], optimizer=self.best_params['optimizer'], 
-                        lr=self.best_params['lr'], momentum=momentum, decay=decay, nesterov=nesterov, loss=self.best_params['loss'], 
-                        model_reg=self.best_params['model_reg'], activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'], 
-                        pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], pooling_3=self.best_params['pooling_3'],  
-                        conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], conv_reg=self.best_params['conv_reg'], dense_reg=self.best_params['dense_reg'], 
-                        smote_sampling=self.smote_sampling, verbose=self.verbose)
+            if self.best_params['optimizer'] != 'adam' and self.best_params['optimizer'] != 'adagrad':
+                decay = self.best_params['decay']
+                if self.best_params['optimizer'] == 'sgd':
+                    momentum = self.best_params['momentum']
+                    nesterov = self.best_params['nesterov']
                 else:
-                    self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
-                        normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
-                        epochs=self.train_epochs, batch_size=self.best_params['batch_size'], optimizer=self.best_params['optimizer'], lr=self.best_params['lr'], momentum=momentum, decay=decay, nesterov=nesterov, 
-                        loss=self.best_params['loss'], model_reg=self.best_params['model_reg'], activation_conv=self.best_params['activation_conv'], 
-                        activation_dense=self.best_params['activation_dense'], pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], 
-                        pooling_3=self.best_params['pooling_3'], pool_size_1=self.best_params['pool_size_1'], pool_stride_1=self.best_params['pool_stride_1'], 
-                        pool_size_2=self.best_params['pool_size_2'], pool_stride_2=self.best_params['pool_stride_2'], pool_size_3=self.best_params['pool_size_3'], 
-                        pool_stride_3=self.best_params['pool_stride_3'], filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], 
-                        strides_1=self.best_params['strides_1'], filter_2=self.best_params['filter_2'], filter_size_2=self.best_params['filter_size_2'], 
-                        strides_2=self.best_params['strides_2'], filter_3=self.best_params['filter_3'], filter_size_3=self.best_params['filter_size_3'], 
-                        strides_3=self.best_params['strides_3'], filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], 
-                        strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], 
-                        strides_5=self.best_params['strides_5'], dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], 
-                        dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'],
-                        conv_reg=self.best_params['conv_reg'], dense_reg=self.best_params['dense_reg'], smote_sampling=self.smote_sampling, verbose=self.verbose)
+                    momentum, nesterov = 0.0, False
+            else:
+                decay = momentum = 0; nesterov = False
+
+            if self.opt_model:
+                if self.clf != 'custom_cnn':
+                    if self.limit_search:
+                        self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
+                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                            epochs=self.train_epochs, batch_size=self.best_params['batch_size'], optimizer=self.best_params['optimizer'], 
+                            lr=self.best_params['lr'], momentum=momentum, decay=decay, nesterov=nesterov, loss=self.best_params['loss'], 
+                            model_reg=self.best_params['model_reg'], activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'], 
+                            pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], pooling_3=self.best_params['pooling_3'],  
+                            conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], smote_sampling=self.smote_sampling, verbose=self.verbose)
+                    else:
+                        self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
+                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                            epochs=self.train_epochs, batch_size=self.best_params['batch_size'], optimizer=self.best_params['optimizer'], lr=self.best_params['lr'], momentum=momentum, decay=decay, nesterov=nesterov, 
+                            loss=self.best_params['loss'], model_reg=self.best_params['model_reg'], activation_conv=self.best_params['activation_conv'], 
+                            activation_dense=self.best_params['activation_dense'], pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], 
+                            pooling_3=self.best_params['pooling_3'], pool_size_1=self.best_params['pool_size_1'], pool_stride_1=self.best_params['pool_stride_1'], 
+                            pool_size_2=self.best_params['pool_size_2'], pool_stride_2=self.best_params['pool_stride_2'], pool_size_3=self.best_params['pool_size_3'], 
+                            pool_stride_3=self.best_params['pool_stride_3'], filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], 
+                            strides_1=self.best_params['strides_1'], filter_2=self.best_params['filter_2'], filter_size_2=self.best_params['filter_size_2'], 
+                            strides_2=self.best_params['strides_2'], filter_3=self.best_params['filter_3'], filter_size_3=self.best_params['filter_size_3'], 
+                            strides_3=self.best_params['strides_3'], filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], 
+                            strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], 
+                            strides_5=self.best_params['strides_5'], dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], 
+                            dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'],
+                            smote_sampling=self.smote_sampling, verbose=self.verbose)
+                else:
+
+                    strides_1 = pool_stride_1 = 1
+
+                    if self.best_params['num_conv_layers'] == 1:
+                        filter_2 = filter_size_2 = strides_2 = pool_size_2 = pool_stride_2 = filter_3 = filter_size_3 = strides_3 = pool_size_3 = pool_stride_3 = 0; pooling_2 = pooling_3 = None
+                    if self.best_params['num_conv_layers'] >= 2:
+                        filter_2 = self.best_params['filter_2']
+                        filter_size_2 = self.best_params['filter_size_2'] 
+                        pooling_2 = self.best_params['pooling_2']
+                        pool_size_2 = self.best_params['pool_size_2']
+                        strides_2 = pool_stride_2 = 1; filter_3 = filter_size_3 = strides_3 = pool_size_3 = pool_stride_3 = 0; pooling_3 = None
+                    if self.best_params['num_conv_layers'] == 3:
+                        filter_3 = self.best_params['filter_3']
+                        filter_size_3 = self.best_params['filter_size_3']
+                        pooling_3 = self.best_params['pooling_3']
+                        pool_size_3 = self.best_params['pool_size_3']
+                        strides_3 = pool_stride_3 = 1
+
+                    if self.best_params['num_dense_layers'] == 1:
+                        dense_neurons_2 = dropout_2 = dense_neurons_3 = dropout_3 = 0
+                    if self.best_params['num_dense_layers'] >= 2:
+                        dense_neurons_2 = self.best_params['dense_neurons_2']
+                        dropout_2 = self.best_params['dropout_2'] 
+                        dense_neurons_3 = dropout_3 = 0
+                    if self.best_params['num_dense_layers'] == 3:
+                        dense_neurons_3 =  self.best_params['dense_neurons_3']                         
+                        dropout_3 =  self.best_params['dropout_3'] 
+
+                    self.model, self.history = custom_model(class_1, class_2, img_num_channels=self.img_num_channels, 
+                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                            epochs=self.train_epochs, batch_size=self.best_params['batch_size'], optimizer=self.best_params['optimizer'], lr=self.best_params['lr'], 
+                            momentum=momentum, decay=decay, nesterov=nesterov, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
+                            activation_dense=self.best_params['activation_dense'], pooling_1=self.best_params['pooling_1'], pooling_2=pooling_2, 
+                            pooling_3=pooling_3, pool_size_1=self.best_params['pool_size_1'], pool_stride_1=1, 
+                            pool_size_2=pool_size_2, pool_stride_2=pool_stride_2, pool_size_3=pool_size_3, 
+                            pool_stride_3=1, filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], 
+                            strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, 
+                            strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, 
+                            strides_3=strides_3, dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=dense_neurons_2, 
+                            dense_neurons_3=dense_neurons_3, dropout_1=self.best_params['dropout_1'], dropout_2=dropout_2, dropout_3=dropout_3, 
+                            conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], smote_sampling=self.smote_sampling, verbose=self.verbose)
             else: 
-                self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                    min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs, optimizer=self.best_params['optimizer'],
-                    smote_sampling=self.smote_sampling, verbose=self.verbose)
-       
+                if self.clf != 'custom_cnn':
+                    self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                        min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
+                        batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                        early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose, smote_sampling=self.smote_sampling)
+                else:
+                    self.model, self.history = custom_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                        min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
+                        batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                        early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose, smote_sampling=self.smote_sampling)
         return 
 
     def save(self, dirname=None, path=None, overwrite=False):
@@ -626,12 +682,12 @@ class Classifier:
                 try:
                     hyper_importances = joblib.load(self.path+'Hyperparameter_Importance')
                 except FileNotFoundError:
-                    raise ValueError('Could not find the importance file in the '+self.path+' folder')
+                    raise ValueError('Could not find the importance file in the '+self.path+' directory')
 
                 try:
                     duration_importances = joblib.load(self.path+'Duration_Importance')
                 except FileNotFoundError:
-                    raise ValueError('Could not find the importance file in the '+self.path+' folder')
+                    raise ValueError('Could not find the importance file in the '+self.path+' directory')
             else:
                 raise ValueError('Call the save_hyper_importance() attribute first.')
         except:
@@ -776,183 +832,425 @@ class Classifier:
             plt.show()
 
 
+#AlexNet model with default parameters set as they were presented in the paper
+
 def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True, 
-        min_pixel=0, max_pixel=100, val_positive=None, val_negative=None, epochs=100, 
-        batch_size=32, lr=0.0001, momentum=0.9, decay=0.0, nesterov=False, 
-        loss='binary_crossentropy', conv_init='uniform_scaling', dense_init='TruncatedNormal',
-        activation_conv='relu', activation_dense='relu', model_reg='local_response', padding='same', 
-        pooling_1='max', pooling_2='max', pooling_3='max', pool_size_1=3, pool_stride_1=2, pool_size_2=3, 
-        pool_stride_2=2, pool_size_3=3, pool_stride_3=2, filter_1=96, filter_size_1=11, strides_1=4, 
-        filter_2=256, filter_size_2=5, strides_2=1, filter_3=384, filter_size_3=3, strides_3=1, filter_4=384, 
-        filter_size_4=3, strides_4=1, filter_5=256, filter_size_5=3, strides_5=1, dense_neurons_1=4096, 
-        dense_neurons_2=4096, dropout_1=0.5, dropout_2=0.5, conv_reg=0, dense_reg=0, optimizer='sgd', 
-        smote_sampling=0, early_stop_callback=None, checkpoint=False, verbose=1):
-        """
-        The CNN model infrastructure presented by the 2012 ImageNet Large Scale 
-        Visual Recognition Challenge, AlexNet. Parameters were adapted for
-        our astronomy case of detecting diffuse emission.
+    min_pixel=0, max_pixel=100, val_positive=None, val_negative=None, epochs=100, 
+    batch_size=32, lr=0.0001, momentum=0.9, decay=0.0, nesterov=False, 
+    loss='binary_crossentropy', conv_init='uniform_scaling', dense_init='TruncatedNormal',
+    activation_conv='relu', activation_dense='relu', model_reg='local_response', padding='same', 
+    pooling_1='max', pooling_2='max', pooling_3='max', pool_size_1=3, pool_stride_1=2, pool_size_2=3, 
+    pool_stride_2=2, pool_size_3=3, pool_stride_3=2, filter_1=96, filter_size_1=11, strides_1=4, 
+    filter_2=256, filter_size_2=5, strides_2=1, filter_3=384, filter_size_3=3, strides_3=1, filter_4=384, 
+    filter_size_4=3, strides_4=1, filter_5=256, filter_size_5=3, strides_5=1, dense_neurons_1=4096, 
+    dense_neurons_2=4096, dropout_1=0.5, dropout_2=0.5, conv_reg=0, dense_reg=0, optimizer='sgd', 
+    smote_sampling=0, early_stop_callback=None, checkpoint=False, verbose=1):
+    """
+    The CNN model infrastructure presented by the 2012 ImageNet Large Scale 
+    Visual Recognition Challenge, AlexNet. Parameters were adapted for
+    our astronomy case of detecting diffuse emission.
 
-        To avoid exploding gradients we need to normalize our pixels to be 
-        between 0 and 1. By default normalize=True, which will perform
-        min-max normalization using the min_pixel and max_pixel arguments, 
-        which should be set carefully.
+    To avoid exploding gradients we need to normalize our pixels to be 
+    between 0 and 1. By default normalize=True, which will perform
+    min-max normalization using the min_pixel and max_pixel arguments, 
+    which should be set carefully.
 
-        Note:
-            SMOTE expects a 2D input array that represents the feature space of the minority class. 
-            In the case of image classification, the feature space is usually flattened to a 1D vector 
-            for each image. This means that each row of the 2D input array represents a single image 
-            from the minority class, and each column represents a feature (pixel) of that image.
+    Note:
+        SMOTE expects a 2D input array that represents the feature space of the minority class. 
+        In the case of image classification, the feature space is usually flattened to a 1D vector 
+        for each image. This means that each row of the 2D input array represents a single image 
+        from the minority class, and each column represents a feature (pixel) of that image.
 
-            SMOTE expects a 2D input array because it works by computing the k-nearest neighbors of each minority 
-            class sample in the feature space and generating synthetic samples by interpolating between those neighbors.
+        SMOTE expects a 2D input array because it works by computing the k-nearest neighbors of each minority 
+        class sample in the feature space and generating synthetic samples by interpolating between those neighbors.
 
-            By working in the feature space, SMOTE is able to generate synthetic samples that are similar 
-            to the existing minority class samples, and therefore more representative of the true distribution 
-            of the minority class. The resulting synthetic samples can then be added to the training set to 
-            balance the class distribution.
+        By working in the feature space, SMOTE is able to generate synthetic samples that are similar 
+        to the existing minority class samples, and therefore more representative of the true distribution 
+        of the minority class. The resulting synthetic samples can then be added to the training set to 
+        balance the class distribution.
 
-            Once SMOTE has generated the synthetic samples, the 2D array can be reshaped back into its 
-            original image format to be used as input to a CNN model.
+        Once SMOTE has generated the synthetic samples, the 2D array can be reshaped back into its 
+        original image format to be used as input to a CNN model.
 
-        Args:
-            positive_class (ndarray): 3D array containing more than one image of diffuse objects.
-            negative_class (ndarray): 3D array containing more than one image of non-diffuse objects.
-            img_num_channels (int): The number of filters used. Defaults to 1, as pyBIA version 1
-                has been trained with only blue broadband data.
-            normalize (bool, optional): If True the data will be min-max normalized using the 
-                input min and max pixels. Defaults to True.
-            min_pixel (int, optional): The minimum pixel count, defaults to 638. 
-                Pixels with counts below this threshold will be set to this limit.
-            max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
-                Pixels with counts above this threshold will be set to this limit.
-            val_positive (array, optional): 3D matrix containing the 2D arrays (images)
-                to be used for validationm, for the positive class. Defaults to None.
-            val_negative(array, optional): 3D matrix containing the 2D arrays (images)
-                to be used for validationm, for the negative class. Defaults to None.
-            epochs (int): Number of epochs used for training. 
-            batch_size (int): The size of each sub-sample used during the training
-                epoch. Large batches are likely to get stuck in local minima. Defaults to 32.
-            lr (float): Learning rate, the rate at which the model updates the gradient. Defaults to 0.0001
-            momentum (float): Momentum is a float greater than 0 that accelerates gradient descent. Defaults to 0.9.
-            decay (float): The rate of learning rate decay applied after each epoch. Defaults to 0.0005. It is recommended
-                to set decay to the learning rate divded by the total number of epochs.
-            nesterov (bool): Whether to apply Nesterov momentum or not. Defaults to False.
-            loss (str): The loss function used to calculate the gradients. Defaults to 'categorical_crossentropy'.
-                Loss functions can be set by calling the Keras API losses module.
-            conv_init (str): Weight initializer for the convolutional layers.
-            dense_init (str): Weight initializer for the dense layers.
-            activation_conv (str): Activation function to use for the convolutional layer. Default is 'relu'.'
-            activation_dense (str): Activation function to use for the dense layers. Default is 'tanh'.
-            model_reg (str): The model regularization technique to use, can be None.
-            padding (str): Either 'same' or 'valid'. When set to 'valid', the dimensions reduce as the boundary 
-                that doesn't make it within even convolutions get cuts off. Defaults to 'same', which applies
-                zero-value padding around the boundary, ensuring even convolutional steps across each dimension.
-            dropout (float): Droupout rate after the dense layers. This is the percentage of dense neurons
-                that are turned off at each epoch. This prevents inter-neuron depedency, and thus overfitting. 
-            pooling (bool): True to enable max pooling, false to disable. 
-                Note: Max pooling can result in loss of positional information, it computation allows
-                setting pooling=False may yield more robust accuracy.
-            pool_size (int, optional): The pool size of the max pooling layers. Defaults to 3.
-            pool_stride (int, optional): The stride to use in the max pooling layers. Defaults to 2.
-            early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
-                to None. Should only be used during optimization, refer to pyBIA.optimization.objective_cnn().
-            checkpoint (bool, optional): If False no checkpoint will be saved. Defaults to True.
-            verbose (int): Controls the amount of output printed during the training process. A value of 0 is for silent mode, 
-                a value of 1 is used for progress bar mode, and 2 for one line per epoch mode. Defaults to 1.
-            smote_sampling (float): The smote_sampling parameter is used in the SMOTE algorithm to specify the desired 
-                ratio of the minority class to the majority class. Defaults to 0 which disables the procedure.
+    Args:
+        positive_class (ndarray): 3D array containing more than one image of diffuse objects.
+        negative_class (ndarray): 3D array containing more than one image of non-diffuse objects.
+        img_num_channels (int): The number of filters used. Defaults to 1, as pyBIA version 1
+            has been trained with only blue broadband data.
+        normalize (bool, optional): If True the data will be min-max normalized using the 
+            input min and max pixels. Defaults to True.
+        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
+            Pixels with counts below this threshold will be set to this limit.
+        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
+            Pixels with counts above this threshold will be set to this limit.
+        val_positive (array, optional): 3D matrix containing the 2D arrays (images)
+            to be used for validationm, for the positive class. Defaults to None.
+        val_negative(array, optional): 3D matrix containing the 2D arrays (images)
+            to be used for validationm, for the negative class. Defaults to None.
+        epochs (int): Number of epochs used for training. 
+        batch_size (int): The size of each sub-sample used during the training
+            epoch. Large batches are likely to get stuck in local minima. Defaults to 32.
+        lr (float): Learning rate, the rate at which the model updates the gradient. Defaults to 0.0001
+        momentum (float): Momentum is a float greater than 0 that accelerates gradient descent. Defaults to 0.9.
+        decay (float): The rate of learning rate decay applied after each epoch. Defaults to 0.0005. It is recommended
+            to set decay to the learning rate divded by the total number of epochs.
+        nesterov (bool): Whether to apply Nesterov momentum or not. Defaults to False.
+        loss (str): The loss function used to calculate the gradients. Defaults to 'categorical_crossentropy'.
+            Loss functions can be set by calling the Keras API losses module.
+        conv_init (str): Weight initializer for the convolutional layers.
+        dense_init (str): Weight initializer for the dense layers.
+        activation_conv (str): Activation function to use for the convolutional layer. Default is 'relu'.'
+        activation_dense (str): Activation function to use for the dense layers. Default is 'tanh'.
+        model_reg (str): The model regularization technique to use, can be None.
+        padding (str): Either 'same' or 'valid'. When set to 'valid', the dimensions reduce as the boundary 
+            that doesn't make it within even convolutions get cuts off. Defaults to 'same', which applies
+            zero-value padding around the boundary, ensuring even convolutional steps across each dimension.
+        dropout (float): Droupout rate after the dense layers. This is the percentage of dense neurons
+            that are turned off at each epoch. This prevents inter-neuron depedency, and thus overfitting. 
+        pooling (bool): True to enable max pooling, false to disable. 
+            Note: Max pooling can result in loss of positional information, it computation allows
+            setting pooling=False may yield more robust accuracy.
+        pool_size (int, optional): The pool size of the max pooling layers. Defaults to 3.
+        pool_stride (int, optional): The stride to use in the max pooling layers. Defaults to 2.
+        early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
+            to None. Should only be used during optimization, refer to pyBIA.optimization.objective_cnn().
+        checkpoint (bool, optional): If False no checkpoint will be saved. Defaults to True.
+        verbose (int): Controls the amount of output printed during the training process. A value of 0 is for silent mode, 
+            a value of 1 is used for progress bar mode, and 2 for one line per epoch mode. Defaults to 1.
+        smote_sampling (float): The smote_sampling parameter is used in the SMOTE algorithm to specify the desired 
+            ratio of the minority class to the majority class. Defaults to 0 which disables the procedure.
 
-        Returns:
-            The trained CNN model and accompanying history.
-        """
-        
-        if batch_size < 16 and model_reg == 'batch_norm':
-            print("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.")
-        
-        if val_positive is not None:
-            val_X1, val_Y1 = process_class(val_positive, label=1, img_num_channels=img_num_channels, 
+    Returns:
+        The trained CNN model and accompanying history.
+    """
+    
+    if batch_size < 16 and model_reg == 'batch_norm':
+        print("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.")
+    
+    if val_positive is not None:
+        val_X1, val_Y1 = process_class(val_positive, label=1, img_num_channels=img_num_channels, 
+            min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
+        if val_negative is None:
+            val_X, val_Y = val_X1, val_Y1
+        else:
+            val_X2, val_Y2 = process_class(val_negative, label=0, img_num_channels=img_num_channels, 
                 min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
-            if val_negative is None:
-                val_X, val_Y = val_X1, val_Y1
-            else:
-                val_X2, val_Y2 = process_class(val_negative, label=0, img_num_channels=img_num_channels, 
-                    min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
-                val_X, val_Y = np.r_[val_X1, val_X2], np.r_[val_Y1, val_Y2]
+            val_X, val_Y = np.r_[val_X1, val_X2], np.r_[val_Y1, val_Y2]
+    else:
+        if val_negative is None:
+            val_X, val_Y = None, None
         else:
-            if val_negative is None:
-                val_X, val_Y = None, None
-            else:
-                val_X2, val_Y2 = process_class(val_negative, label=0, img_num_channels=img_num_channels, 
-                    min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
-                val_X, val_Y = val_X2, val_Y2
+            val_X2, val_Y2 = process_class(val_negative, label=0, img_num_channels=img_num_channels, 
+                min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
+            val_X, val_Y = val_X2, val_Y2
 
-        img_width = positive_class[0].shape[0]
-        img_height = positive_class[0].shape[1]
+    img_width = positive_class[0].shape[0]
+    img_height = positive_class[0].shape[1]
+    
+    ix = np.random.permutation(len(positive_class))
+    positive_class = positive_class[ix]
+
+    ix = np.random.permutation(len(negative_class))
+    negative_class = negative_class[ix]
+
+    X_train, Y_train = create_training_set(positive_class, negative_class, normalize=normalize, 
+        min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+
+    if normalize:
+        X_train[X_train > 1] = 1
+        X_train[X_train < 0] = 0
         
-        ix = np.random.permutation(len(positive_class))
-        positive_class = positive_class[ix]
-
-        ix = np.random.permutation(len(negative_class))
-        negative_class = negative_class[ix]
-
-        X_train, Y_train = create_training_set(positive_class, negative_class, normalize=normalize, 
-            min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
-
-        if normalize:
-            X_train[X_train > 1] = 1
-            X_train[X_train < 0] = 0
-            
-        #Apply SMOTE to oversample the minority class
-        if smote_sampling > 0:
-            if len(np.where(Y_train[:,0]==1)[0]) == len(np.where(Y_train[:,1]==1)[0]):
-                X_train_res, Y_train_res = X_train, Y_train
-                print('Classes are already balanced, skipping SMOTE sampling.')
-            else:
-                smote = SMOTE(sampling_strategy=smote_sampling, random_state=1909)
-                #Reshape X_train into a 2D array
-                X_2d = np.reshape(X_train, (X_train.shape[0], -1))
-                X_res, Y_train_res = smote.fit_resample(X_2d, Y_train)
-                #Reshape X_res back into a 4D array
-                X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels))
-                Y_train_res = to_categorical(Y_train_res, num_classes=2)
-        elif smote_sampling == 0:
+    #Apply SMOTE to oversample the minority class
+    if smote_sampling > 0:
+        if len(np.where(Y_train[:,0]==1)[0]) == len(np.where(Y_train[:,1]==1)[0]):
             X_train_res, Y_train_res = X_train, Y_train
+            print('Classes are already balanced, skipping SMOTE sampling.')
         else:
-            raise ValueError('smote_sampling must be a float between 0.0 and 1.0!')
+            smote = SMOTE(sampling_strategy=smote_sampling, random_state=1909)
+            #Reshape X_train into a 2D array
+            X_2d = np.reshape(X_train, (X_train.shape[0], -1))
+            X_res, Y_train_res = smote.fit_resample(X_2d, Y_train)
+            #Reshape X_res back into a 4D array
+            X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels))
+            Y_train_res = to_categorical(Y_train_res, num_classes=2)
+    elif smote_sampling == 0:
+        X_train_res, Y_train_res = X_train, Y_train
+    else:
+        raise ValueError('smote_sampling must be a float between 0.0 and 1.0!')
 
-        num_classes, input_shape = 2, (img_width, img_height, img_num_channels)
-       
-        if verbose == 1:
-            print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer, model_reg, 
-                conv_init, activation_conv, dense_init, activation_dense, filter_size_1, filter_size_2, 
-                filter_size_3, filter_size_4, filter_size_5, pooling_1, pooling_2, pooling_3, 
-                pool_size_1, pool_size_2, pool_size_3, conv_reg, dense_reg)
+    num_classes, input_shape = 2, (img_width, img_height, img_num_channels)
+   
+    if verbose == 1:
+        dense_neurons_3 = dropout_3 = 0
+        print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer, 
+            model_reg, conv_init, activation_conv, dense_init, activation_dense,
+            filter_1, filter_2, filter_3, filter_4, filter_5, filter_size_1, filter_size_2, 
+            filter_size_3, filter_size_4, filter_size_5, pooling_1, pooling_2, pooling_3, 
+            pool_size_1, pool_size_2, pool_size_3, conv_reg, dense_reg, dense_neurons_1, 
+            dense_neurons_2, dense_neurons_3, dropout_1, dropout_2, dropout_3)
 
-        #Uniform scaling initializer
-        if conv_init == 'uniform_scaling':
-            conv_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None)
-        if dense_init == 'uniform_scaling':
-            dense_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None)
+    #Uniform scaling initializer
+    if conv_init == 'uniform_scaling':
+        conv_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None)
+    if dense_init == 'uniform_scaling':
+        dense_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None)
 
-        #Call the appropriate tf.keras.losses.Loss function
-        loss = get_loss_function(loss)
+    #Call the appropriate tf.keras.losses.Loss function
+    loss = get_loss_function(loss)
 
-        #Model configuration
-        model = Sequential()
+    #Model configuration
+    model = Sequential()
+    
+    #Convolutional layers
+    model.add(Conv2D(filter_1, filter_size_1, strides=strides_1, activation=activation_conv, input_shape=input_shape,
+                     padding=padding, kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
+    if pooling_1 == 'min':
+        model.add(tf.keras.layers.Lambda(lambda x: -tf.nn.max_pool2d(-x, ksize=(pool_size_1, pool_size_1), strides=(pool_stride_1, pool_stride_1), padding='SAME')))
+    elif pooling_1 == 'max':
+        model.add(MaxPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
+    elif pooling_1 == 'average':
+        model.add(AveragePooling2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding)) 
+    if model_reg == 'local_response':
+        model.add(Lambda(lambda x: tf.nn.local_response_normalization(x, depth_radius=5, bias=2, alpha=1e-4, beta=0.75))) #Lambda allows for the application of the lambda function to the input tensor
+    elif model_reg == 'batch_norm':
+        model.add(BatchNormalization())
+
+    model.add(Conv2D(filter_2, filter_size_2, strides=strides_2, activation=activation_conv, padding=padding,
+                     kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
+    if pooling_2 == 'min':
+        model.add(tf.keras.layers.Lambda(lambda x: -tf.nn.max_pool2d(-x, ksize=(pool_size_2, pool_size_2), strides=(pool_stride_2, pool_stride_2), padding='SAME')))
+    elif pooling_2 == 'max':
+        model.add(MaxPool2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))
+    elif pooling_2 == 'average':
+        model.add(AveragePooling2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))            
+    if model_reg == 'local_response':
+        model.add(Lambda(lambda x: tf.nn.local_response_normalization(x, depth_radius=5, bias=2, alpha=1e-4, beta=0.75)))
+    elif model_reg == 'batch_norm':
+        model.add(BatchNormalization())
+
+    model.add(Conv2D(filter_3, filter_size_3, strides=strides_3, activation=activation_conv, padding=padding,
+                     kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
+    if model_reg == 'batch_norm':
+        model.add(BatchNormalization())
+
+    model.add(Conv2D(filter_4, filter_size_4, strides=strides_4, activation=activation_conv, padding=padding,
+                     kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
+    if model_reg == 'batch_norm':
+        model.add(BatchNormalization())
+
+    model.add(Conv2D(filter_5, filter_size_5, strides=strides_5, activation=activation_conv, padding=padding,
+                     kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
+    if pooling_3 == 'min':
+        model.add(tf.keras.layers.Lambda(lambda x: -tf.nn.max_pool2d(-x, ksize=(pool_size_3, pool_size_3), strides=(pool_stride_3, pool_stride_3), padding='SAME')))
+    if pooling_3 == 'max':
+        model.add(MaxPool2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))
+    elif pooling_3 == 'average':
+        model.add(AveragePooling2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))            
+    if model_reg == 'batch_norm':
+        model.add(BatchNormalization())
+
+    #Dense layers
+    model.add(Flatten())
+
+    #FCC 1
+    model.add(Dense(dense_neurons_1, activation=activation_dense, kernel_initializer=dense_init, kernel_regularizer=l2(dense_reg)))
+    model.add(Dropout(dropout_1))
+    if model_reg == 'batch_norm':
+        model.add(BatchNormalization())
+    
+    #FCC 2
+    model.add(Dense(dense_neurons_2, activation=activation_dense, kernel_initializer=dense_init, kernel_regularizer=l2(dense_reg)))
+    model.add(Dropout(dropout_2))
+    if model_reg == 'batch_norm':
+        model.add(BatchNormalization())
+
+    #Output layer
+    model.add(Dense(num_classes, activation='sigmoid', kernel_initializer=dense_init)) #adding a kernel model_reg has no effect if sigmoid is being used, but works for layers with trainable weights like softmax
+    if model_reg == 'batch_norm':
+        model.add(BatchNormalization())
+
+    #Call the appropriate tf.keras.optimizers function
+    optimizer = get_optimizer(optimizer, lr, momentum=momentum, decay=decay, nesterov=nesterov)
+
+    #Compile the Model
+    model.compile(loss=loss, optimizer=optimizer, metrics=[tf.keras.metrics.BinaryAccuracy(), f1_score])
+    
+    #Optional checkpoint callback, with the monitor hardcoded to loss of the validation data.
+    callbacks_list = []
+    if checkpoint:
+        callbacks_list.append(ModelCheckpoint(str(Path.home())+'/'+'checkpoint.hdf5', monitor='val_binary_loss', verbose=2, save_best_only=True, mode='min'))
+    
+    #Early stop callback for use during the optimization routine
+    if early_stop_callback is not None:
+        callbacks_list.append(early_stop_callback)
+
+    #Fit the Model
+    if val_X is None:
+        history = model.fit(X_train_res, Y_train_res, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=verbose)
+    else:
+        history = model.fit(X_train_res, Y_train_res, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=verbose)
+
+    return model, history
+
+
+#Custom CNN model configured to genereate shallower CNNs than AlexNet
+
+def custom_model(positive_class, negative_class, img_num_channels=1, normalize=True, 
+    min_pixel=0, max_pixel=100, val_positive=None, val_negative=None, epochs=100, 
+    batch_size=32, optimizer='sgd', lr=0.0001, momentum=0.9, decay=0.0, nesterov=False, 
+    loss='binary_crossentropy', conv_init='uniform_scaling', dense_init='TruncatedNormal',
+    activation_conv='relu', activation_dense='relu', conv_reg=0, dense_reg=0, padding='same',
+    filter_1=256, filter_size_1=7, strides_1=1, pooling_1='average', pool_size_1=3, pool_stride_1=1, 
+    filter_2=0, filter_size_2=0, strides_2=0, pooling_2=None, pool_size_2=0, pool_stride_2=0, 
+    filter_3=0, filter_size_3=0, strides_3=0, pooling_3=None, pool_size_3=0, pool_stride_3=0, 
+    dense_neurons_1=4096, dropout_1=0.5, dense_neurons_2=0, dropout_2=0, dense_neurons_3=0, dropout_3=0,
+    smote_sampling=0, early_stop_callback=None, checkpoint=False, verbose=1):
+    """
+    CNN Model that allows between 1 and 3 convolutional layers (with pooling) followed by dense layers,
+    also up to three layers. This is a simpler model than AlexNet that can be used to limit overfitting behavior.
+
+    Args:
+        positive_class (ndarray): 3D array containing more than one image of diffuse objects.
+        negative_class (ndarray): 3D array containing more than one image of non-diffuse objects.
+        img_num_channels (int): The number of filters used. Defaults to 1, as pyBIA version 1
+            has been trained with only blue broadband data.
+        normalize (bool, optional): If True the data will be min-max normalized using the 
+            input min and max pixels. Defaults to True.
+        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
+            Pixels with counts below this threshold will be set to this limit.
+        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
+            Pixels with counts above this threshold will be set to this limit.
+        val_positive (array, optional): 3D matrix containing the 2D arrays (images)
+            to be used for validationm, for the positive class. Defaults to None.
+        val_negative(array, optional): 3D matrix containing the 2D arrays (images)
+            to be used for validationm, for the negative class. Defaults to None.
+        epochs (int): Number of epochs used for training. 
+        batch_size (int): The size of each sub-sample used during the training
+            epoch. Large batches are likely to get stuck in local minima. Defaults to 32.
+        lr (float): Learning rate, the rate at which the model updates the gradient. Defaults to 0.0001
+        momentum (float): Momentum is a float greater than 0 that accelerates gradient descent. Defaults to 0.9.
+        decay (float): The rate of learning rate decay applied after each epoch. Defaults to 0.0005. It is recommended
+            to set decay to the learning rate divded by the total number of epochs.
+        nesterov (bool): Whether to apply Nesterov momentum or not. Defaults to False.
+        loss (str): The loss function used to calculate the gradients. Defaults to 'categorical_crossentropy'.
+            Loss functions can be set by calling the Keras API losses module.
+        conv_init (str): Weight initializer for the convolutional layers.
+        dense_init (str): Weight initializer for the dense layers.
+        activation_conv (str): Activation function to use for the convolutional layer. Default is 'relu'.'
+        activation_dense (str): Activation function to use for the dense layers. Default is 'tanh'.
+        padding (str): Either 'same' or 'valid'. When set to 'valid', the dimensions reduce as the boundary 
+            that doesn't make it within even convolutions get cuts off. Defaults to 'same', which applies
+            zero-value padding around the boundary, ensuring even convolutional steps across each dimension.
+        dropout (float): Droupout rate after the dense layers. This is the percentage of dense neurons
+            that are turned off at each epoch. This prevents inter-neuron depedency, and thus overfitting. 
+        pooling (bool): True to enable max pooling, false to disable. 
+            Note: Max pooling can result in loss of positional information, it computation allows
+            setting pooling=False may yield more robust accuracy.
+        pool_size (int, optional): The pool size of the max pooling layers. Defaults to 3.
+        pool_stride (int, optional): The stride to use in the max pooling layers. Defaults to 2.
+        early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
+            to None. Should only be used during optimization, refer to pyBIA.optimization.objective_cnn().
+        checkpoint (bool, optional): If False no checkpoint will be saved. Defaults to True.
+        verbose (int): Controls the amount of output printed during the training process. A value of 0 is for silent mode, 
+            a value of 1 is used for progress bar mode, and 2 for one line per epoch mode. Defaults to 1.
+        smote_sampling (float): The smote_sampling parameter is used in the SMOTE algorithm to specify the desired 
+            ratio of the minority class to the majority class. Defaults to 0 which disables the procedure.
+
+    Returns:
+        The trained CNN model and accompanying history.
+    """
+    
+    if batch_size < 16:
+        print("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.")
+    
+    if val_positive is not None:
+        val_X1, val_Y1 = process_class(val_positive, label=1, img_num_channels=img_num_channels, 
+            min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
+        if val_negative is None:
+            val_X, val_Y = val_X1, val_Y1
+        else:
+            val_X2, val_Y2 = process_class(val_negative, label=0, img_num_channels=img_num_channels, 
+                min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
+            val_X, val_Y = np.r_[val_X1, val_X2], np.r_[val_Y1, val_Y2]
+    else:
+        if val_negative is None:
+            val_X, val_Y = None, None
+        else:
+            val_X2, val_Y2 = process_class(val_negative, label=0, img_num_channels=img_num_channels, 
+                min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
+            val_X, val_Y = val_X2, val_Y2
+
+    img_width = positive_class[0].shape[0]
+    img_height = positive_class[0].shape[1]
+    
+    ix = np.random.permutation(len(positive_class))
+    positive_class = positive_class[ix]
+
+    ix = np.random.permutation(len(negative_class))
+    negative_class = negative_class[ix]
+
+    X_train, Y_train = create_training_set(positive_class, negative_class, normalize=normalize, 
+        min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
+
+    if normalize:
+        X_train[X_train > 1] = 1
+        X_train[X_train < 0] = 0
         
-        #Convolutional layers
-        model.add(Conv2D(filter_1, filter_size_1, strides=strides_1, activation=activation_conv, input_shape=input_shape,
-                         padding=padding, kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
-        if pooling_1 == 'min':
-            model.add(tf.keras.layers.Lambda(lambda x: -tf.nn.max_pool2d(-x, ksize=(pool_size_1, pool_size_1), strides=(pool_stride_1, pool_stride_1), padding='SAME')))
-        elif pooling_1 == 'max':
-            model.add(MaxPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
-        elif pooling_1 == 'average':
-            model.add(AveragePooling2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding)) 
-        if model_reg == 'local_response':
-            model.add(Lambda(lambda x: tf.nn.local_response_normalization(x, depth_radius=5, bias=2, alpha=1e-4, beta=0.75))) #Lambda allows for the application of the lambda function to the input tensor
-        elif model_reg == 'batch_norm':
-            model.add(BatchNormalization())
+    #Apply SMOTE to oversample the minority class
+    if smote_sampling > 0:
+        if len(np.where(Y_train[:,0]==1)[0]) == len(np.where(Y_train[:,1]==1)[0]):
+            X_train_res, Y_train_res = X_train, Y_train
+            print('Classes are already balanced, skipping SMOTE sampling.')
+        else:
+            smote = SMOTE(sampling_strategy=smote_sampling, random_state=1909)
+            #Reshape X_train into a 2D array
+            X_2d = np.reshape(X_train, (X_train.shape[0], -1))
+            X_res, Y_train_res = smote.fit_resample(X_2d, Y_train)
+            #Reshape X_res back into a 4D array
+            X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels))
+            Y_train_res = to_categorical(Y_train_res, num_classes=2)
+    elif smote_sampling == 0:
+        X_train_res, Y_train_res = X_train, Y_train
+    else:
+        raise ValueError('smote_sampling must be a float between 0.0 and 1.0!')
+
+    num_classes, input_shape = 2, (img_width, img_height, img_num_channels)
+   
+    if verbose == 1:
+        filter_size_4 = filter_size_5 = filter_4 = filter_5 = 0
+        print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer, 
+            model_reg, conv_init, activation_conv, dense_init, activation_dense,
+            filter_1, filter_2, filter_3, filter_4, filter_5, filter_size_1, filter_size_2, 
+            filter_size_3, filter_size_4, filter_size_5, pooling_1, pooling_2, pooling_3, 
+            pool_size_1, pool_size_2, pool_size_3, conv_reg, dense_reg, dense_neurons_1, 
+            dense_neurons_2, dense_neurons_3, dropout_1, dropout_2, dropout_3)
+
+    #Uniform scaling initializer
+    if conv_init == 'uniform_scaling':
+        conv_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None)
+    if dense_init == 'uniform_scaling':
+        dense_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None)
+
+    #Call the appropriate tf.keras.losses.Loss function
+    loss = get_loss_function(loss)
+
+    #Model configuration
+    model = Sequential()
+    
+    #Convolutional layers
+    model.add(Conv2D(filter_1, filter_size_1, strides=strides_1, activation=activation_conv, input_shape=input_shape,
+                     padding=padding, kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
+    if pooling_1 == 'min':
+        model.add(tf.keras.layers.Lambda(lambda x: -tf.nn.max_pool2d(-x, ksize=(pool_size_1, pool_size_1), strides=(pool_stride_1, pool_stride_1), padding='SAME')))
+    elif pooling_1 == 'max':
+        model.add(MaxPool2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding))
+    elif pooling_1 == 'average':
+        model.add(AveragePooling2D(pool_size=pool_size_1, strides=pool_stride_1, padding=padding)) 
+    model.add(BatchNormalization())
+
+    if filter_2 > 0:
+        if filter_size_2 is None or strides_2 is None:
+            raise ValueError('Filter 2 parameters are missing, input the missing arguments.')
 
         model.add(Conv2D(filter_2, filter_size_2, strides=strides_2, activation=activation_conv, padding=padding,
                          kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
@@ -962,22 +1260,13 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
             model.add(MaxPool2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))
         elif pooling_2 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_2, strides=pool_stride_2, padding=padding))            
-        if model_reg == 'local_response':
-            model.add(Lambda(lambda x: tf.nn.local_response_normalization(x, depth_radius=5, bias=2, alpha=1e-4, beta=0.75)))
-        elif model_reg == 'batch_norm':
-            model.add(BatchNormalization())
+        model.add(BatchNormalization())
+
+    if filter_3 > 0:
+        if filter_size_3 is None or strides_3 is None:
+            raise ValueError('Filter 3 parameters are missing, input the missing arguments.')
 
         model.add(Conv2D(filter_3, filter_size_3, strides=strides_3, activation=activation_conv, padding=padding,
-                         kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
-        if model_reg == 'batch_norm':
-            model.add(BatchNormalization())
-
-        model.add(Conv2D(filter_4, filter_size_4, strides=strides_4, activation=activation_conv, padding=padding,
-                         kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
-        if model_reg == 'batch_norm':
-            model.add(BatchNormalization())
-
-        model.add(Conv2D(filter_5, filter_size_5, strides=strides_5, activation=activation_conv, padding=padding,
                          kernel_initializer=conv_init, kernel_regularizer=l2(conv_reg)))
         if pooling_3 == 'min':
             model.add(tf.keras.layers.Lambda(lambda x: -tf.nn.max_pool2d(-x, ksize=(pool_size_3, pool_size_3), strides=(pool_stride_3, pool_stride_3), padding='SAME')))
@@ -985,52 +1274,54 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
             model.add(MaxPool2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))
         elif pooling_3 == 'average':
             model.add(AveragePooling2D(pool_size=pool_size_3, strides=pool_stride_3, padding=padding))            
-        if model_reg == 'batch_norm':
-            model.add(BatchNormalization())
+        model.add(BatchNormalization())
 
-        #Dense layers
-        model.add(Flatten())
+    #Dense layers
+    model.add(Flatten())
 
-        #FCC 1
-        model.add(Dense(dense_neurons_1, activation=activation_dense, kernel_initializer=dense_init, kernel_regularizer=l2(dense_reg)))
-        model.add(Dropout(dropout_1))
-        if model_reg == 'batch_norm':
-            model.add(BatchNormalization())
-        
-        #FCC 2
+    #FCC 1
+    model.add(Dense(dense_neurons_1, activation=activation_dense, kernel_initializer=dense_init, kernel_regularizer=l2(dense_reg)))
+    model.add(Dropout(dropout_1))
+    model.add(BatchNormalization())
+    
+    #FCC 2
+    if dense_neurons_2 > 0:
         model.add(Dense(dense_neurons_2, activation=activation_dense, kernel_initializer=dense_init, kernel_regularizer=l2(dense_reg)))
         model.add(Dropout(dropout_2))
-        if model_reg == 'batch_norm':
-            model.add(BatchNormalization())
+        model.add(BatchNormalization())
 
-        #Output layer
-        model.add(Dense(num_classes, activation='sigmoid', kernel_initializer=dense_init)) #adding a kernel model_reg has no effect if sigmoid is being used, but works for layers with trainable weights like softmax
-        if model_reg == 'batch_norm':
-            model.add(BatchNormalization())
+    #FCC 3
+    if dense_neurons_3 > 0:
+        model.add(Dense(dense_neurons_3, activation=activation_dense, kernel_initializer=dense_init, kernel_regularizer=l2(dense_reg)))
+        model.add(Dropout(dropout_3))
+        model.add(BatchNormalization())
 
-        #Call the appropriate tf.keras.optimizers function
-        optimizer = get_optimizer(optimizer, lr, momentum=momentum, decay=decay, nesterov=nesterov)
+    #Output layer
+    model.add(Dense(num_classes, activation='sigmoid', kernel_initializer=dense_init)) 
+    model.add(BatchNormalization())
 
-        #Compile the Model
-        model.compile(loss=loss, optimizer=optimizer, metrics=[tf.keras.metrics.BinaryAccuracy(), f1_score])
-        
-        #Optional checkpoint callback, with the monitor hardcoded to loss of the validation data.
-        callbacks_list = []
-        if checkpoint:
-            callbacks_list.append(ModelCheckpoint(str(Path.home())+'/'+'checkpoint.hdf5', monitor='val_binary_loss', verbose=2, save_best_only=True, mode='min'))
-        
-        #Early stop callback for use during the optimization routine
-        if early_stop_callback is not None:
-            callbacks_list.append(early_stop_callback)
+    #Call the appropriate tf.keras.optimizers function
+    optimizer = get_optimizer(optimizer, lr, momentum=momentum, decay=decay, nesterov=nesterov)
 
-        #Fit the Model
-        if val_X is None:
-            history = model.fit(X_train_res, Y_train_res, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=verbose)
-        else:
-            history = model.fit(X_train_res, Y_train_res, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=verbose)
+    #Compile the Model
+    model.compile(loss=loss, optimizer=optimizer, metrics=[tf.keras.metrics.BinaryAccuracy(), f1_score])
+    
+    #Optional checkpoint callback, with the monitor hardcoded to loss of the validation data.
+    callbacks_list = []
+    if checkpoint:
+        callbacks_list.append(ModelCheckpoint(str(Path.home())+'/'+'checkpoint.hdf5', monitor='val_binary_loss', verbose=2, save_best_only=True, mode='min'))
+    
+    #Early stop callback for use during the optimization routine
+    if early_stop_callback is not None:
+        callbacks_list.append(early_stop_callback)
 
-        return model, history
+    #Fit the Model
+    if val_X is None:
+        history = model.fit(X_train_res, Y_train_res, batch_size=batch_size, epochs=epochs, callbacks=callbacks_list, verbose=verbose)
+    else:
+        history = model.fit(X_train_res, Y_train_res, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=verbose)
 
+    return model, history
 
 ### Score and Loss Functions ###
 
@@ -1182,9 +1473,10 @@ def get_loss_function(loss):
    
 def print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer, 
     model_reg, conv_init, activation_conv, dense_init, activation_dense,
-    filter_size_1, filter_size_2, filter_size_3, filter_size_4, filter_size_5, 
-    pooling_1, pooling_2, pooling_3, pool_size_1, pool_size_2, pool_size_3,
-    conv_reg, dense_reg):
+    filter1, filter2, filter3, filter4, filter5, filter_size_1, filter_size_2, 
+    filter_size_3, filter_size_4, filter_size_5, pooling_1, pooling_2, pooling_3, 
+    pool_size_1, pool_size_2, pool_size_3, conv_reg, dense_reg, dense_neurons_1, 
+    dense_neurons_2, dense_neurons_3, dropout_1, dropout_2, dropout_3):
     """
     Prints the model training parameters and architecture parameters.
 
@@ -1224,13 +1516,25 @@ def print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer,
     print('Dense Initializer : '+ dense_init)
     print('Dense Activation Fn : '+ activation_dense)
     print()
-    print('======= Layer Parameters ======')
+    print('======= Conv2D Layer Parameters ======')
     print()
-    print('Filter 1 || Size : {}, Pooling : {}, Pooling Size : {}'.format(filter_size_1, pooling_1, pool_size_1))
-    print('Filter 2 || Size : {}, Pooling : {}, Pooling Size : {}'.format(filter_size_2, pooling_2, pool_size_2))
-    print('Filter 3 || Size : {}, Pooling : {}, Pooling Size : {}'.format(filter_size_3, pooling_3, pool_size_3))
-    print('Filter 4 || Size : {}'.format(filter_size_4))
-    print('Filter 5 || Size : {}'.format(filter_size_5))
+    print('Filter 1 || Num: {}, Size : {}, Pooling : {}, Pooling Size : {}'.format(filter1, filter_size_1, pooling_1, pool_size_1))
+    if filter_size_2 > 0:
+        print('Filter 2 || Num: {}, Size : {}, Pooling : {}, Pooling Size : {}'.format(filter2, filter_size_2, pooling_2, pool_size_2))
+    if filter_size_3 > 0:
+        print('Filter 3 || Num: {}, Size : {}, Pooling : {}, Pooling Size : {}'.format(filter3, filter_size_3, pooling_3, pool_size_3))
+    if filter_size_4 > 0:
+        print('Filter 4 || Num: {}, Size : {}'.format(filter4, filter_size_4))
+    if filter_size_5 > 0:
+        print('Filter 5 || Num: {}, Size : {}'.format(filter5, filter_size_5))
+    print()
+    print('======= Dense Layer Parameters ======')
+    print()
+    print('Neurons 1 || Num : {}, Dropout : {}'.format(dense_neurons_1, dropout_1))
+    if dense_neurons_2 > 0:
+        print('Neurons 2 || Num : {}, Dropout : {}'.format(dense_neurons_2, dropout_2))
+    if dense_neurons_3 > 0:
+        print('Neurons 3 || Num : {}, Dropout : {}'.format(dense_neurons_3, dropout_3))
     print()
     print('===============================')
     print()

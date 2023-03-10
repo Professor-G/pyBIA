@@ -370,8 +370,7 @@ class Classifier:
                             smote_sampling=self.smote_sampling, verbose=self.verbose)
                 else:
 
-                    strides_1 = pool_stride_1 = 1
-
+                    strides_1 = pool_stride_1 = 1 
                     if self.best_params['num_conv_layers'] == 1:
                         filter_2 = filter_size_2 = strides_2 = pool_size_2 = pool_stride_2 = filter_3 = filter_size_3 = strides_3 = pool_size_3 = pool_stride_3 = 0; pooling_2 = pooling_3 = None
                     if self.best_params['num_conv_layers'] >= 2:

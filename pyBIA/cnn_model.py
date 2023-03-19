@@ -28,6 +28,7 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.backend import clear_session 
+from tensorflow.keras.callbacks import EarlyStopping, Callback
 from tensorflow.keras.models import Sequential, save_model, load_model, Model
 from tensorflow.keras.initializers import VarianceScaling
 from tensorflow.keras.optimizers import SGD, Adagrad, Adam, RMSprop
@@ -79,6 +80,8 @@ class Classifier:
             if opt_aug=True. Defaults to 2.
         batch_max (int): The maximum number of augmentations to perform per image on the positive class, only applicable 
             if opt_aug=True. Defaults to 25.
+        batch_other (int): The number of augmentations to perform to the other class, presumed to be the majority class.
+            Defaults to 1. This is done to ensure augmentation techniques are applied consistently across both classes.        
         image_size_min (int): The minimum image size to assess, only applicable if opt_aug=True. Defaults to 50.
         image_size_max (int): The maximum image size to assess, only applicable if opt_aug=True. Defaults to 100.
         opt_max_min_pix (int, optional): The minimum max pixel value to use when tuning the normalization procedure, 
@@ -134,7 +137,7 @@ class Classifier:
 
     def __init__(self, positive_class=None, negative_class=None, val_positive=None, val_negative=None, img_num_channels=1, 
         optimize=True, n_iter=25, normalize=True, min_pixel=0, max_pixel=1000, epochs=25, train_epochs=25, 
-        patience=5, opt_model=True, opt_aug=False, batch_min=2, batch_max=25, image_size_min=50, image_size_max=100, 
+        patience=5, opt_model=True, opt_aug=False, batch_min=2, batch_max=25, batch_other=1, image_size_min=50, image_size_max=100, 
         balance=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True, test_positive=None, 
         test_negative=None, shift=10, opt_cv=None, mask_size=None, num_masks=None, verbose=0, train_acc_threshold=None,
         clf='cnn', limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, smote_sampling=0):
@@ -159,6 +162,7 @@ class Classifier:
         self.opt_aug = opt_aug
         self.batch_min = batch_min 
         self.batch_max = batch_max 
+        self.batch_other = batch_other
         self.image_size_min = image_size_min
         self.image_size_max = image_size_max
         self.balance = balance
@@ -179,6 +183,7 @@ class Classifier:
         self.monitor1_thresh = monitor1_thresh
         self.monitor2_thresh = monitor2_thresh
         self.smote_sampling = smote_sampling
+
         self.clf = clf 
         if self.clf == 'cnn' or self.clf == 'custom_cnn':
             pass
@@ -199,11 +204,17 @@ class Classifier:
         """
 
         if self.optimize is False and self.best_params is None:
-            print("Returning base AlexNet model...")
-            self.model, self.history = AlexNet(self.positive_class, self.negative_class, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_positive=self.val_positive, val_negative=self.val_negative, epochs=self.epochs, 
-                smote_sampling=self.smote_sampling)
-            
+            if self.clf == 'cnn':
+                print("Returning base AlexNet model...")
+                self.model, self.history = AlexNet(self.positive_class, self.negative_class, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_positive=self.val_positive, val_negative=self.val_negative, epochs=self.epochs, 
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric)
+            else:
+                print("Returning the base custom model (1 convolutional layer + 1 dense layer)...")
+                self.model, self.history = AlexNet(self.positive_class, self.negative_class, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                    min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_positive=self.val_positive, val_negative=self.val_negative, epochs=self.epochs, 
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric)
+                
             return      
 
         if self.best_params is None:
@@ -213,7 +224,7 @@ class Classifier:
                 batch_min=self.batch_min, batch_max=self.batch_max, image_size_min=self.image_size_min, image_size_max=self.image_size_max, balance=self.balance,
                 opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, test_positive=self.test_positive, test_negative=self.test_negative, shift=self.shift, opt_cv=self.opt_cv, 
                 mask_size=self.mask_size, num_masks=self.num_masks, verbose=self.verbose, train_acc_threshold=self.train_acc_threshold, limit_search=self.limit_search,
-                monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, monitor2_thresh=self.monitor2_thresh, smote_sampling=self.smote_sampling)
+                monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, monitor2_thresh=self.monitor2_thresh, smote_sampling=self.smote_sampling, batch_other=self.batch_other)
             print("Fitting and returning final model...")
         else:
             print('Fitting model using the loaded best_params...')
@@ -244,7 +255,6 @@ class Classifier:
                 else:
                     raise ValueError('Only three filters are supported!')
 
-
                 horizontal = vertical = rotation = True 
                 
                 augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.best_params['num_aug'], 
@@ -263,7 +273,7 @@ class Classifier:
                 else:
                     class_1 = augmented_images
 
-                #Perform same augmentation techniques on other data, batch=1
+                #Perform same augmentation techniques on other data, batch=1 by default
                 if self.img_num_channels == 1:
                     channel1, channel2, channel3 = copy.deepcopy(self.negative_class), None, None 
                 elif self.img_num_channels == 2:
@@ -271,7 +281,7 @@ class Classifier:
                 elif self.img_num_channels == 3:
                     channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), copy.deepcopy(self.negative_class[:,:,:,2])
                 
-                augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=1, 
+                augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
                     width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
                     image_size=self.best_params['image_size'], mask_size=self.mask_size, num_masks=self.num_masks)
 
@@ -288,8 +298,11 @@ class Classifier:
                 else:
                     class_2 = augmented_images_negative
 
-                #Balance the class sizes
+                #Balance the class sizes if necessary
                 if self.balance:
+                    if self.batch_other > 1: #Must shuffle!!!
+                        ix = np.random.permutation(len(class_2))
+                        class_2 = class_2[ix]
                     class_2 = class_2[:len(class_1)]     
 
                 if self.img_num_channels == 1:
@@ -354,7 +367,8 @@ class Classifier:
                             lr=self.best_params['lr'], momentum=momentum, decay=decay, nesterov=nesterov, loss=self.best_params['loss'], 
                             model_reg=self.best_params['model_reg'], activation_conv=self.best_params['activation_conv'], activation_dense=self.best_params['activation_dense'], 
                             pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], pooling_3=self.best_params['pooling_3'],  
-                            conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], smote_sampling=self.smote_sampling, verbose=self.verbose)
+                            conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], smote_sampling=self.smote_sampling, verbose=self.verbose,
+                            patience=self.patience, metric=self.metric)
                     else:
                         self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
                             normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
@@ -370,7 +384,7 @@ class Classifier:
                             strides_4=self.best_params['strides_4'], filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], 
                             strides_5=self.best_params['strides_5'], dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], 
                             dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'],
-                            smote_sampling=self.smote_sampling, verbose=self.verbose)
+                            smote_sampling=self.smote_sampling, verbose=self.verbose, patience=self.patience, metric=self.metric)
                 else:
 
                     strides_1 = pool_stride_1 = 1 
@@ -411,18 +425,21 @@ class Classifier:
                             strides_2=strides_2, filter_3=filter_3, filter_size_3=filter_size_3, 
                             strides_3=strides_3, dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=dense_neurons_2, 
                             dense_neurons_3=dense_neurons_3, dropout_1=self.best_params['dropout_1'], dropout_2=dropout_2, dropout_3=dropout_3, 
-                            conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], smote_sampling=self.smote_sampling, verbose=self.verbose)
+                            conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], smote_sampling=self.smote_sampling, 
+                            patience=self.patience, metric=self.metric, verbose=self.verbose)
             else: 
                 if self.clf != 'custom_cnn':
                     self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
                         min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
                         batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
-                        early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose, smote_sampling=self.smote_sampling)
+                        early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose, smote_sampling=self.smote_sampling, 
+                        patience=self.patience, metric=self.metric)
                 else:
                     self.model, self.history = custom_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
                         min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
                         batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
-                        early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose, smote_sampling=self.smote_sampling)
+                        early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose, smote_sampling=self.smote_sampling,
+                        patience=self.patience, metric=self.metric)
         return 
 
     def save(self, dirname=None, path=None, overwrite=False):
@@ -474,11 +491,13 @@ class Classifier:
                 raise ValueError('Tried to create "pyBIA_cnn_model" directory in specified path but folder already exists! If you wish to overwrite set overwrite=True.')
         
         path += 'pyBIA_cnn_model/'
-        if self.model is not None:      
+        if self.model is not None:
+            #np.savetxt(path+'model_train_metrics', np.c_[self.history.history['binary_accuracy'], self.history.history['loss'], self.history.history['f1_score']], header='binary_accuracy\tloss\tf1_score'))
             np.savetxt(path+'model_acc', self.history.history['binary_accuracy'])
             np.savetxt(path+'model_loss', self.history.history['loss'])
             np.savetxt(path+'model_f1', self.history.history['f1_score'])
             if self.val_positive is not None:
+                #np.savetxt(path+'model_val_metrics', np.c_[self.history.history['val_binary_accuracy'], self.history.history['val_loss'], self.history.history['val_f1_score']], header=header = 'val_binary_accuracy\tval_loss\tval_f1_score')
                 np.savetxt(path+'model_val_acc', self.history.history['val_binary_accuracy'])
                 np.savetxt(path+'model_val_loss', self.history.history['val_loss'])
                 np.savetxt(path+'model_val_f1', self.history.history['val_f1_score'])
@@ -541,7 +560,7 @@ class Classifier:
         
         return
 
-    def predict(self, data, target='ML', return_proba=False):
+    def predict(self, data, target='DIFFUSE', return_proba=False):
         """
         Returns the class prediction. The input can either be a single 2D array 
         or a 3D array if there are multiple samples.
@@ -767,13 +786,13 @@ class Classifier:
 
         return  
 
-    def plot_performance(self, metric='binary_accuracy', combine=False, ylabel=None, title=None,
+    def plot_performance(self, metric='acc', combine=False, ylabel=None, title=None,
         xlim=None, ylim=None, xlog=False, ylog=True, savefig=False):
         """
         Plots the training/performance histories.
     
         Args:
-            metric (str): Metric to plot, options are: 'binary_accuracy', 'f1_score', 'loss'. Defaults to 'binary_accuracy'
+            metric (str): Metric to plot, options are: 'acc', 'f1_score', 'loss'. Defaults to 'acc'
             combine (bool): If True the validation history will also be included, if applicable.
             ylabel (str, optional): The y-label of the plot.
             title (str, optional): The title of the plot.
@@ -846,7 +865,8 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
     filter_2=256, filter_size_2=5, strides_2=1, filter_3=384, filter_size_3=3, strides_3=1, filter_4=384, 
     filter_size_4=3, strides_4=1, filter_5=256, filter_size_5=3, strides_5=1, dense_neurons_1=4096, 
     dense_neurons_2=4096, dropout_1=0.5, dropout_2=0.5, conv_reg=0, dense_reg=0, optimizer='sgd', 
-    smote_sampling=0, early_stop_callback=None, checkpoint=False, verbose=1):
+    smote_sampling=0, patience=0, metric='binary_accuracy', checkpoint=False, verbose=1,
+    early_stop_callback=None, weight=None):
     """
     The CNN model infrastructure presented by the 2012 ImageNet Large Scale 
     Visual Recognition Challenge, AlexNet. Parameters were adapted for
@@ -914,13 +934,17 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
             setting pooling=False may yield more robust accuracy.
         pool_size (int, optional): The pool size of the max pooling layers. Defaults to 3.
         pool_stride (int, optional): The stride to use in the max pooling layers. Defaults to 2.
-        early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
-            to None. Should only be used during optimization, refer to pyBIA.optimization.objective_cnn().
         checkpoint (bool, optional): If False no checkpoint will be saved. Defaults to True.
         verbose (int): Controls the amount of output printed during the training process. A value of 0 is for silent mode, 
             a value of 1 is used for progress bar mode, and 2 for one line per epoch mode. Defaults to 1.
         smote_sampling (float): The smote_sampling parameter is used in the SMOTE algorithm to specify the desired 
             ratio of the minority class to the majority class. Defaults to 0 which disables the procedure.
+        patience (int): Number of epochs without improvement before the training is terminated. Defaults to 0, which
+            disables this feature.
+        metric (str): The metric to monitor according to the input patience. Defaults to 'binary_accuracy'.
+        early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
+            to None. Should only be used with the optimization routine, refer to pyBIA.optimization.objective_cnn().
+        weight (int): Weight to apply if using the weighted loss function. Defaults to None. 
 
     Returns:
         The trained CNN model and accompanying history.
@@ -929,6 +953,12 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
     if batch_size < 16 and model_reg == 'batch_norm':
         print("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.")
     
+    if 'all' in metric: #This is an option for optimization purposes but not a valid argument
+        if 'val' in metric:
+            print("Cannot combine combined metrics for these callbacks, setting metric='val_loss'"); metric = 'val_loss'
+        else:
+            print("Cannot combine combined metrics for these callbacks, setting metric='loss'"); metric = 'loss'
+
     if val_positive is not None:
         val_X1, val_Y1 = process_class(val_positive, label=1, img_num_channels=img_num_channels, 
             min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
@@ -961,7 +991,7 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
     if normalize:
         X_train[X_train > 1] = 1
         X_train[X_train < 0] = 0
-        
+
     #Apply SMOTE to oversample the minority class
     if smote_sampling > 0:
         if len(np.where(Y_train[:,0]==1)[0]) == len(np.where(Y_train[:,1]==1)[0]):
@@ -969,11 +999,9 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
             print('Classes are already balanced, skipping SMOTE sampling.')
         else:
             smote = SMOTE(sampling_strategy=smote_sampling, random_state=1909)
-            #Reshape X_train into a 2D array
-            X_2d = np.reshape(X_train, (X_train.shape[0], -1))
+            X_2d = np.reshape(X_train, (X_train.shape[0], -1)) #Reshape X_train into a 2D array
             X_res, Y_train_res = smote.fit_resample(X_2d, Y_train)
-            #Reshape X_res back into a 4D array
-            X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels))
+            X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels)) #Reshape X_res back into a 4D array
             Y_train_res = to_categorical(Y_train_res, num_classes=2)
     elif smote_sampling == 0:
         X_train_res, Y_train_res = X_train, Y_train
@@ -998,7 +1026,7 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
         dense_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None)
 
     #Call the appropriate tf.keras.losses.Loss function
-    loss = get_loss_function(loss)
+    loss = get_loss_function(loss, weight=weight)
 
     #Model configuration
     model = Sequential()
@@ -1077,11 +1105,21 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
     #Compile the Model
     model.compile(loss=loss, optimizer=optimizer, metrics=[tf.keras.metrics.BinaryAccuracy(), f1_score])
     
-    #Optional checkpoint callback, with the monitor hardcoded to loss of the validation data.
+    #Wheter to maximize or minimize the metric
+    if 'loss' in metric:
+        mode = 'min'
+    else:
+        mode = 'max'
+
+    #Optional checkpoint callback, with the monitor being the inpit metric.
     callbacks_list = []
     if checkpoint:
-        callbacks_list.append(ModelCheckpoint(str(Path.home())+'/'+'checkpoint.hdf5', monitor='val_binary_loss', verbose=2, save_best_only=True, mode='min'))
+        callbacks_list.append(ModelCheckpoint(str(Path.home())+'/'+'checkpoint.hdf5', monitor=metric, verbose=2, save_best_only=True, mode=mode))
     
+    #Early stopping callback
+    if patience > 0:
+        callbacks_list.append(EarlyStopping(monitor=metric, mode=mode, patience=patience))
+
     #Early stop callback for use during the optimization routine
     if early_stop_callback is not None:
         callbacks_list.append(early_stop_callback)
@@ -1106,7 +1144,8 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
     filter_2=0, filter_size_2=0, strides_2=0, pooling_2=None, pool_size_2=0, pool_stride_2=0, 
     filter_3=0, filter_size_3=0, strides_3=0, pooling_3=None, pool_size_3=0, pool_stride_3=0, 
     dense_neurons_1=4096, dropout_1=0.5, dense_neurons_2=0, dropout_2=0, dense_neurons_3=0, dropout_3=0,
-    smote_sampling=0, early_stop_callback=None, checkpoint=False, verbose=1):
+    smote_sampling=0, patience=0, metric='binary_accuracy', early_stop_callback=None, checkpoint=False, 
+    weight=None, verbose=1):
     """
     CNN Model that allows between 1 and 3 convolutional layers (with pooling) followed by dense layers,
     also up to three layers. This is a simpler model than AlexNet that can be used to limit overfitting behavior.
@@ -1150,13 +1189,17 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
             setting pooling=False may yield more robust accuracy.
         pool_size (int, optional): The pool size of the max pooling layers. Defaults to 3.
         pool_stride (int, optional): The stride to use in the max pooling layers. Defaults to 2.
-        early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
-            to None. Should only be used during optimization, refer to pyBIA.optimization.objective_cnn().
         checkpoint (bool, optional): If False no checkpoint will be saved. Defaults to True.
         verbose (int): Controls the amount of output printed during the training process. A value of 0 is for silent mode, 
             a value of 1 is used for progress bar mode, and 2 for one line per epoch mode. Defaults to 1.
         smote_sampling (float): The smote_sampling parameter is used in the SMOTE algorithm to specify the desired 
             ratio of the minority class to the majority class. Defaults to 0 which disables the procedure.
+        patience (int): Number of epochs without improvement before the training is terminated. Defaults to 0, which
+            disables this feature.
+        metric (str): The metric to monitor according to the input patience. Defaults to 'binary_accuracy'.
+        early_stop_callback (list, optional): Callbacks for early stopping and pruning with Optuna, defaults
+            to None. Should only be used with the optimization routine, refer to pyBIA.optimization.objective_cnn().
+        weight (int): Weight to apply if using the weighted loss function. Defaults to None. 
 
     Returns:
         The trained CNN model and accompanying history.
@@ -1165,6 +1208,12 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
     if batch_size < 16:
         print("Batch Normalization can be unstable with low batch sizes, if loss returns nan try a larger batch size and/or smaller learning rate.")
     
+    if 'all' in metric: #This is an option for optimization purposes but not a valid argument
+        if 'val' in metric:
+            print("Cannot combine combined metrics for these callbacks, setting metric='val_loss'"); metric = 'val_loss'
+        else:
+            print("Cannot combine combined metrics for these callbacks, setting metric='loss'"); metric = 'loss'
+
     if val_positive is not None:
         val_X1, val_Y1 = process_class(val_positive, label=1, img_num_channels=img_num_channels, 
             min_pixel=min_pixel, max_pixel=max_pixel, normalize=normalize)
@@ -1193,7 +1242,7 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
 
     X_train, Y_train = create_training_set(positive_class, negative_class, normalize=normalize, 
         min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
-
+    
     if normalize:
         X_train[X_train > 1] = 1
         X_train[X_train < 0] = 0
@@ -1205,11 +1254,9 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
             print('Classes are already balanced, skipping SMOTE sampling.')
         else:
             smote = SMOTE(sampling_strategy=smote_sampling, random_state=1909)
-            #Reshape X_train into a 2D array
-            X_2d = np.reshape(X_train, (X_train.shape[0], -1))
+            X_2d = np.reshape(X_train, (X_train.shape[0], -1)) #Reshape X_train into a 2D array
             X_res, Y_train_res = smote.fit_resample(X_2d, Y_train)
-            #Reshape X_res back into a 4D array
-            X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels))
+            X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels)) #Reshape X_res back into a 4D array
             Y_train_res = to_categorical(Y_train_res, num_classes=2)
     elif smote_sampling == 0:
         X_train_res, Y_train_res = X_train, Y_train
@@ -1220,6 +1267,7 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
    
     if verbose == 1:
         filter_size_4 = filter_size_5 = filter_4 = filter_5 = 0
+        model_reg = 'batch_norm'
         print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer, 
             model_reg, conv_init, activation_conv, dense_init, activation_dense,
             filter_1, filter_2, filter_3, filter_4, filter_5, filter_size_1, filter_size_2, 
@@ -1234,7 +1282,7 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
         dense_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None)
 
     #Call the appropriate tf.keras.losses.Loss function
-    loss = get_loss_function(loss)
+    loss = get_loss_function(loss, weight=weight)
 
     #Model configuration
     model = Sequential()
@@ -1308,11 +1356,21 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
     #Compile the Model
     model.compile(loss=loss, optimizer=optimizer, metrics=[tf.keras.metrics.BinaryAccuracy(), f1_score])
     
-    #Optional checkpoint callback, with the monitor hardcoded to loss of the validation data.
+    #Wheter to maximize or minimize the metric
+    if 'loss' in metric:
+        mode = 'min'
+    else:
+        mode = 'max'
+
+    #Optional checkpoint callback, with the monitor being the input metric.
     callbacks_list = []
     if checkpoint:
-        callbacks_list.append(ModelCheckpoint(str(Path.home())+'/'+'checkpoint.hdf5', monitor='val_binary_loss', verbose=2, save_best_only=True, mode='min'))
+        callbacks_list.append(ModelCheckpoint(str(Path.home())+'/'+'checkpoint.hdf5', monitor=metric, verbose=2, save_best_only=True, mode=mode))
     
+    #Early stopping callback
+    if patience > 0:
+        callbacks_list.append(EarlyStopping(monitor=metric, mode=mode, patience=patience))
+
     #Early stop callback for use during the optimization routine
     if early_stop_callback is not None:
         callbacks_list.append(early_stop_callback)
@@ -1324,6 +1382,7 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
         history = model.fit(X_train_res, Y_train_res, batch_size=batch_size, validation_data=(val_X, val_Y), epochs=epochs, callbacks=callbacks_list, verbose=verbose)
 
     return model, history
+
 
 ### Score and Loss Functions ###
 
@@ -1405,6 +1464,41 @@ def jaccard_loss(y_true, y_pred, smooth=1e-7):
 
     return 1.0 - jaccard
 
+def weighted_binary_crossentropy(weight):
+    """
+    Return a binary cross-entropy loss function with weighted terms.
+
+    This function returns a callable loss function that can be used as a loss argument
+    in Keras models. The loss function calculates the binary cross-entropy between the
+    true binary labels and the predicted probabilities, but applies a weight factor to
+    the positive class to address class imbalance. The weight factor is given by `weight`,
+    which can be any non-negative scalar.
+
+    When `weight` is greater than 1, the loss function will assign more importance to the
+    positive class, while when `weight` is less than 1, the loss function will assign less
+    importance to the positive class. The weight factor can be used to balance the contribution
+    of the positive and negative classes to the loss function.
+
+    The implementation is a nested function, which allows for easy customization of the `weight`
+    parameter.
+
+    Args:
+        weight (float): A scalar weight factor for the positive class. This parameter controls
+            the relative weight of the positive class in the loss function. When `weight` is 1,
+            the loss function is equivalent to the standard binary cross-entropy loss function.
+
+    Returns:
+        A callable binary cross-entropy loss function that can be used as a loss argument in Keras models.
+    """
+
+    def loss(y_true, y_pred):
+        y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
+        bce = -(y_true * K.log(y_pred) * weight + (1 - y_true) * K.log(1 - y_pred))
+        weighted_bce = K.mean(bce, axis=-1)
+        return weighted_bce
+
+    return loss
+
 
 ### AlexNet Helper Functions ###
 
@@ -1439,7 +1533,7 @@ def get_optimizer(optimizer, lr, momentum=None, decay=None, nesterov=False):
 
     return optimizer
 
-def get_loss_function(loss):
+def get_loss_function(loss, weight=None):
     """
     Returns the specified loss function as a Keras loss object.
 
@@ -1470,6 +1564,10 @@ def get_loss_function(loss):
         return dice_loss
     elif loss == 'jaccard_loss':
         return jaccard_loss
+    elif loss == 'weighted_binary_crossentropy':
+        if weight is None:
+            raise ValueError('If using weighted loss function, the weight parameter must be input!')
+        return weighted_binary_crossentropy(weight)
     else:
         raise ValueError("Invalid loss function name")
    
@@ -1502,11 +1600,11 @@ def print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer,
     print()
     print('|| Batch Size : '+str(batch_size), '|| Loss Function : '+loss, '||')
     if optimizer == 'sgd':
-        print('|| Optimizer : '+optimizer, '|| lr : '+str(lr), '|| Decay : '+str(decay), '|| Momentum : '+str(momentum), '|| Nesterov : '+str(nesterov)+' ||')
+        print('|| Optimizer : '+optimizer, '|| lr : '+str(np.round(lr, 7)), '|| Decay : '+str(decay), '|| Momentum : '+str(momentum), '|| Nesterov : '+str(nesterov)+' ||')
     elif optimizer == 'rmsprop':
-        print('|| Optimizer : '+optimizer, '|| lr : '+str(lr), '|| Decay : '+str(decay)+' ||')
+        print('|| Optimizer : '+optimizer, '|| lr : '+str(np.round(lr, 7)), '|| Decay : '+str(decay)+' ||')
     else:
-        print('|| Optimizer : '+optimizer, '|| lr : '+str(lr)+' ||')
+        print('|| Optimizer : '+optimizer, '|| lr : '+str(np.round(lr, 7))+' ||')
     print()
     print('=== Architecture Parameters ===')
     print()

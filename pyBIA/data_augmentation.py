@@ -230,26 +230,28 @@ def resize(data, size=50):
 
     return resized_data
 
-def random_cutout(images, mask_size=16, num_masks=1, seed=None, augmenting=False):
+import numpy as np
+
+def random_cutout(images, mask_size=16, num_masks=1, seed=None, augmenting=False, mask_type='square'):
     """
     Applies the cutout data augmentation technique to a sample of 2D images.
-    This method applies `num_masks` random positioned (mask_size x mask_size) black squares to each image.
+    This method applies `num_masks` random positioned (mask_size x mask_size) black squares or
+    circles to each image.
 
     Args:
-        data (numpy array): A 3D array of shape (num_images, height, width).
+        images (numpy array): A 3D array of shape (num_images, height, width).
         mask_size (int): The size of the cutout mask. Defaults to 16.
         num_masks (int): Number of masks to apply to each image. Defaults to 1.
         seed (int): Seed for the random number generator. Defaults to None.
         augmenting (bool): If False the image shape is assumed to be (num_img, height, width), if True
             it is assumed to be reversed. Defaults to False.
+        mask_type (str): Type of mask to create. Can be 'square' or 'circle'. Defaults to 'square'.
 
     Returns:
         A 3D array of the same shape as data, with cutout applied.
     """
 
-    #images = copy.deepcopy(data)
-
-    if augmenting: #The data augmentation procedure requires the input to be inversed.
+    if augmenting:
         width, height, num_images = images.shape
     else:
         num_images, height, width = images.shape
@@ -259,14 +261,26 @@ def random_cutout(images, mask_size=16, num_masks=1, seed=None, augmenting=False
 
     for i in range(num_images):
         for j in range(num_masks):
-            if height - mask_size > 0:
-                h = np.random.randint(height - mask_size)
-                w = np.random.randint(width - mask_size)
-                images[i, h:h+mask_size, w:w+mask_size] = 0
+            if mask_type == 'square':
+                if height - 2*mask_size > 0 and width - 2*mask_size > 0:
+                    h = np.random.randint(mask_size, height - mask_size)
+                    w = np.random.randint(mask_size, width - mask_size)
+                    images[i, h-mask_size:h+mask_size, w-mask_size:w+mask_size] = 0
+                else:
+                    raise ValueError('Mask size is too large for the image input!')
+            elif mask_type == 'circle':
+                if height - 2*mask_size > 0 and width - 2*mask_size > 0:
+                    h = np.random.randint(mask_size, height - mask_size)
+                    w = np.random.randint(mask_size, width - mask_size)
+                    y, x = np.ogrid[-h:height-h, -w:width-w]
+                    mask = x*x + y*y <= mask_size*mask_size
+                    images[i][mask] = 0
+                else:
+                    raise ValueError('Mask size is too large for the image input!')
             else:
-                raise ValueError('WARNING: Mask size is too large for the image input!')
+                raise ValueError('Invalid mask_type, options are "square" or "circle".')
 
-    np.random.seed(1909) #Set back to pyBIA default
+    np.random.seed(1909)
 
     return images
 

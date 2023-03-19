@@ -112,6 +112,8 @@ class objective_cnn(object):
             if opt_aug=True. Defaults to 2.
         batch_max (int): The maximum number of augmentations to perform per image on the positive class, only applicable 
             if opt_aug=True. Defaults to 25.
+        batch_other (int): The number of augmentations to perform to the other class, presumed to be the majority class.
+            Defaults to 1. This is done to ensure augmentation techniques are applied consistently across both classes.
         image_size_min (int): The minimum image size to assess, only applicable if opt_aug=True. Defaults to 50.
         image_size_max (int): The maximum image size to assess, only applicable if opt_aug=True. Defaults to 100.
         opt_max_min_pix (int, optional): The minimum max pixel value to use when tuning the normalization procedure, 
@@ -160,10 +162,11 @@ class objective_cnn(object):
 
     def __init__(self, positive_class, negative_class, img_num_channels=1, normalize=True, min_pixel=0, max_pixel=100, 
         val_positive=None, val_negative=None, test_positive=None, test_negative=None, train_epochs=25, patience=20, 
-        opt_model=True, opt_aug=False, batch_min=2, batch_max=25, image_size_min=50, image_size_max=100, 
+        opt_model=True, opt_aug=False, batch_min=2, batch_max=25, batch_other=1, image_size_min=50, image_size_max=100, 
         balance=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True, shift=10,
         mask_size=None, num_masks=None, opt_cv=None, verbose=0, train_acc_threshold=None, smote_sampling=0,
-        clf='cnn', limit_search=True, batch_size_min=16, batch_size_max=64, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None):
+        clf='cnn', limit_search=True, batch_size_min=16, batch_size_max=64, monitor1=None, monitor2=None, 
+        monitor1_thresh=None, monitor2_thresh=None):
 
         self.positive_class = positive_class
         self.negative_class = negative_class
@@ -177,6 +180,7 @@ class objective_cnn(object):
         self.test_negative = test_negative
         self.batch_size_min = batch_size_min
         self.batch_size_max = batch_size_max
+        self.batch_other = batch_other
 
         self.train_epochs = train_epochs
         self.patience = patience 
@@ -221,6 +225,9 @@ class objective_cnn(object):
             if self.opt_max_min_pix is None:
                 raise ValueError('To optimize min/max normalization pixel value, both opt_min_pix and opt_max_pix must be input')
 
+        if self.balance and self.smote_sampling > 0:
+            print('WARNING: balance=True but SMOTE sampling is not applied if the classes are balanced.')
+
     def __call__(self, trial):
 
         if self.opt_aug:
@@ -260,7 +267,7 @@ class objective_cnn(object):
             else:
                 class_1 = augmented_images
 
-            #Perform same augmentation techniques on negative class data for balance but only use batch=1
+            #Perform same augmentation techniques on negative class data for balance but only use batch=1 by default
             #This is done so that the training data also includes the random cutout, if configured.
             if self.img_num_channels == 1:
                 channel1, channel2, channel3 = copy.deepcopy(self.negative_class), None, None 
@@ -269,7 +276,7 @@ class objective_cnn(object):
             elif self.img_num_channels == 3:
                 channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), copy.deepcopy(self.negative_class[:,:,:,2])
             
-            augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=1, 
+            augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
                 width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
                 image_size=image_size, mask_size=self.mask_size, num_masks=self.num_masks)
 
@@ -288,6 +295,9 @@ class objective_cnn(object):
 
             #Balance the class sizes if necessary
             if self.balance:
+                if self.batch_other > 1: #Must shuffle!!!
+                    ix = np.random.permutation(len(class_2))
+                    class_2 = class_2[ix]
                 class_2 = class_2[:len(class_1)]
   
             if self.img_num_channels == 1:
@@ -355,6 +365,7 @@ class objective_cnn(object):
         ### Early Stopping and Pruning Callbacks ###
         if self.patience != 0:
             if self.metric == 'all' or self.metric == 'val_all':
+                print()
                 print('Cannot use callbacks if averaging out all performance metrics for evaluation, setting patience=0.')
                 callbacks = []#TFKerasPruningCallback(trial, monitor=self.metric),]
             else:
@@ -380,7 +391,7 @@ class objective_cnn(object):
 
         ### Batch Size, Learning Rate & Optimizer ###
         batch_size = trial.suggest_int('batch_size', self.batch_size_min, self.batch_size_max, step=1)
-        lr = trial.suggest_float('lr', 1e-6, 1e-3, step=1e-4) 
+        lr = trial.suggest_float('lr', 1e-6, 1e-3, step=5e-6) 
         optimizer = trial.suggest_categorical('optimizer', ['adam', 'sgd', 'rmsprop', 'adagrad']) 
 
         #Adam and Adagrad don't need decay nor momentum
@@ -401,7 +412,7 @@ class objective_cnn(object):
             ### Activation and Loss Functions ### 
             activation_conv = trial.suggest_categorical('activation_conv', ['relu',  'sigmoid', 'tanh', 'elu', 'selu'])            
             activation_dense = trial.suggest_categorical('activation_dense', ['relu', 'sigmoid', 'tanh', 'elu', 'selu'])
-            loss = trial.suggest_categorical('loss', ['binary_crossentropy', 'hinge', 'squared_hinge', 'kld', 'logcosh'])#, 'focal_loss', 'dice_loss', 'jaccard_loss'])
+            loss = trial.suggest_categorical('loss', ['binary_crossentropy', 'hinge', 'squared_hinge', 'kld', 'logcosh', 'focal_loss', 'dice_loss', 'jaccard_loss'])
 
             ### Kernel Initializers ###
             conv_init = trial.suggest_categorical('conv_init', ['uniform_scaling', 'TruncatedNormal', 'he_normal', 'lecun_uniform', 'glorot_uniform']) 
@@ -489,23 +500,23 @@ class objective_cnn(object):
                         early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
     
             else:
-                #Custom CNN function, the first CONV layer is mandatory. 
+                #Custom CNN function, the first CONV layer is required. 
                 filter_1 = trial.suggest_int('filter_1', 12, 240, step=12)
                 filter_size_1 = trial.suggest_int('filter_size_1', 1, 11, step=2)
                 pooling_1 = trial.suggest_categorical('pooling_1', ['min', 'max', 'average'])
                 pool_size_1 = trial.suggest_int('pool_size_1', 1, 7, step=1)
-                strides_1 = pool_stride_1 = 1
+                strides_1 = pool_stride_1 = strides_2 = pool_stride_2 = strides_3 = pool_stride_3 = 1
 
-                num_conv_layers = trial.suggest_int('num_conv_layers', 1, 3, step=1)
+                num_conv_layers = trial.suggest_int('num_conv_layers', 1, 2, step=1)
 
                 if num_conv_layers == 1:
-                    filter_2 = filter_size_2 = strides_2 = pool_size_2 = pool_stride_2 = filter_3 = filter_size_3 = strides_3 = pool_size_3 = pool_stride_3 = 0; pooling_2 = pooling_3 = None
+                    filter_2 = filter_size_2 = pool_size_2 = filter_3 = filter_size_3 = strides_3 = pool_size_3 = 0; pooling_2 = pooling_3 = None
                 if num_conv_layers >= 2:
                     filter_2 = trial.suggest_int('filter_2', 12, 240, step=12)
                     filter_size_2 = trial.suggest_int('filter_size_2', 1, 7, step=2)
                     pooling_2 = trial.suggest_categorical('pooling_2', ['min', 'max', 'average'])
                     pool_size_2 = trial.suggest_int('pool_size_2', 1, 7, step=1)
-                    filter_3 = filter_size_3 = strides_3 = pool_size_3 = pool_stride_3 = 0; pooling_3 = None
+                    filter_3 = filter_size_3 = pool_size_3 = 0; pooling_3 = None
                 if num_conv_layers == 3:
                     filter_3 = trial.suggest_int('filter_3', 12, 240, step=12)
                     filter_size_3 = trial.suggest_int('filter_size_3', 1, 7, step=2)
@@ -517,7 +528,7 @@ class objective_cnn(object):
                 dense_neurons_1 = trial.suggest_int('dense_neurons_1', 128, 6400, step=128)
                 dropout_1 = trial.suggest_float('dropout_1', 0.0, 0.5, step=0.01)
 
-                num_dense_layers = trial.suggest_int('num_dense_layers', 1, 3, step=1)
+                num_dense_layers = trial.suggest_int('num_dense_layers', 1, 2, step=1)
 
                 if num_dense_layers == 1:
                     dense_neurons_2 = dropout_2 = dense_neurons_3 = dropout_3 = 0
@@ -585,11 +596,12 @@ class objective_cnn(object):
             models, histories = [], []
             models.append(model), histories.append(history)
 
-        else: 
+        else:
+            print() 
             print('Training failed due to numerical instability, returning nan...')
             return np.nan 
 
-        ##### Cross-Validation Routine - very specific implementation in which the validation data is inserted into the training data with the replacement serving as the new validation#####
+        ##### Cross-Validation Routine - implementation in which the validation data is inserted into the training data with the replacement serving as the new validation#####
         if self.opt_cv is not None:
             if self.val_positive is None and self.val_negative is not None:
                 raise ValueError('CNN cross-validation is currently supported only if validation data is input.')
@@ -640,7 +652,7 @@ class objective_cnn(object):
                     else:
                         class_1 = augmented_images
 
-                    #Perform same augmentation techniques on negative class data, batch=1
+                    #Perform same augmentation techniques on negative class data, batch=1 by default
                     if self.img_num_channels == 1:
                         channel1, channel2, channel3 = copy.deepcopy(class_2), None, None 
                     elif self.img_num_channels == 2:
@@ -648,7 +660,7 @@ class objective_cnn(object):
                     elif self.img_num_channels == 3:
                         channel1, channel2, channel3 = copy.deepcopy(class_2[:,:,:,0]), copy.deepcopy(class_2[:,:,:,1]), copy.deepcopy(class_2[:,:,:,2])
                     
-                    augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=1, 
+                    augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
                         width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
                         image_size=image_size, mask_size=self.mask_size, num_masks=self.num_masks)
 
@@ -665,9 +677,12 @@ class objective_cnn(object):
                     else:
                         class_2 = augmented_images_negative
 
-                    #Balance the class sizes
+                    #Balance the class sizes if necessary
                     if self.balance:
-                        class_2 = class_2[:len(class_1)]     
+                        if self.batch_other > 1: #Must shuffle!!!
+                            ix = np.random.permutation(len(class_2))
+                            class_2 = class_2[ix]
+                    class_2 = class_2[:len(class_1)]   
 
                     if self.img_num_channels == 1:
                         class_2 = resize(class_2, size=image_size)
@@ -711,7 +726,7 @@ class objective_cnn(object):
 
                 clear_session()
                 if self.opt_model is False:
-                    if clf != 'custom_cnn':
+                    if self.clf != 'custom_cnn':
                         model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                             min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.train_epochs, 
                             batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
@@ -722,7 +737,7 @@ class objective_cnn(object):
                             batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
                             checkpoint=False, verbose=self.verbose, optimizer=optimizer, smote_sampling=self.smote_sampling)
                 else:
-                    if clf != 'custom_cnn':
+                    if self.clf != 'custom_cnn':
                         if self.limit_search:
                             model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
                                 normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
@@ -775,6 +790,7 @@ class objective_cnn(object):
                             return (len(history.history['loss']) * 0.001) - 999.0
                     models.append(model), histories.append(history)
                 else:
+                    print()
                     print('Training failed due to numerical instability, returning nan...')
                     return np.nan 
 
@@ -812,6 +828,7 @@ class objective_cnn(object):
 
             test_metric = np.mean(test)
             if self.verbose == 1:
+                print()
                 print('Post-Trial Metric: '+str(test_metric))
         else:
             test_metric = None
@@ -1188,7 +1205,7 @@ class Monitor_Tracker(Callback):
 
 def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=True, img_num_channels=1, 
     normalize=True, min_pixel=0, max_pixel=100, val_X=None, val_Y=None, train_epochs=25, patience=0, metric='loss', 
-    limit_search=True, opt_model=True, opt_aug=False, batch_min=2, batch_max=25, image_size_min=50, image_size_max=100,
+    limit_search=True, opt_model=True, opt_aug=False, batch_min=2, batch_max=25, batch_other=1, image_size_min=50, image_size_max=100,
     opt_max_min_pix=None, opt_max_max_pix=None, opt_cv=10, test_size=None, average=True, test_positive=None, test_negative=None, shift=10, 
     mask_size=None, num_masks=None, verbose=1, train_acc_threshold=None, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None,
     smote_sampling=0):
@@ -1285,9 +1302,11 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
         opt_model (bool): If True, the architecture parameters will be optimized. Defaults to True.
         opt_aug (bool): If True, the augmentation procedure will be optimized. Defaults to False.
         batch_min (int): The minimum number of augmentations to perform per image on the positive class, only applicable 
-        if opt_aug=True. Defaults to 2.
+            if opt_aug=True. Defaults to 2.
         batch_max (int): The maximum number of augmentations to perform per image on the positive class, only applicable 
-        if opt_aug=True. Defaults to 25.
+            if opt_aug=True. Defaults to 25.
+        batch_other (int): The number of augmentations to perform to the other class, presumed to be the majority class.
+            Defaults to 1. This is done to ensure augmentation techniques are applied consistently across both classes.        
         image_size_min (int): The minimum image size to assess, only applicable if opt_aug=True. Defaults to 50.
         image_size_max (int): The maximum image size to assess, only applicable if opt_aug=True. Defaults to 100.
         opt_max_min_pix (int, optional): The minimum max pixel value to use when tuning the normalization procedure, 
@@ -1464,7 +1483,8 @@ def hyper_opt(data_x, data_y, clf='rf', n_iter=25, return_study=True, balance=Tr
             val_positive=val_X, val_negative=val_Y, train_epochs=train_epochs, patience=patience, metric=metric, average=average, test_positive=test_positive, test_negative=test_negative,
             opt_model=opt_model, opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, image_size_min=image_size_min, image_size_max=image_size_max, balance=balance, 
             opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix, shift=shift, opt_cv=opt_cv, mask_size=mask_size, num_masks=num_masks, train_acc_threshold=train_acc_threshold,
-            verbose=verbose, limit_search=limit_search, clf=clf, monitor1=monitor1, monitor2=monitor2, monitor1_thresh=monitor1_thresh, monitor2_thresh=monitor2_thresh, smote_sampling=smote_sampling)
+            verbose=verbose, limit_search=limit_search, clf=clf, monitor1=monitor1, monitor2=monitor2, monitor1_thresh=monitor1_thresh, monitor2_thresh=monitor2_thresh, 
+            smote_sampling=smote_sampling, batch_other=batch_other)
         study.optimize(objective, n_trials=n_iter, show_progress_bar=True, gc_after_trial=True)#, n_jobs=1)
         params = study.best_trial.params
 

@@ -7,7 +7,6 @@ Created on Thu Sep 27 08:28:20 2021
 """
 from pyBIA.data_processing import crop_image, concat_channels
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from scipy.ndimage import rotate
 import matplotlib.pyplot as plt
 from warnings import warn
 import numpy as np
@@ -230,8 +229,6 @@ def resize(data, size=50):
 
     return resized_data
 
-import numpy as np
-
 def random_cutout(images, mask_size=16, num_masks=1, seed=None, augmenting=False, mask_type='square'):
     """
     Applies the cutout data augmentation technique to a sample of 2D images.
@@ -283,6 +280,59 @@ def random_cutout(images, mask_size=16, num_masks=1, seed=None, augmenting=False
     np.random.seed(1909)
 
     return images
+
+def image_blending(images, num_augmentations=1, blend_ratio=0.5, blending_func='mean', seed=None):
+    """
+    Perform image blending augmentation on a set of single-band images.
+
+    Args:
+        images (ndarray): A 3D numpy array of grayscale images, with dimensions (num_images, width, height).
+        num_augmentations (int): The number of augmented images to generate.
+        blend_ratio (float): The proportion of the two images to blend together. Must be between 0 and 1.
+        blending_func (str): The blending function to use. Options are 'mean', 'max', 'min', and 'random'.
+        seed (int): The random seed to use for reproducibility.
+
+    Returns:
+        ndarray: A 4D numpy array of the augmented images, with dimensions (num_images * num_augmentations, width, height, 1).
+    """
+
+    assert images.ndim == 3, "Input images must have dimensions (num_images, width, height)"
+    assert isinstance(num_augmentations, int) and num_augmentations > 0, "num_augmentations must be a positive integer"
+    assert 0 <= blend_ratio <= 1, "blend_ratio must be between 0 and 1"
+    
+    if seed is not None:
+        np.random.seed(seed)
+    
+    #Initialize output array
+    num_images, width, height = images.shape
+    augmented_images = np.zeros((num_images * num_augmentations, width, height, 1), dtype=np.float32)
+    
+    #Define blending function
+    if blending_func == 'mean':
+        blend_func = lambda x, y: (1 - blend_ratio) * x + blend_ratio * y
+    elif blending_func == 'max':
+        blend_func = lambda x, y: np.maximum(x, y)
+    elif blending_func == 'min':
+        blend_func = lambda x, y: np.minimum(x, y)
+    elif blending_func == 'random':
+        blend_funcs = [np.mean, np.max, np.min]
+        blend_func = np.random.choice(blend_funcs)
+    else:
+        raise ValueError(f"Blending function '{blending_func}' not recognized")
+    
+    #Perform image blending augmentation
+    for i in range(num_augmentations):
+        for j in range(num_images):
+            #Randomly select a second image to blend with
+            k = np.random.choice(num_images)
+            while k == j:
+                k = np.random.choice(num_images)
+            #Apply image blending
+            blended_image = blend_func(images[j], images[k])
+            #Add to output array
+            augmented_images[i * num_images + j, :, :, 0] = blended_image.astype(np.float32)
+    
+    return augmented_images
 
 def plot(data, cmap='gray', title=''):
     """

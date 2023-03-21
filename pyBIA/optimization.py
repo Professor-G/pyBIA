@@ -226,7 +226,7 @@ class objective_cnn(object):
                 raise ValueError('To optimize min/max normalization pixel value, both opt_min_pix and opt_max_pix must be input')
 
         if self.balance and self.smote_sampling > 0:
-            print('WARNING: balance=True but SMOTE sampling is not applied if the classes are balanced.')
+            print('WARNING: balance=True but SMOTE sampling will not be applied if the classes are balanced.')
 
     def __call__(self, trial):
 
@@ -418,7 +418,6 @@ class objective_cnn(object):
             conv_init = trial.suggest_categorical('conv_init', ['uniform_scaling', 'TruncatedNormal', 'he_normal', 'lecun_uniform', 'glorot_uniform']) 
             dense_init = trial.suggest_categorical('dense_init', ['uniform_scaling', 'TruncatedNormal','he_normal', 'lecun_uniform', 'glorot_uniform']) 
 
-            ### Train the Model ###
             print()
             if self.verbose == 1:
                 if self.opt_cv is not None:
@@ -433,7 +432,7 @@ class objective_cnn(object):
                     print('Image Size : ', image_size)
                     print('Max Pixel(s) :', max_pix)
 
-            if self.clf != 'custom_cnn':
+            if self.clf == 'cnn':
 
                 ### Regularization Technique (BN is newer) ###
                 model_reg = trial.suggest_categorical('model_reg', ['local_response', 'batch_norm'])
@@ -499,7 +498,9 @@ class objective_cnn(object):
                         dropout_1=dropout_1, dropout_2=dropout_2, smote_sampling=self.smote_sampling,
                         early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
     
-            else:
+            elif self.clf == 'custom_cnn':
+                if self.limit_search:
+                    print('There is no limit_search option if clf="custom_cnn", setting limit_search=False...')
                 #Custom CNN function, the first CONV layer is required. 
                 filter_1 = trial.suggest_int('filter_1', 12, 240, step=12)
                 filter_size_1 = trial.suggest_int('filter_size_1', 1, 11, step=2)
@@ -551,6 +552,81 @@ class objective_cnn(object):
                     dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, dense_neurons_3=dense_neurons_3, 
                     dropout_1=dropout_1, dropout_2=dropout_2, dropout_3=dropout_3, smote_sampling=self.smote_sampling, 
                     early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+
+            elif self.clf == 'vgg16':
+                ### Regularization Technique (BN is newer) ###
+                model_reg = trial.suggest_categorical('model_reg', [None, 'batch_norm'])
+
+                pooling_1 = trial.suggest_categorical('pooling_1', ['min', 'max', 'average'])
+                pooling_2 = trial.suggest_categorical('pooling_2', ['min', 'max', 'average'])
+                pooling_3 = trial.suggest_categorical('pooling_3', ['min', 'max', 'average'])
+                pooling_4 = trial.suggest_categorical('pooling_4', ['min', 'max', 'average'])
+                pooling_5 = trial.suggest_categorical('pooling_5', ['min', 'max', 'average'])
+
+                ### Pooling Type ###
+                if self.limit_search:
+                
+                    model, history = cnn_model.VGG16(class_1, class_2, img_num_channels=self.img_num_channels, 
+                        normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                        epochs=self.train_epochs, batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                        loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, model_reg=model_reg, 
+                        conv_init=conv_init, dense_init=dense_init, optimizer=optimizer, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose, 
+                        pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pooling_4=pooling_4, pooling_5=pooling_5, smote_sampling=self.smote_sampling)
+                else:
+                    ### Filter and Layer Characterstics ###
+                    filter_1 = trial.suggest_int('filter_1', 12, 240, step=12)
+                    filter_size_1 = trial.suggest_int('filter_size_1', 1, 11, step=2)
+                    strides_1 = trial.suggest_int('strides_1', 1, 3, step=1)
+                    pool_size_1 = trial.suggest_int('pool_size_1', 1, 7, step=1)
+                    pool_stride_1 = trial.suggest_int('pool_stride_1', 1, 3, step=1)
+
+                    filter_2 = trial.suggest_int('filter_2', 12, 240, step=12)
+                    filter_size_2 = trial.suggest_int('filter_size_2', 1, 7, step=2)
+                    strides_2 = trial.suggest_int('strides_2', 1, 3, step=1)
+                    pool_size_2 = trial.suggest_int('pool_size_2', 1, 7, step=1)
+                    pool_stride_2 = trial.suggest_int('pool_stride_2', 1, 3, step=1)
+
+                    filter_3 = trial.suggest_int('filter_3', 12, 240, step=12)
+                    filter_size_3 = trial.suggest_int('filter_size_3', 1, 7, step=2)
+                    strides_3 = trial.suggest_int('strides_3', 1, 3, step=1)
+                    pool_size_3 = trial.suggest_int('pool_size_3', 1, 7, step=1)
+                    pool_stride_3 = trial.suggest_int('pool_stride_3', 1, 3, step=1)
+
+                    filter_4 = trial.suggest_int('filter_4', 12, 240, step=12)
+                    filter_size_4 = trial.suggest_int('filter_size_4', 1, 7, step=2)
+                    strides_4 = trial.suggest_int('strides_4', 1, 3, step=1)
+                    pool_size_4 = trial.suggest_int('pool_size_4', 1, 7, step=1)
+                    pool_stride_4 = trial.suggest_int('pool_stride_4', 1, 3, step=1)
+
+                    filter_5 = trial.suggest_int('filter_5', 12, 240, step=12)
+                    filter_size_5 = trial.suggest_int('filter_size_5', 1, 7, step=2)
+                    strides_5 = trial.suggest_int('strides_5', 1, 3, step=1) 
+                    pool_size_5 = trial.suggest_int('pool_size_5', 1, 7, step=1)
+                    pool_stride_5 = trial.suggest_int('pool_stride_5', 1, 3, step=1)
+
+                    ### Dense Layers ###
+                    dense_neurons_1 = trial.suggest_int('dense_neurons_1', 128, 6400, step=128)
+                    dense_neurons_2 = trial.suggest_int('dense_neurons_2', 128, 6400, step=128)
+                    dropout_1 = trial.suggest_float('dropout_1', 0.0, 0.5, step=0.01)
+                    dropout_2 = trial.suggest_float('dropout_2', 0.0, 0.5, step=0.01) 
+
+                    model, history = cnn_model.VGG16(class_1, class_2, img_num_channels=self.img_num_channels, 
+                        normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                        epochs=self.train_epochs, batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                        loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, model_reg=model_reg, 
+                        conv_init=conv_init, dense_init=dense_init, optimizer=optimizer, pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, 
+                        pooling_4=pooling_4, pooling_5=pooling_5, 
+                        pool_stride_1=pool_stride_1, pool_size_1=pool_size_1, pool_size_2=pool_size_2, pool_stride_2=pool_stride_2, 
+                        pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, pool_size_4=pool_size_4, pool_stride_4=pool_stride_4, 
+                        pool_size_5=pool_size_5, pool_stride_5=pool_stride_5, 
+                        filter_1=filter_1, filter_size_1=filter_size_1, 
+                        strides_1=strides_1, filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, 
+                        filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, filter_4=filter_4, 
+                        filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, 
+                        strides_5=strides_5, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, 
+                        dropout_1=dropout_1, dropout_2=dropout_2, smote_sampling=self.smote_sampling,
+                        early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+
         else:
             if self.opt_cv is not None:
                 print()
@@ -564,17 +640,18 @@ class objective_cnn(object):
                 print('Image Size : ', image_size)
                 print('Max Pixel(s) : ', max_pix)
 
-            if self.clf != 'custom_cnn':
+            if self.clf == 'cnn':
                 model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                     min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.train_epochs, 
                     batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
                     checkpoint=False, verbose=self.verbose, optimizer=optimizer, smote_sampling=self.smote_sampling)
-            else:
+            elif self.clf == 'custom_cnn':
                  model, history = cnn_model.custom_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                     min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.train_epochs, 
                     batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
                     checkpoint=False, verbose=self.verbose, optimizer=optimizer, smote_sampling=self.smote_sampling)
-
+            elif self.clf == 'vgg16':
+                pass
 
         #If the patience is reached#
         if len(history.history['loss']) != self.train_epochs:
@@ -682,7 +759,7 @@ class objective_cnn(object):
                         if self.batch_other > 1: #Must shuffle!!!
                             ix = np.random.permutation(len(class_2))
                             class_2 = class_2[ix]
-                    class_2 = class_2[:len(class_1)]   
+                        class_2 = class_2[:len(class_1)]   
 
                     if self.img_num_channels == 1:
                         class_2 = resize(class_2, size=image_size)
@@ -726,18 +803,18 @@ class objective_cnn(object):
 
                 clear_session()
                 if self.opt_model is False:
-                    if self.clf != 'custom_cnn':
+                    if self.clf == 'cnn':
                         model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                             min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.train_epochs, 
                             batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
                             conv_init=conv_init, dense_init=dense_init, checkpoint=False, verbose=self.verbose, optimizer=optimizer, smote_sampling=self.smote_sampling)
-                    else:
+                    elif self.clf == 'custom_cnn':
                          model, history = cnn_model.custom_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                             min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.train_epochs, 
                             batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
                             checkpoint=False, verbose=self.verbose, optimizer=optimizer, smote_sampling=self.smote_sampling)
                 else:
-                    if self.clf != 'custom_cnn':
+                    if self.clf == 'cnn':
                         if self.limit_search:
                             model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
                                 normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
@@ -758,7 +835,7 @@ class objective_cnn(object):
                                 filter_size_4=filter_size_4, strides_4=strides_4, filter_5=filter_5, filter_size_5=filter_size_5, 
                                 strides_5=strides_5, dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, 
                                 dropout_1=dropout_1, dropout_2=dropout_2, smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
-                    else:
+                    elif self.clf == 'custom_cnn':
                         model, history = cnn_model.custom_model(class_1, class_2, img_num_channels=self.img_num_channels, 
                             normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
                             epochs=self.train_epochs, batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov,
@@ -1141,7 +1218,7 @@ class Monitor_Tracker(Callback):
         self.monitor2_thresh = monitor2_thresh
         self.stopped_epoch = 0
         self.best_metric = float('inf') 
-        self.best_weights = None #Will use this to store the weights with the best metric value
+        self.best_weights = None #Will use this to store the weights with the best metric value but not currently called in the routine
 
     def on_epoch_end(self, epoch, logs={}):
         """

@@ -5,14 +5,14 @@ Created on Wed Sep  11 12:04:23 2021
 
 @author: daniel
 """
-import os, sys
-import copy, gc
+import os, sys, copy, gc
+import selectors, termios
 import tensorflow as tf
 os.environ['PYTHONHASHSEED']= '0' #, os.environ["TF_DETERMINISTIC_OPS"] =1
+
 import numpy as np
 import random as python_random
-##https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development##
-np.random.seed(1909), python_random.seed(1909), tf.random.set_seed(1909)
+np.random.seed(1909), python_random.seed(1909), tf.random.set_seed(1909) ##https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development##
 from pandas import DataFrame
 from warnings import filterwarnings
 filterwarnings("ignore", category=FutureWarning)
@@ -155,7 +155,9 @@ class objective_cnn(object):
         smote_sampling (float): The smote_sampling parameter is used in the SMOTE algorithm to specify the desired 
             ratio of the minority class to the majority class. Defaults to 0 which disables the procedure. For more
             information refer to the ensemble_model module.
-        
+        blend_max (float): If used this will apply blending augmentation 
+        max_images_to_blend (int):
+
     Returns:
         The performance metric.
     """
@@ -166,7 +168,7 @@ class objective_cnn(object):
         balance=True, opt_max_min_pix=None, opt_max_max_pix=None, metric='loss', average=True, shift=10,
         mask_size=None, num_masks=None, opt_cv=None, verbose=0, train_acc_threshold=None, smote_sampling=0,
         clf='cnn', limit_search=True, batch_size_min=16, batch_size_max=64, monitor1=None, monitor2=None, 
-        monitor1_thresh=None, monitor2_thresh=None):
+        monitor1_thresh=None, monitor2_thresh=None, blend_max=0, max_images_to_blend=2):
 
         self.positive_class = positive_class
         self.negative_class = negative_class
@@ -209,13 +211,15 @@ class objective_cnn(object):
         self.monitor1_thresh = monitor1_thresh
         self.monitor2_thresh = monitor2_thresh
         self.smote_sampling = smote_sampling
+        self.max_images_to_blend = max_images_to_blend
+        self.blend_max = blend_max
 
         if 'all' not in self.metric and 'loss' not in self.metric and 'f1_score' not in self.metric and 'binary_accuracy' not in self.metric:
             raise ValueError("Invalid metric input, options are: 'loss', 'binary_accuracy', 'f1_score', or 'all', and the validation equivalents (add val_ at the beginning).")
         
         if self.metric == 'val_loss' or self.metric == 'val_binary_accuracy':
             if self.val_positive is None and self.val_negative is None:
-                raise ValueError('No validation data input, change the metric to either "loss" or "binary_accuracy".')
+                raise ValueError('No validation data input, change the metric to either "loss", "binary_accuracy", "f1_score", or "all".')
 
         if self.opt_max_min_pix is not None:
             if self.opt_max_max_pix is None:
@@ -240,21 +244,23 @@ class objective_cnn(object):
             else:
                 raise ValueError('Only three filters are supported!')
 
-        if 'loss' in self.metric: #This sets the model patience during individual training runs
-            mode = 'min'
-        else:
-            mode = 'max'
-
         if self.opt_aug:
+            rotation = horizontal = vertical = True 
             num_aug = trial.suggest_int('num_aug', self.batch_min, self.batch_max, step=1)
             image_size = trial.suggest_int('image_size', self.image_size_min, self.image_size_max, step=1)
-            rotation = horizontal = vertical = True 
+            if self.blend_max > 1.01:
+                blend_multiplier = trial.suggest_int('blend_multiplier', 1.0, self.blend_max, step=0.01)
+                blending_func = trial.suggest_categorical('blending_func', ['mean', 'min', 'max', 'random'])
+                blend_other = 1
+            else:
+                blend_multiplier, blend_other, blending_func = 0, 0, 'mean' #Won't be used
 
             augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=num_aug, 
                 width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
-                image_size=image_size, mask_size=self.mask_size, num_masks=self.num_masks)
+                image_size=image_size, mask_size=self.mask_size, num_masks=self.num_masks, blend_multiplier=blend_multiplier, 
+                blending_func=blending_func, num_images_to_blend=self.num_images_to_blend)
 
-            #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
+            #Concat channels since augmentation returns an output for each filter, e.g. 3 outputs for RGB
             if self.img_num_channels > 1:
                 class_1=[]
                 if self.img_num_channels == 2:
@@ -267,8 +273,8 @@ class objective_cnn(object):
             else:
                 class_1 = augmented_images
 
-            #Perform same augmentation techniques on negative class data for balance but only use batch=1 by default
-            #This is done so that the training data also includes the random cutout, if configured.
+            #Perform same augmentation techniques on negative class data for balance but use batch=batch_other, num_images_to_blend=self.num_images_to_blend 
+            #This is done so that the training data also includes the same augmentation techniques, if configured.
             if self.img_num_channels == 1:
                 channel1, channel2, channel3 = copy.deepcopy(self.negative_class), None, None 
             elif self.img_num_channels == 2:
@@ -278,7 +284,8 @@ class objective_cnn(object):
             
             augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
                 width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
-                image_size=image_size, mask_size=self.mask_size, num_masks=self.num_masks)
+                image_size=image_size, mask_size=self.mask_size, num_masks=self.num_masks, blend_multiplier=blend_other, blending_func=blending_func, 
+                num_images_to_blend=self.num_images_to_blend)
 
             #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
             if self.img_num_channels > 1:
@@ -299,7 +306,8 @@ class objective_cnn(object):
                     ix = np.random.permutation(len(class_2))
                     class_2 = class_2[ix]
                 class_2 = class_2[:len(class_1)]
-  
+            
+            #Resize if necessary and concat the channels
             if self.img_num_channels == 1:
                 class_2 = resize(class_2, size=image_size)
             else:
@@ -364,16 +372,30 @@ class objective_cnn(object):
 
         ### Early Stopping and Pruning Callbacks ###
         if self.patience != 0:
+            mode = 'min' if 'loss' in self.metric else 'max' #Need to minimize the metric if evaluating the loss!
             if self.metric == 'all' or self.metric == 'val_all':
                 print()
-                print('Cannot use callbacks if averaging out all performance metrics for evaluation, setting patience=0.')
-                callbacks = []#TFKerasPruningCallback(trial, monitor=self.metric),]
+                print("'Cannot use early stopping callbacks if averaging out all performance metrics for evaluation!")
+                try:
+                    user_input = input_timeout.inputimeout()
+                    print("Input the desired early stopping metric (e.g. loss or val_loss) or None: ", user_input)             
+                    metric_options = ['None', 'loss', 'binary_accuracy', 'f1_score', 'val_loss', 'val_binary_accuracy', 'val_f1_score']
+                    if user_input == 'None':
+                        print("No input received, setting patience=0...")
+                        callbacks = None 
+                    else:
+                        if any(keyword in user_input for keyword in metric_options):
+                            mode = 'min' if 'loss' in user_input else 'max'
+                            callbacks = [EarlyStopping(monitor=user_input, mode=mode, patience=self.patience),]
+                            print(f"Input accepted, configuring early stopping if the {user_input} does not improve after {self.patience} epochs.")
+                        else:
+                            raise ValueError("Invalid input! Options are {}.".format(metric_options))
+                except InputTimeout.TimeoutOccurred:
+                    print("Input timeout occurred, setting patience=0...")
+                    callbacks = None 
             else:
                 if self.train_acc_threshold is None:
-                    callbacks = [
-                        EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience),
-                        #TFKerasPruningCallback(trial, monitor=self.metric),
-                        ]
+                    callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience),]
                 else:
                     callbacks = [
                         EarlyStopping(monitor='binary_accuracy', mode='max', patience=0, baseline=self.train_acc_threshold),
@@ -381,12 +403,18 @@ class objective_cnn(object):
                         #TFKerasPruningCallback(trial, monitor=self.metric),
                         ]
             if self.monitor1 is not None:
-                callbacks.append(Monitor_Tracker(monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, monitor2_thresh=self.monitor2_thresh))
-        else:
-            callbacks = None
+                if callbacks is not None:
+                    callbacks.append(Monitor_Tracker(monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, monitor2_thresh=self.monitor2_thresh))
+                else:
+                    callbacks = [Monitor_Tracker(monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, monitor2_thresh=self.monitor2_thresh),]
+            else:
+                if self.monitor1 is not None:
+                    callbacks = [Monitor_Tracker(monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, monitor2_thresh=self.monitor2_thresh),]
+                else:
+                    callbacks = None
 
         ### ### ### ### ### ### ### ### ### 
-        ## Optimize CNN -- AlexNet only! ##
+             ## Optimize CNN Model ##
         ### ### ### ### ### ### ### ### ### 
 
         ### Batch Size, Learning Rate & Optimizer ###
@@ -412,7 +440,7 @@ class objective_cnn(object):
             ### Activation and Loss Functions ### 
             activation_conv = trial.suggest_categorical('activation_conv', ['relu',  'sigmoid', 'tanh', 'elu', 'selu'])            
             activation_dense = trial.suggest_categorical('activation_dense', ['relu', 'sigmoid', 'tanh', 'elu', 'selu'])
-            loss = trial.suggest_categorical('loss', ['binary_crossentropy', 'hinge', 'squared_hinge', 'kld', 'logcosh', 'focal_loss', 'dice_loss', 'jaccard_loss'])
+            loss = trial.suggest_categorical('loss', ['binary_crossentropy', 'hinge', 'squared_hinge', 'kld', 'logcosh'])#, 'focal_loss', 'dice_loss', 'jaccard_loss'])
 
             ### Kernel Initializers ###
             conv_init = trial.suggest_categorical('conv_init', ['uniform_scaling', 'TruncatedNormal', 'he_normal', 'lecun_uniform', 'glorot_uniform']) 
@@ -646,33 +674,33 @@ class objective_cnn(object):
                     batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
                     checkpoint=False, verbose=self.verbose, optimizer=optimizer, smote_sampling=self.smote_sampling)
             elif self.clf == 'custom_cnn':
-                 model, history = cnn_model.custom_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                model, history = cnn_model.custom_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
                     min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.train_epochs, 
                     batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
                     checkpoint=False, verbose=self.verbose, optimizer=optimizer, smote_sampling=self.smote_sampling)
             elif self.clf == 'vgg16':
-                pass
+                model, history = cnn_model.VGG16(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                    min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.train_epochs, 
+                    batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
+                    checkpoint=False, verbose=self.verbose, optimizer=optimizer, smote_sampling=self.smote_sampling)
 
         #If the patience is reached#
         if len(history.history['loss']) != self.train_epochs:
             print()
-            print('The trial was pruned or the training patience was reached...')#, returning 0.001 times the number of completed epochs...')
+            print('Training patience was reached...')#, returning 0.001 times the number of completed epochs...')
             print()
             return (len(history.history['loss']) * 0.001) - 999.0
 
         #If the output is nan
         if np.isfinite(history.history['loss'][-1]):
-            #If the train ac notc threshold is set#
             if self.train_acc_threshold is not None:
                 if history.history['binary_accuracy'][-1] > self.train_acc_threshold:
                     print()
                     print('The trial was pruned or the training patience was reached...')#, returning 0.001 times the number of completed epochs...')
                     print()
                     return (len(history.history['loss']) * 0.001) - 999.0
-
             models, histories = [], []
             models.append(model), histories.append(history)
-
         else:
             print() 
             print('Training failed due to numerical instability, returning nan...')
@@ -813,6 +841,11 @@ class objective_cnn(object):
                             min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.train_epochs, 
                             batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
                             checkpoint=False, verbose=self.verbose, optimizer=optimizer, smote_sampling=self.smote_sampling)
+                    elif self.clf == 'vgg16':
+                            model, history = cnn_model.VGG16(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize, 
+                                min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.train_epochs, 
+                                batch_size=batch_size, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, early_stop_callback=callbacks, 
+                                checkpoint=False, verbose=self.verbose, optimizer=optimizer, smote_sampling=self.smote_sampling)
                 else:
                     if self.clf == 'cnn':
                         if self.limit_search:
@@ -847,7 +880,11 @@ class objective_cnn(object):
                             dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, dense_neurons_3=dense_neurons_3, 
                             dropout_1=dropout_1, dropout_2=dropout_2, dropout_3=dropout_3, smote_sampling=self.smote_sampling, 
                             early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
-
+                    elif self.clf == 'vgg16':
+                        if self.limit_search:
+                            pass 
+                        else:
+                            pass
 
                 #If the trial is pruned or the patience is reached, return nan#
                 if len(history.history['loss']) != self.train_epochs:
@@ -1783,5 +1820,55 @@ def KNN_imputation(data, imputer=None, k=3):
         return imputed_data, imputer
 
     return imputer.transform(data) 
+
+
+class InputTimeout:
+    """
+    A class for reading user input with a timeout on Linux, used in the CNN optimization routine. 
+
+    Example:
+
+        input_timeout = InputTimeout("Enter your input: ", 5)
+        try:
+            user_input = input_timeout.inputimeout()
+            print("User input:", user_input)
+        except InputTimeout.TimeoutOccurred:
+            print("Timeout occurred. No input received.")
+
+    Attributes:
+        prompt (str): The prompt message to display to the user.
+        timeout (float): The number of seconds to wait for input before timing out.
+    
+    Methods:
+        inputimeout(): Reads user input from the command line with a timeout. If no input is
+            received within the specified timeout, a TimeoutOccurred exception is raised.
+    """
+
+    class TimeoutOccurred(Exception):
+        pass
+    
+    def __init__(self, prompt='', timeout=30):
+        self.prompt = prompt
+        self.timeout = timeout
+        self.echo = self._echo_posix
+        self.inputimeout = self._inputimeout_posix
+    
+    def _echo_posix(self, string):
+        sys.stdout.write(string)
+        sys.stdout.flush()
+        
+    def _inputimeout_posix(self):
+        self.echo(self.prompt)
+        sel = selectors.DefaultSelector()
+        sel.register(sys.stdin, selectors.EVENT_READ)
+        events = sel.select(self.timeout)
+
+        if events:
+            key, _ = events[0]
+            return key.fileobj.readline().rstrip('\n')
+        else:
+            self.echo('\n')
+            termios.tcflush(sys.stdin, termios.TCIFLUSH)
+            raise self.TimeoutOccurred
 
 

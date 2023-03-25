@@ -18,7 +18,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from tensorflow.keras.utils import to_categorical
-from imblearn.over_sampling import SMOTE
 
 import random as python_random
 ##https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development##
@@ -38,7 +37,7 @@ from tensorflow.keras.layers import Input, Activation, Dense, Dropout, Conv2D, M
 
 from optuna.importance import get_param_importances, FanovaImportanceEvaluator
 from pyBIA.data_processing import process_class, create_training_set, concat_channels
-from pyBIA.data_augmentation import augmentation, resize
+from pyBIA.data_augmentation import augmentation, resize, smote_oversampling
 from pyBIA import optimization
 
 
@@ -1000,22 +999,19 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
 
     #Apply SMOTE to oversample the minority class
     if smote_sampling > 0:
+        X_train[np.isfinite(X_train)==False] = 0
         if len(np.where(Y_train[:,0]==1)[0]) == len(np.where(Y_train[:,1]==1)[0]):
             X_train_res, Y_train_res = X_train, Y_train
             print('Classes are already balanced, skipping SMOTE sampling.')
         else:
-            smote = SMOTE(sampling_strategy=smote_sampling, random_state=1909)
-            X_2d = np.reshape(X_train, (X_train.shape[0], -1)) #Reshape X_train into a 2D array
-            X_res, Y_train_res = smote.fit_resample(X_2d, Y_train)
-            X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels)) #Reshape X_res back into a 4D array
-            Y_train_res = to_categorical(Y_train_res, num_classes=2)
+            X_train_res, Y_train_res = smote_oversampling(X_train, Y_train, smote_sampling=smote_sampling)
     elif smote_sampling == 0:
         X_train_res, Y_train_res = X_train, Y_train
     else:
         raise ValueError('smote_sampling must be a float between 0.0 and 1.0!')
 
     num_classes, input_shape = 2, (img_width, img_height, img_num_channels)
-   
+    
     if verbose == 1:
         dense_neurons_3 = dropout_3 = 0
         pooling_4 = pool_size_4 = pooling_5 = pool_size_5 = 'None' 
@@ -1256,15 +1252,12 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
         
     #Apply SMOTE to oversample the minority class
     if smote_sampling > 0:
+        X_train[np.isfinite(X_train)==False] = 0
         if len(np.where(Y_train[:,0]==1)[0]) == len(np.where(Y_train[:,1]==1)[0]):
             X_train_res, Y_train_res = X_train, Y_train
             print('Classes are already balanced, skipping SMOTE sampling.')
         else:
-            smote = SMOTE(sampling_strategy=smote_sampling, random_state=1909)
-            X_2d = np.reshape(X_train, (X_train.shape[0], -1)) #Reshape X_train into a 2D array
-            X_res, Y_train_res = smote.fit_resample(X_2d, Y_train)
-            X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels)) #Reshape X_res back into a 4D array
-            Y_train_res = to_categorical(Y_train_res, num_classes=2)
+            X_train_res, Y_train_res = smote_oversampling(X_train, Y_train, smote_sampling=smote_sampling)
     elif smote_sampling == 0:
         X_train_res, Y_train_res = X_train, Y_train
     else:
@@ -1516,15 +1509,12 @@ def VGG16(positive_class, negative_class, img_num_channels=1, normalize=True,
         
     #Apply SMOTE to oversample the minority class
     if smote_sampling > 0:
+        X_train[np.isfinite(X_train)==False] = 0
         if len(np.where(Y_train[:,0]==1)[0]) == len(np.where(Y_train[:,1]==1)[0]):
             X_train_res, Y_train_res = X_train, Y_train
             print('Classes are already balanced, skipping SMOTE sampling.')
         else:
-            smote = SMOTE(sampling_strategy=smote_sampling, random_state=1909)
-            X_2d = np.reshape(X_train, (X_train.shape[0], -1)) #Reshape X_train into a 2D array
-            X_res, Y_train_res = smote.fit_resample(X_2d, Y_train)
-            X_train_res = np.reshape(X_res, (X_res.shape[0], img_height, img_width, img_num_channels)) #Reshape X_res back into a 4D array
-            Y_train_res = to_categorical(Y_train_res, num_classes=2)
+            X_train_res, Y_train_res = smote_oversampling(X_train, Y_train, smote_sampling=smote_sampling)
     elif smote_sampling == 0:
         X_train_res, Y_train_res = X_train, Y_train
     else:

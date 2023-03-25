@@ -132,7 +132,7 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
         else:
             raise ValueError("Input data must be 2D for single sample or 3D for multiple samples")
 
-    augmented_data, seeds = [], [] #Seeds will store the rotation/translation/shift augmentation seeds for multi-band reproducibility
+    augmented_data, seeds = [], [] #Seeds will store the rotation/translation/shift and/or zoom augmentations for multi-band reproducibility
     for i in np.arange(0, len(data)):
         original_data = data[i].reshape((1,) + data[-i].shape)
         for j in range(batch):
@@ -242,7 +242,8 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
         a = [] #Individual images will be input independently to ensure proper seed use
         for i in range(len(augmented_data3)):
             a.append(random_cutout(augmented_data3[i], mask_size=mask_size, num_masks=num_masks, seed=seeds_mask[i]))
-
+        augmented_data3 = np.array(a)
+        
     return augmented_data, augmented_data2, augmented_data3
 
 def random_cutout(images, mask_size=16, num_masks=1, seed=None, mask_type='circle'):

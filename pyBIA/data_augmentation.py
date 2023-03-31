@@ -86,6 +86,15 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
         additionl outputs, respectively.
     """
 
+    if batch == 0: #Setting this in case the negative class is not set to be augmented during the CNN optimization routine.
+        if channel_2 is None:
+            return channel1 
+        else:
+            if channel_3 is None:
+                return channel1, channel2
+            else:
+                return channel1, channel2, channel3
+
     if isinstance(width_shift, int) == False or isinstance(height_shift, int) == False:
         raise ValueError("Shift parameters must be integers indicating +- pixel range")
     if mask_size is not None:
@@ -123,14 +132,13 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
     if rotation != 0:
         datagen.preprocessing_function = image_rotation
 
-    if len(channel1.shape) != 4:
-        if len(channel1.shape) == 3: 
-            data = np.array(np.expand_dims(channel1, axis=-1))
-        elif len(channel1.shape) == 2:
-            data = np.array(np.expand_dims(channel1, axis=-1))
-            data = data.reshape((1,) + data.shape)
-        else:
-            raise ValueError("Input data must be 2D for single sample or 3D for multiple samples")
+    if len(channel1.shape) == 3: 
+        data = np.array(np.expand_dims(channel1, axis=-1))
+    elif len(channel1.shape) == 2:
+        data = np.array(np.expand_dims(channel1, axis=-1))
+        data = data.reshape((1,) + data.shape)
+    else:
+        raise ValueError("Input data must be 2D for single sample or 3D for multiple samples")
 
     augmented_data, seeds = [], [] #Seeds will store the rotation/translation/shift and/or zoom augmentations for multi-band reproducibility
     for i in np.arange(0, len(data)):
@@ -169,13 +177,12 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
     if channel2 is None:
         return augmented_data
     else:
-        if len(channel2.shape) != 4:
-            if len(channel2.shape) == 3: 
-                data = np.array(np.expand_dims(channel2, axis=-1))
-            elif len(channel2.shape) == 2:
-                data = np.array(np.expand_dims(channel2, axis=-1))
-                data = data.reshape((1,) + data.shape)
-
+        if len(channel2.shape) == 3: 
+            data = np.array(np.expand_dims(channel2, axis=-1))
+        elif len(channel2.shape) == 2:
+            data = np.array(np.expand_dims(channel2, axis=-1))
+            data = data.reshape((1,) + data.shape)
+     
         augmented_data2, k = [], 0
         for i in np.arange(0, len(data)):
             original_data = data[i].reshape((1,) + data[-i].shape)
@@ -208,13 +215,12 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
     if channel3 is None:
         return augmented_data, augmented_data2
     else:
-        if len(channel3.shape) != 4:
-            if len(channel3.shape) == 3: 
-                data = np.array(np.expand_dims(channel3, axis=-1))
-            elif len(channel3.shape) == 2:
-                data = np.array(np.expand_dims(channel3, axis=-1))
-                data = data.reshape((1,) + data.shape)
-
+        if len(channel3.shape) == 3: 
+            data = np.array(np.expand_dims(channel3, axis=-1))
+        elif len(channel3.shape) == 2:
+            data = np.array(np.expand_dims(channel3, axis=-1))
+            data = data.reshape((1,) + data.shape)
+   
         augmented_data3, k = [], 0
         for i in np.arange(0, len(data)):
             original_data = data[i].reshape((1,) + data[-i].shape)
@@ -243,7 +249,7 @@ def augmentation(channel1, channel2=None, channel3=None, batch=10, width_shift=5
         for i in range(len(augmented_data3)):
             a.append(random_cutout(augmented_data3[i], mask_size=mask_size, num_masks=num_masks, seed=seeds_mask[i]))
         augmented_data3 = np.array(a)
-        
+
     return augmented_data, augmented_data2, augmented_data3
 
 def random_cutout(images, mask_size=16, num_masks=1, seed=None, mask_type='circle'):
@@ -354,15 +360,20 @@ def image_blending(images, num_augmentations=1, blend_ratio=0.5, blending_func='
     if blending_func == 'mean':
         blend_func = lambda x, y: (1 - blend_ratio) * x + blend_ratio * y
     elif blending_func == 'max':
-        blend_func = lambda x, y: np.maximum(x, y)
+        blend_func = lambda x, y: np.maximum(x.astype(np.float64), y.astype(np.float64)).astype(x.dtype)
     elif blending_func == 'min':
-        blend_func = lambda x, y: np.minimum(x, y)
+        blend_func = lambda x, y: np.minimum(x.astype(np.float64), y.astype(np.float64)).astype(x.dtype)
     elif blending_func == 'random':
-        blend_funcs = [np.mean, np.max, np.min]
-        blend_func = np.random.choice(blend_funcs)
+        random_func = random.choice(['mean', 'max', 'min'])
+        if random_func == 'mean':
+            blend_func = lambda x, y: (1 - blend_ratio) * x + blend_ratio * y
+        elif random_func == 'max':
+            blend_func = lambda x, y: np.maximum(x.astype(np.float64), y.astype(np.float64)).astype(x.dtype)
+        elif random_func == 'min':
+            blend_func = lambda x, y: np.minimum(x.astype(np.float64), y.astype(np.float64)).astype(x.dtype) 
     else:
         raise ValueError(f"Blending function '{blending_func}' not recognized, options are 'mean', 'max', 'min', or 'random'.")
-    
+
     if seed is not None:
         np.random.seed(seed)
     
@@ -448,7 +459,7 @@ def smote_oversampling(X_train, Y_train, smote_sampling=1, binary=True, seed=Non
     valid_sampling_options = ['minority', 'not minority', 'not majority', 'all']
     if isinstance(smote_sampling, str) and smote_sampling not in valid_sampling_options:
         raise ValueError(f"Invalid smote_sampling option '{smote_sampling}'. Valid options are {valid_sampling_options}, or a float in the range (0, 1)")
-    elif isinstance(smote_sampling, float) and (smote_sampling <= 0 or smote_sampling >= 1):
+    elif isinstance(smote_sampling, float) and (smote_sampling < 0 or smote_sampling > 1):
         raise ValueError("smote_sampling must be a float in the range (0, 1)")
     
     #Reshape X_train to 2D array

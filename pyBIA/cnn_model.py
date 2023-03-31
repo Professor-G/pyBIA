@@ -618,7 +618,7 @@ class Classifier:
 
         return 
 
-    def load(self, load_training_data=True):
+    def load(self, path=None, load_training_data=True):
         """ 
         Loads the model, imputer, and feats to use, if created and saved.
         This function will look for a folder named 'pyBIA_models' in the
@@ -629,7 +629,7 @@ class Classifier:
                 will be loaded if found the directory.
         """
 
-        path = str(Path.home()) if self.path is None else self.path
+        path = str(Path.home()) if path is None else path
         path += '/' if path[-1] != '/' else ''
         path += 'pyBIA_cnn_model/'
 

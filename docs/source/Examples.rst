@@ -150,7 +150,7 @@ For this example, we will augment each unique sample in the ``positive_class`` 2
 	
 	model.augment_positive(batch=10, width_shift=width_shift, height_shift=height_shift, vertical=vertical, horizontal=horizontal, rotation=rotation, zoom_range=zoom_range, image_size=image_size, mask_size=mask_size, num_masks=num_masks)
 
-The ``positive_class`` will now contain 500 images so as to match our ``negative_class``. Alternatively, we could have set ``batch`` to 10, and enabled the ``blend_multiplkier`` option with a value of 2.5, to bring the final sample to 500 (20 original images times 10 augmentations times a 2.5 blending multiplier). When applying mask cutouts, it is avised to apply similar cutouts to the ``negative_class`` so as to prevent the model from associating random cutouts with the positive class:
+The ``positive_class`` will now contain 500 images so as to match our ``negative_class``. Alternatively, we could have set ``batch`` to 10, and enabled the ``blend_multiplier`` option with a value of 2.5, to bring the final sample to 500 (20 original images times 10 augmentations times a 2.5 blending multiplier). When applying mask cutouts, it is avised to apply similar cutouts to the ``negative_class`` so as to prevent the model from associating random cutouts with the positive class:
 
 .. code-block:: python
 
@@ -173,7 +173,7 @@ To re-do the augmentations, simply reset the positive and negative class attribu
 .. code-block:: python
 
 	model.positive_class = lenses 
-	model.augment_positive(blend_mulitplier=50, num_images_to_blend=3, blend_func='mean', image_size=image_size)
+	model.augment_positive(blend_multiplier=50, num_images_to_blend=3, blend_func='mean', image_size=image_size)
 
 	model.negative_class = other 
 	model.augment_negative(blend_multiplier=1, num_images_to_blend=3, blend_func='mean', image_size=image_size)

@@ -160,6 +160,7 @@ Note that the ``image_size`` paramter was set to 67 when augmenting the ``positi
 
 As exemplified in the previous section, the ``_plot_positive`` and ``_plot_negative`` can be used for quick visualization.
 
+
 .. code-block:: python
 
 	model._plot_positive()

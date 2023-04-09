@@ -35,7 +35,7 @@ Currently, pyBIA supports the implementation of three popular CNN architectures:
 .. code-block:: python
 
 	model.clf = 'resnet18'
-	model = model.create()
+	model.create()
 
 By default, ``verbose`` is set to 0, but this can be set to 1 to visualize the model's performance as it trains, epoch-per-epoch. The ``epochs`` attribute controls the total training epochs, which is set to 25 by default. To input validation data, set the ``val_positive`` and/or the ``val_negative`` attributes. To configure early-stopping criteria, the ``patience`` attribute can be set to a non-zero integer. This parameter will determine the number of epochs to train to after no training improvement, which could be indicative of overfitting behavior.
 
@@ -46,7 +46,7 @@ Note that the ``Classifier`` does not support weighted loss functions, which are
 .. code-block:: python
 
 	model.smote_sampling = 1
-	model = cnn_model.create(overwrite_training=True)
+	model.create(overwrite_training=True)
 
 This will increase our 20 lense samples to 500, to match the size of the other class. Note that the ``overwrite_training`` parameter has been set to ``True``, which will replace the ``positive_class`` and ``negative_class`` class attributes with the data as it was right before the model training. This allows you to visualize the the final training data, applicable when applying data augmentation techniques. 
 
@@ -54,7 +54,7 @@ With ``overwrite_training`` enabled, once training is complete the ``positive_cl
 
 .. code-block:: python
 
-	model = model._plot_positive(index=0, channel=0)
+	model._plot_positive(index=0, channel=0)
 
 This will plot the first object in the ``positive_class`` array, with the filter to displayed designated by the ``channel`` argument. If set to 'all', the figure will combine all filters to form a colorized image. 
 

@@ -62,7 +62,7 @@ If you wish to keep your classes imbalanced, a weighted loss function can be app
 
 .. code-block:: python
 
-	model, history = cnn_model.AleNnet(lenses, other, img_num_channels=3, loss='weighted_binary_crossentropy', normalize=False, weight=2.0)
+	model, history = cnn_model.AlexNet(lenses, other, img_num_channels=3, loss='weighted_binary_crossentropy', normalize=False, weight=2.0)
 
 where the ``weight`` argument is a scalar factor that will control the relative weight of the positive class. When ``weight`` is greater than 1, for example, the ``loss`` function will assign more importance to the positive class, and vice versa (although in practice the positive class is the imbalanced one in binary classification problems, so it should not be less than 1). Note that setting ``weight`` equal to 1 is equivalent to using the standard binary cross-entropy loss function. 
 

@@ -8,7 +8,7 @@ Created on Thu Sep 16 22:40:39 2021
 import os
 import tensorflow as tf
 os.environ['PYTHONHASHSEED'], os.environ["TF_DETERMINISTIC_OPS"] = '0', '1'
-os.environ['CUDA_VISIBLE_DEVICES'], os.environ['TF_CPP_MIN_LOG_LEVEL'] = '-1', '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import copy 
 import joblib
 import pickle 
@@ -38,7 +38,7 @@ from tensorflow.keras.layers import Input, Activation, Dense, Dropout, Conv2D, M
     AveragePooling2D, GlobalAveragePooling2D, Flatten, BatchNormalization, Lambda, concatenate
 from optuna.importance import get_param_importances, FanovaImportanceEvaluator
 from pyBIA.data_processing import process_class, create_training_set, concat_channels
-from pyBIA.data_augmentation import augmentation, resize, smote_oversampling
+from pyBIA.data_augmentation import augmentation, resize, smote_oversampling, plot
 from pyBIA import optimization
 
 
@@ -143,11 +143,11 @@ class Classifier:
     """
 
     def __init__(self, positive_class=None, negative_class=None, val_positive=None, val_negative=None, img_num_channels=1, clf='alexnet', 
-        normalize=True, min_pixel=0, max_pixel=1000, optimize=True, n_iter=25, batch_size_min=16, batch_size_max=64, epochs=25, patience=5, metric='loss', 
+        normalize=False, min_pixel=0, max_pixel=100, optimize=False, n_iter=25, batch_size_min=16, batch_size_max=64, epochs=25, patience=5, metric='loss', 
         average=True, test_positive=None, test_negative=None, opt_model=True, train_epochs=25, opt_cv=None,
         opt_aug=False, batch_min=2, batch_max=25, batch_other=1, balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, 
-        mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, blending_func='mean', num_images_to_blend=2, blend_other=1, zoom_range=(0.9,1.1),
-        limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, path=None):
+        mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, blending_func='mean', num_images_to_blend=2, blend_other=1, zoom_range=(0.9,1.1), skew_angle=0,
+        limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, path=None, use_gpu=False):
 
         self.positive_class = positive_class
         self.negative_class = negative_class
@@ -198,6 +198,7 @@ class Classifier:
         self.num_images_to_blend = num_images_to_blend
         self.blend_other = blend_other
         self.zoom_range = zoom_range
+        self.skew_angle = skew_angle
 
         #Limit search and optional early-stopping monitors to speed up the optimization
         self.limit_search = limit_search
@@ -209,9 +210,19 @@ class Classifier:
         self.verbose = verbose
         #Path for saving & loading, will start as None and be updated when objects are loaded/saved
         self.path = path
+        #Whether to turn off GPU
+        self.use_gpu = use_gpu
+
+        if self.use_gpu is False:
+            os.environ['CUDA_VISIBLE_DEVICES'] = '-1' 
 
         if self.clf not in ['alexnet', 'vgg16', 'resnet18', 'custom_cnn']:
             raise ValueError('Invalid clf input, options are: "alexnet", "vgg16", "resnet18", or "custom_cnn".')
+
+        if self.val_positive is not None:
+            if len(self.positive_class.shape) == 4 and self.img_num_channels != self.positive_class.shape[-1]:
+                print('NOTE: Detected {} filters but img_num_channels was set to {}, setting img_numg_channels={}'.format(self.positive_class.shape[-1], self.img_num_channels, self.positive_class.shape[-1]))
+                self.img_num_channels = self.positive_class.shape[-1]
 
         #These will be the model attributes
         self.model = None
@@ -219,12 +230,13 @@ class Classifier:
         self.best_params = None 
         self.optimization_results = None 
 
-    def create(self, save_training_data=False):
+    def create(self, overwrite_training=False, save_training=False):
         """
         Generates the CNN machine learning model.
 
         Args:
-            save_training_data (bool):
+            overwrite_training (bool)
+            save_training (bool):
         
         Returns:
             Trained classifier.
@@ -235,21 +247,22 @@ class Classifier:
                 print("Returning base AlexNet model...")
                 self.model, self.history = AlexNet(self.positive_class, self.negative_class, img_num_channels=self.img_num_channels, normalize=self.normalize,
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_positive=self.val_positive, val_negative=self.val_negative, epochs=self.epochs, 
-                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, save_training_data=save_training_data, path=self.path)
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, save_training_data=save_training, path=self.path)
             elif self.clf == 'vgg16':
+                print("Returning the base VGG16 model...")
                 self.model, self.history = VGG16(self.positive_class, self.negative_class, img_num_channels=self.img_num_channels, normalize=self.normalize,
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_positive=self.val_positive, val_negative=self.val_negative, epochs=self.epochs, 
-                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, save_training_data=save_training_data, path=self.path)
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, save_training_data=save_training, path=self.path)
             elif self.clf == 'resnet18':
-                print("Returning the base custom model (1 convolutional layer + 1 dense layer)...")
+                print("Returning the base ResNet-18 model...")
                 self.model, self.history = Resnet18(self.positive_class, self.negative_class, img_num_channels=self.img_num_channels, normalize=self.normalize,
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_positive=self.val_positive, val_negative=self.val_negative, epochs=self.epochs, 
-                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, save_training_data=save_training_data, path=self.path)
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, save_training_data=save_training, path=self.path)
             elif self.clf == 'custom_cnn':
                 print("Returning the base custom model (1 convolutional layer + 1 dense layer)...")
                 self.model, self.history = custom_model(self.positive_class, self.negative_class, img_num_channels=self.img_num_channels, normalize=self.normalize,
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_positive=self.val_positive, val_negative=self.val_negative, epochs=self.epochs, 
-                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, save_training_data=save_training_data, path=self.path)          
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, save_training_data=save_training, path=self.path)          
             return      
 
         if self.best_params is None:
@@ -258,8 +271,8 @@ class Classifier:
                 test_positive=self.test_positive, test_negative=self.test_negative, opt_model=self.opt_model, batch_size_min=self.batch_size_min, batch_size_max=self.batch_size_max, train_epochs=self.train_epochs, opt_cv=self.opt_cv,
                 opt_aug=self.opt_aug, batch_min=self.batch_min, batch_max=self.batch_max, batch_other=self.batch_other, balance=self.balance, image_size_min=self.image_size_min, image_size_max=self.image_size_max, shift=self.shift, 
                 opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, mask_size=self.mask_size, num_masks=self.num_masks, smote_sampling=self.smote_sampling, blend_max=self.blend_max, blend_other=self.blend_other, 
-                num_images_to_blend=self.num_images_to_blend, blending_func=self.blending_func, zoom_range=self.zoom_range, limit_search=self.limit_search, monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, monitor2_thresh=self.monitor2_thresh, 
-                verbose=self.verbose, return_study=True)
+                num_images_to_blend=self.num_images_to_blend, blending_func=self.blending_func, zoom_range=self.zoom_range, skew_angle=self.skew_angle, limit_search=self.limit_search, monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, 
+                monitor2_thresh=self.monitor2_thresh, verbose=self.verbose, return_study=True)
             print("Fitting and returning final model...")
         else:
             print('Fitting model using the loaded best_params...')
@@ -267,17 +280,6 @@ class Classifier:
         if self.epochs != 0:
 
             clear_session()
-
-            if self.opt_max_min_pix is not None:
-                self.normalize = True #In case it's mistakenly set to False by user
-                min_pix, max_pix = 0.0, []
-                max_pix.append(self.best_params['max_pixel_1']) if self.img_num_channels >= 1 else None
-                max_pix.append(self.best_params['max_pixel_2']) if self.img_num_channels >= 2 else None
-                max_pix.append(self.best_params['max_pixel_3']) if self.img_num_channels == 3 else None
-                print('Setting max_pixel attribute to the tuned value(s)...')
-                self.max_pixel = max_pix 
-            else:
-                min_pix, max_pix = self.min_pixel, self.max_pixel
 
             if self.opt_aug:
                 if self.img_num_channels == 1:
@@ -289,18 +291,26 @@ class Classifier:
                 else:
                     raise ValueError('Only three filters are supported!')
 
-                horizontal = vertical = rotation = True 
-                
-                if self.blend_max >= 1.1:
-                    blend_multiplier = self.best_params['blend_multiplier']
+                if self.opt_max_min_pix is not None:
+                    self.normalize = True #In case it's mistakenly set to False by user
+                    min_pix, max_pix = self.min_pixel, [] #Will append to a list because it's 1 max pix valuer per band!
+                    max_pix.append(self.best_params['max_pixel_1']) if self.img_num_channels >= 1 else None
+                    max_pix.append(self.best_params['max_pixel_2']) if self.img_num_channels >= 2 else None
+                    max_pix.append(self.best_params['max_pixel_3']) if self.img_num_channels == 3 else None
+                    self.max_pixel = max_pix; print('Setting max_pixel attribute to the tuned value(s)...')
                 else:
-                    blend_multiplier = 0 #Won't be used
+                    min_pix, max_pix = self.min_pixel, self.max_pixel
+
+                horizontal = vertical = rotation = True 
+                blend_multiplier = self.best_params['blend_multiplier'] if self.blend_max >= 1.1 else 0
+                skew_angle = self.best_params['skew_angle'] if self.skew_angle > 0 else 0
 
                 augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.best_params['num_aug'], 
                     width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
                     image_size=self.best_params['image_size'], mask_size=self.mask_size, num_masks=self.num_masks, blend_multiplier=blend_multiplier, 
-                    blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range)
+                    blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
 
+                #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
                 if self.img_num_channels > 1:
                     class_1=[]
                     if self.img_num_channels == 2:
@@ -313,7 +323,7 @@ class Classifier:
                 else:
                     class_1 = augmented_images
 
-                #Perform same augmentation techniques on other data, batch=1 by default
+                #Perform same augmentation techniques on other data, batch_other=1 by default
                 if self.img_num_channels == 1:
                     channel1, channel2, channel3 = copy.deepcopy(self.negative_class), None, None 
                 elif self.img_num_channels == 2:
@@ -324,8 +334,8 @@ class Classifier:
                 augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
                     width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
                     image_size=self.best_params['image_size'], mask_size=self.mask_size, num_masks=self.num_masks, blend_multiplier=self.blend_other, 
-                    blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range)
-
+                    blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
+                
                 #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
                 if self.img_num_channels > 1:
                     class_2=[]
@@ -387,6 +397,7 @@ class Classifier:
             else:
                 class_1, class_2 = self.positive_class, self.negative_class
                 val_class_1, val_class_2 = self.val_positive, self.val_negative
+                min_pix, max_pix = self.min_pixel, self.max_pixel
 
             #Set the batch_size and learning parameters
             if self.batch_size_min == self.batch_size_max:
@@ -394,9 +405,11 @@ class Classifier:
             else:
                 batch_size = self.best_params['batch_size']
 
-            lr = self.best_params['lr']; optimizer = self.best_params['optimizer']; decay = 0
+            lr = self.best_params['lr']
+            optimizer = self.best_params['optimizer']
+            decay = 0
 
-            #All use inverse time decay, a few use rho as well, and Adam-based optimizers use beta_1 and beta_2 
+            #Inverse time decay is set to 0, optimizzing beta and rho parameters instead.
             if optimizer == 'sgd':
                 momentum = self.best_params['momentum']
                 nesterov = self.best_params['nesterov']
@@ -421,7 +434,7 @@ class Classifier:
                             beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
                             activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
                             model_reg=self.best_params['model_reg'], pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], pooling_3=self.best_params['pooling_3'], 
-                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
                     else:
                         self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
                             normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
@@ -434,7 +447,7 @@ class Classifier:
                             filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], strides_4=self.best_params['strides_4'], 
                             filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], strides_5=self.best_params['strides_5'], 
                             dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
-                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
 
                 elif self.clf == 'resnet18':
                     if self.limit_search:
@@ -444,7 +457,7 @@ class Classifier:
                             beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
                             activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
                             model_reg=self.best_params['model_reg'], pooling=self.best_params['pooling'],
-                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
                     else:
                         self.model, self.history = Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, 
                             normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
@@ -454,7 +467,7 @@ class Classifier:
                             model_reg=self.best_params['model_reg'], filters=self.best_params['filters'], filter_size=self.best_params['filter_size'], strides=self.best_params['strides'],  
                             pooling=self.best_params['pooling'], pool_size=self.best_params['pool_size'], pool_stride=self.best_params['pool_stride'], block_filters_1=self.best_params['block_filters_1'], 
                             block_filters_2=self.best_params['block_filters_2'], block_filters_3=self.best_params['block_filters_3'], block_filters_4=self.best_params['block_filters_4'], 
-                            block_filters_size=self.best_params['block_filters_size'], smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                            block_filters_size=self.best_params['block_filters_size'], smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
                 
                 elif self.clf == 'vgg16':
                     if self.limit_search:
@@ -464,7 +477,7 @@ class Classifier:
                             beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
                             activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
                             model_reg=self.best_params['model_reg'], pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], pooling_3=self.best_params['pooling_3'], 
-                            pooling_4=self.best_params['pooling_4'], pooling_5=self.best_params['pooling_5'], smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                            pooling_4=self.best_params['pooling_4'], pooling_5=self.best_params['pooling_5'], smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
                     else:
                         self.model, self.history = VGG16(class_1, class_2, img_num_channels=self.img_num_channels, 
                             normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
@@ -477,7 +490,7 @@ class Classifier:
                             filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], strides_4=self.best_params['strides_4'], pooling_4=self.best_params['pooling_4'], pool_size_4=self.best_params['pool_size_4'], pool_stride_4=self.best_params['pool_stride_4'],
                             filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], strides_5=self.best_params['strides_5'], pooling_5=self.best_params['pooling_5'], pool_size_5=self.best_params['pool_size_5'], pool_stride_5=self.best_params['pool_stride_5'],
                             dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
-                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
                 
                 elif self.clf == 'custom_cnn':
                     #Need to extract the second and third layers manually 
@@ -518,31 +531,34 @@ class Classifier:
                         filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, pooling_3=pooling_3, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, 
                         dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=dense_neurons_2, dense_neurons_3=dense_neurons_3, 
                         dropout_1=self.best_params['dropout_1'], dropout_2=dropout_2, dropout_3=dropout_3, 
-                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
             else: 
                 if self.clf == 'alexnet':
                     self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
                         min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
                         batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
-                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
                 elif self.clf == 'custom_cnn':
                     self.model, self.history = custom_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
                         min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
                         batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
-                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
                 elif self.clf == 'vgg16':
                     self.model, self.history = VGG16(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
                         min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
                         batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
-                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
                 elif self.clf == 'resnet18':
                     self.model, self.history = Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
                         min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
                         batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
-                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training_data, path=self.path)
+                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
         
-        print('Complete! To save the final model and optimization results, run the save() method.')
-        return 
+        print('Complete! To save the final model and optimization results, use save().') 
+        if overwrite_training:
+            self.positive_class, self.negative_class, self.val_positive, self.val_negative = class_1, class_2, val_class_1, val_class_2
+
+        return
 
     def save(self, dirname=None, overwrite=False):
         """
@@ -618,7 +634,7 @@ class Classifier:
 
         return 
 
-    def load(self, path=None, load_training_data=True):
+    def load(self, path=None, load_training_data=False):
         """ 
         Loads the model, imputer, and feats to use, if created and saved.
         This function will look for a folder named 'pyBIA_models' in the
@@ -641,14 +657,14 @@ class Classifier:
             model = ''
                 
         try:
-            np.loadtxt(path+'model_train_metrics')
+            self.model_train_metrics = np.loadtxt(path+'model_train_metrics')
             train_metrics = ', training_history'
         except:
             print('Could not load training history!')
             train_metrics = ''
 
         try:
-            np.loadtxt(path+'model_val_metrics')
+            self.model_val_metrics = np.loadtxt(path+'model_val_metrics')
             val_metrics = ', val_training_history'
         except:
             val_metrics = ''
@@ -674,7 +690,7 @@ class Classifier:
             class_attributes = ''
 
         if load_training_data:
-            print('Will load training data if found, to disable set load_training_data=False. ')
+            print('IMPORTANT: If re-creating a model, set opt_aug=False and normalize=False if applicable to avoid re-augmenting and re-normalizing the loaded data!')
             try:
                 self.positive_class = np.load(path+'class_1.npy')
                 positive_class = ', positive_class'
@@ -722,11 +738,15 @@ class Classifier:
         Returns:
             The class prediction(s).
         """
-      
+        
         data = process_class(data, normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, img_num_channels=self.img_num_channels)
         if self.normalize:
             data[data > 1] = 1; data[data < 0] = 0
-       
+
+        image_size = self.model.layers[0].input_shape[1:]
+        if data.shape[-1] != image_size:
+            print('Incorrect image size, the model requires size {}'.format(image_size)); print('Resizing...'); data = resize(data, image_size)
+    
         predictions = self.model.predict(data)
 
         output, probas = [], [] 
@@ -744,6 +764,120 @@ class Classifier:
             output = np.c_[output, probas]
             
         return np.array(output)
+
+    def augment_positive(self, batch=1, width_shift=0, height_shift=0, horizontal=False, vertical=False, 
+        rotation=False, fill='nearest', image_size=None, zoom_range=None, mask_size=None, num_masks=None, 
+        blend_multiplier=0, blending_func='mean', num_images_to_blend=2, skew_angle=0):
+        """
+        Method to augment the positive class, requires all manual inputs!
+
+        Args:
+            batch (int): How many augmented images to create and save. Defaults to 1.
+            width_shift (int): The max pixel shift allowed in either horizontal direction.
+                If set to zero no horizontal shifts will be performed. Defaults to 0 pixels.
+            height_shift (int): The max pixel shift allowed in either vertical direction.
+                If set to zero no vertical shifts will be performed. Defaults to 0 pixels.
+            horizontal (bool): If False no horizontal flips are allowed. Defaults to False.
+            vertical (bool): If False no vertical reflections are allowed. Defaults to False.
+            rotation (int): If True full 360 rotation is allowed, if False no rotation is performed.
+                Defaults to False.
+            fill (str): This is the treatment for data outside the boundaries after roration
+                and shifts. Default is set to 'nearest' which repeats the closest pixel values.
+                Can be set to: {"constant", "nearest", "reflect", "wrap"}.
+            image_size (int, bool): The length/width of the cropped image. This can be used to remove
+                anomalies caused by the fill (defaults to 50). This can also be set to None in which case 
+                the image in its original size is returned.
+            mask_size (int): The size of the cutout mask. Defaults to None to disable random cutouts.
+            num_masks (int): Number of masks to apply to each image. Defaults to None, must be an integer
+                if mask_size is used as this designates how many masks of that size to randomly place in the image.
+            blend_multiplier (float): Sets the amount of synthetic images to make via image blending.
+                Must be a ratio greater than or equal to 1. If set to 1, the data will be replaced with
+                randomly blended images, if set to 1.5, it will increase the training set by 50% with blended images,
+                and so forth. Deafults to 0 which disables this feature.
+            blending_func (str): The blending function to use. Options are 'mean', 'max', 'min', and 'random'. 
+                Only used when blend_multiplier >= 1. Defaults to 'mean'.
+            num_images_to_blend (int): The number of images to randomly select for blending. Only used when 
+                blend_multiplier >= 1. Defaults to 2.
+            zoom_range (tuple): Tuple of floats (min_zoom, max_zoom) specifying the range of zoom in/out values.
+                If set to (0.9, 1.1), for example, the zoom will be randomly chosen between 90% to 110% the original 
+                image size, note that the image size thus increases if the randomly selected zoom is greater than 1,
+                therefore it is recommended to also input an appropriate image_size. Defaults to None, which disables this procedure.
+            skew_angle (float): The maximum absolute value of the skew angle, in degrees. This is the maximum because 
+                the actual angle to skew by will be chosen from a uniform distribution between the negative and positive 
+                skew_angle values. Defaults to 0, which disables this feature.
+        """
+
+        #The augmentation function takes in each channel as individual inputs
+        if self.img_num_channels == 1:
+            channel1, channel2, channel3 = self.positive_class, None, None 
+        elif self.img_num_channels == 2:
+            channel1, channel2, channel3 = self.positive_class[:,:,:,0], self.positive_class[:,:,:,1], None 
+        elif self.img_num_channels == 3:
+            channel1, channel2, channel3 = self.positive_class[:,:,:,0], self.positive_class[:,:,:,1], self.positive_class[:,:,:,2]
+        
+        self.positive_class = augmentation(channel1, channel2, channel3, batch=batch, width_shift=width_shift, height_shift=height_shift, 
+            horizontal=horizontal, vertical=vertical, rotation=rotation, fill=fill, image_size=image_size, zoom_range=zoom_range, 
+            mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, blending_func=blending_func, num_images_to_blend=num_images_to_blend, 
+            skew_angle=skew_angle, return_stacked=True)
+
+        return 
+
+    def augment_negative(self, batch=1, width_shift=0, height_shift=0, horizontal=False, vertical=False, 
+        rotation=False, fill='nearest', image_size=None, zoom_range=None, mask_size=None, num_masks=None, 
+        blend_multiplier=0, blending_func='mean', num_images_to_blend=2, skew_angle=0):
+        """
+        Method to augment the positive class, requires all manual inputs!
+
+        Args:
+            batch (int): How many augmented images to create and save. Defaults to 1.
+            width_shift (int): The max pixel shift allowed in either horizontal direction.
+                If set to zero no horizontal shifts will be performed. Defaults to 0 pixels.
+            height_shift (int): The max pixel shift allowed in either vertical direction.
+                If set to zero no vertical shifts will be performed. Defaults to 0 pixels.
+            horizontal (bool): If False no horizontal flips are allowed. Defaults to False.
+            vertical (bool): If False no vertical reflections are allowed. Defaults to False.
+            rotation (int): If True full 360 rotation is allowed, if False no rotation is performed.
+                Defaults to False.
+            fill (str): This is the treatment for data outside the boundaries after roration
+                and shifts. Default is set to 'nearest' which repeats the closest pixel values.
+                Can be set to: {"constant", "nearest", "reflect", "wrap"}.
+            image_size (int, bool): The length/width of the cropped image. This can be used to remove
+                anomalies caused by the fill (defaults to 50). This can also be set to None in which case 
+                the image in its original size is returned.
+            mask_size (int): The size of the cutout mask. Defaults to None to disable random cutouts.
+            num_masks (int): Number of masks to apply to each image. Defaults to None, must be an integer
+                if mask_size is used as this designates how many masks of that size to randomly place in the image.
+            blend_multiplier (float): Sets the amount of synthetic images to make via image blending.
+                Must be a ratio greater than or equal to 1. If set to 1, the data will be replaced with
+                randomly blended images, if set to 1.5, it will increase the training set by 50% with blended images,
+                and so forth. Deafults to 0 which disables this feature.
+            blending_func (str): The blending function to use. Options are 'mean', 'max', 'min', and 'random'. 
+                Only used when blend_multiplier >= 1. Defaults to 'mean'.
+            num_images_to_blend (int): The number of images to randomly select for blending. Only used when 
+                blend_multiplier >= 1. Defaults to 2.
+            zoom_range (tuple): Tuple of floats (min_zoom, max_zoom) specifying the range of zoom in/out values.
+                If set to (0.9, 1.1), for example, the zoom will be randomly chosen between 90% to 110% the original 
+                image size, note that the image size thus increases if the randomly selected zoom is greater than 1,
+                therefore it is recommended to also input an appropriate image_size. Defaults to None, which disables this procedure.
+            skew_angle (float): The maximum absolute value of the skew angle, in degrees. This is the maximum because 
+                the actual angle to skew by will be chosen from a uniform distribution between the negative and positive 
+                skew_angle values. Defaults to 0, which disables this feature.
+        """
+
+        #The augmentation function takes in each channel as individual inputs
+        if self.img_num_channels == 1:
+            channel1, channel2, channel3 = self.negative_class, None, None 
+        elif self.img_num_channels == 2:
+            channel1, channel2, channel3 = self.negative_class[:,:,:,0], self.negative_class[:,:,:,1], None 
+        elif self.img_num_channels == 3:
+            channel1, channel2, channel3 = self.negative_class[:,:,:,0], self.negative_class[:,:,:,1], self.negative_class[:,:,:,2]
+        
+        self.negative_class = augmentation(channel1, channel2, channel3, batch=batch, width_shift=width_shift, height_shift=height_shift, 
+            horizontal=horizontal, vertical=vertical, rotation=rotation, fill=fill, image_size=image_size, zoom_range=zoom_range, 
+            mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, blending_func=blending_func, num_images_to_blend=num_images_to_blend, 
+            skew_angle=skew_angle, return_stacked=True)
+
+        return 
 
     def plot_tsne(self, legend_loc='upper center', title='Feature Parameter Space', savefig=False):
         """
@@ -1040,7 +1174,7 @@ class Classifier:
         return  
 
     def plot_performance(self, metric='acc', combine=False, ylabel=None, title=None,
-        xlim=None, ylim=None, xlog=False, ylog=True, savefig=False):
+        xlim=None, ylim=None, xlog=False, ylog=False, savefig=False):
         """
         Plots the training/performance histories.
     
@@ -1066,16 +1200,19 @@ class Classifier:
         else:
             index = 2
 
-        metric1 = np.loadtxt(self.path+'model_train_metrics')
-        metric1 = metric1[:,index]
+        try:
+            metric1 = self.model_train_metrics
+            metric1 = metric1[:,index]
+        except:
+            raise ValueError('Training history not found! Run the load() method first!')
 
         if combine:
             try:
-                metric2 = np.loadtxt(self.path+'model_val_metrics')
+                metric2 = self.model_val_metrics
+                metric2 = metric2[:,index]
+                label1, label2 = 'Training', 'Validation'
             except:
                 raise ValueError('combine=True but no validation metrics found!')
-            metric2 = metric2[:,index]
-            label1, label2 = 'Training', 'Validation'
         else:
             label1 = 'Training'
             
@@ -1110,6 +1247,96 @@ class Classifier:
         else:
             plt.show()
 
+    def _plot_positive(self, index=0, channel=0, vmin=None, vmax=None, cmap='gray', title=''):
+        """
+        Plots the sample in the ``positive`` class, located an the specified index.
+
+        The channel parameter determines what filter to display, must be less than
+        or equal to the ``img_num_channels`` - 1, or 'all', to plot a colorized image.
+
+        The plotting procedure employs the matplotlib imshow display, with a robust
+        vmin and vmax, unless these are set as arguments.
+    
+        Args:
+            index (int): The index of the sample to be displayed. Defaults to 0.
+            channel (int): The channel to plot, can be 0, 1, 2, or 'all'. Defaults to 0.      
+            cmap (str): Colormap to use when generating the image.
+            vmin (float): The vmin to control the colorbar scaling.
+            vmax (float): The vmax to control the colorbar scaling. 
+            title (str, optional): Title displayed above the image. 
+
+        Returns:
+            AxesImage.
+        """
+
+
+        data = self.positive_class[index]
+
+        if channel == 'all':
+            if vmin is None:
+                plot(data)
+            else:
+                index = np.where(np.isfinite(data[:,:,channel]))
+                std = np.median(np.abs(data[:,:,channel]-np.median(data[:,:,channel])))
+                vmin, vmax = np.median(data[:,:,channel]) - 3*std, np.median(data[:,:,channel]) + 10*std  
+                plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
+
+            return 
+
+        if vmin is None:
+            plot(self.positive_class[:,:,:,channel][index])
+        else:   
+            index = np.where(np.isfinite(data[:,:,channel]))
+            std = np.median(np.abs(data[:,:,channel][index]-np.median(data[:,:,channel][index])))
+            vmin, vmax = np.median(data[:,:,channel][index]) - 3*std, np.median(data[:,:,channel][index]) + 10*std  
+            plt.imshow(data[:,:,channel][index], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title);plt.show()
+
+        return
+
+    def _plot_negative(self, index=0, channel=1, vmin=None, vmax=None, cmap='gray', title=''):
+        """
+        Plots the sample in the ``negative`` class, located an the specified index.
+
+        The channel parameter determines what filter to display, must be less than
+        or equal to the ``img_num_channels`` - 1, or 'all', to plot a colorized image.
+
+        The plotting procedure employs the matplotlib imshow display, with a robust
+        vmin and vmax, unless these are set as arguments.
+    
+        Args:
+            index (int): The index of the sample to be displayed. Defaults to 0.
+            channel (int): The channel to plot, can be 0, 1, 2, or 'all'. Defaults to 0.      
+            cmap (str): Colormap to use when generating the image.
+            vmin (float): The vmin to control the colorbar scaling.
+            vmax (float): The vmax to control the colorbar scaling. 
+            title (str, optional): Title displayed above the image. 
+
+        Returns:
+            AxesImage.
+        """
+
+        data = self.negative_class[index]
+
+        if channel == 'all':
+            if vmin is None:
+                plot(data)
+            else:
+                index = np.where(np.isfinite(data[:,:,channel]))
+                std = np.median(np.abs(data[:,:,channel]-np.median(data[:,:,channel])))
+                vmin, vmax = np.median(data[:,:,channel])-3*std, np.median(data[:,:,channel])+10*std  
+                plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
+
+            return 
+
+        if vmin is None:
+            plot(data[:,:,channel])
+        else:   
+            index = np.where(np.isfinite(data[:,:,channel]))
+            std = np.median(np.abs(data[:,:,channel]-np.median(data[:,:,channel])))
+            vmin, vmax = np.median(data[:,:,channel])-3*std, np.median(data[:,:,channel])+10*std  
+            plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
+
+        return
 
 #Custom CNN model configured to genereate shallower CNNs than AlexNet
 
@@ -2138,24 +2365,24 @@ def resnet_block(x, filters_in, filters_out, filter_size=3, activation='relu', s
         tf.Tensor: The output tensor of the block.
     """
 
+    #Save the input tensor as the residual
     residual = x
-
-    #Conv2D
-    x = Conv2D(filters_out, kernel_size=filter_size, activation=activation, strides=stride, padding=padding, kernel_initializer=kernel_initializer)(x)
+    
+    #First convolutional layer
+    x = Conv2D(filters_in, kernel_size=filter_size, strides=stride, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
     x = BatchNormalization()(x) if model_reg == 'batch_norm' else x
-    #Conv2D
-    x = Conv2D(filters_out, kernel_size=filter_size, activation=activation, strides=1, padding=padding, kernel_initializer=kernel_initializer)(x)
+    
+    #Second convolutional layer
+    x = Conv2D(filters_out, kernel_size=filter_size, strides=1, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
     x = BatchNormalization()(x) if model_reg == 'batch_norm' else x
-
-    #This is the ResNet shortcut connection
-    if stride > 1 or filters_in != filters_out:
-        residual = Conv2D(filters_out, kernel_size=1, strides=stride, padding='valid', kernel_initializer=kernel_initializer)(residual)
-        residual = BatchNormalization()(residual) if model_reg == 'batch_norm' else residual
-
-    x = Add()([x, residual])
-
+    
+    #Add the residual connection
+    x = x + residual
+    
+    #Apply the activation function
+    x = Activation(activation)(x)
+    
     return x
-
 ### Score and Loss Functions ###
 
 def f1_score(y_true, y_pred):

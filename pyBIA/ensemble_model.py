@@ -167,6 +167,7 @@ class Classifier:
 
         if self.impute:
             if self.imp_method == 'KNN':
+                data[~np.isfinite(data)]=0
                 data, self.imputer = KNN_imputation(data=self.data_x, imputer=None)
             else:
                 raise ValueError('Invalid imputation method, currently only k-NN is supported.')
@@ -197,9 +198,14 @@ class Classifier:
         else: 
             data_x = self.data_x[:,self.feats_to_use]
 
-        self.model, self.best_params, self.optimization_results = hyper_opt(data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, 
-            balance=self.balance, return_study=True, limit_search=self.limit_search, opt_cv=self.opt_cv)
-        print("Fitting and returning final model...")
+        if self.n_iter > 0:
+            self.model, self.best_params, self.optimization_results = hyper_opt(data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, 
+                balance=self.balance, return_study=True, limit_search=self.limit_search, opt_cv=self.opt_cv)
+        else:
+            print("Fitting and returning final model...")
+            self.model = hyper_opt(data_x, self.data_y, clf=self.clf, n_iter=self.n_iter, 
+                balance=self.balance, return_study=True, limit_search=self.limit_search, opt_cv=self.opt_cv)
+
         self.model.fit(data_x, self.data_y)
         
     def save(self, dirname=None, path=None, overwrite=False):
@@ -453,7 +459,7 @@ class Classifier:
      
         markers = ['o', 's', '+', 'v', '.', 'x', 'h', 'p', '<', '>', '*']
         #color = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'b', 'g', 'r', 'c']
-        color = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf']
+        color = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#e41a1c', '#377eb8'] #Update the last two!
 
         if data_y is None:
             if self.data_y_ is None:
@@ -794,26 +800,26 @@ class Classifier:
         else:
             plt.show()
 
-    def plot_feature_opt(self, feat_names=None, top=3, include_other=True, include_shadow=True, 
+    def plot_feature_opt(self, feat_names=None, top='all', include_other=True, include_shadow=True, 
         include_rejected=False, flip_axes=True, save_data=False, savefig=False):
         """
         Returns whisker plot displaying the z-score distribution of each feature
         across all trials.
     
         Note:
-            The following can be used to output the plot from the original API.
+            The following can be used to output the plot from the original BorutaShap API.
 
             model.feature_history.plot(which_features='accepted', X_size=14)
 
             Can designate to display either 'all', 'accepted', or 'tentative'
 
-
         Args: 
             feat_names (ndarry, optional): A list or array containing the names
                 of the features in the data_x matrix, in order. Defaults to None,
                 in which case the respective indices will appear instead.
-            top (float, optional): Designates how many features to plot. Defaults to 3, which 
-                will plot the top 3 performing features.
+            top (float, optional): Designates how many features to plot. If set to 3, it 
+                will plot the top 3 performing features. Can be 'all' in which casee all features
+                that were accepted are plotted. Defaults to 'all'.
             include_other (bool): Whether to include the features that are not in the top designation,
                 if True these features will be averaged out and displayed. Defaults to True.
             include_shadow (bool): Whether to include the max shadow feature that was used as a 
@@ -838,15 +844,21 @@ class Classifier:
         csv_data = pd.read_csv(fname+'.csv')
         #os.remove(fname+'.csv')
         accepted_indices = np.where(csv_data.Decision == 'Accepted')[0]
-        if top > len(accepted_indices):
+        if top == 'all':
             top = len(accepted_indices)
-            print('The top parameter exceeds the number of accepted variables, setting to the maximum value of {}'.format(str(top)))
+        else:
+            if top > len(accepted_indices):
+                top = len(accepted_indices)
+                print('The top parameter exceeds the number of accepted variables, setting to the maximum value of {}'.format(str(top)))
 
         x, y, y_err = [], [], []
 
         for i in accepted_indices[:top]:
             if feat_names is None:
-                x.append(int(i))
+                if self.csv_file is None:
+                    x.append(int(i))
+                else:
+                    x.append(int(csv_data.iloc[i].Features))
             else:
                 x.append(int(csv_data.iloc[i].Features))
             y.append(float(csv_data.iloc[i]['Average Feature Importance']))
@@ -856,8 +868,7 @@ class Classifier:
             include_other = False
 
         if include_other:
-            mean = []
-            std = []
+            mean, std = [], []
             for j in accepted_indices[top:]:
                 mean.append(float(csv_data.iloc[j]['Average Feature Importance']))
                 std.append(float(csv_data.iloc[j]['Standard Deviation Importance']))
@@ -888,7 +899,7 @@ class Classifier:
                     if include_shadow is False:
                         x_names = csv_data.iloc[x].Features
                     else:
-                        x_names = np.r_[csv_data.iloc[x[:-1]], ['Max Shadow']]
+                        x_names = np.r_[csv_data.iloc[x[:-1]].Features, ['Max Shadow']]
                 else:
                     if include_shadow is False:
                         x_names = np.r_[csv_data.iloc[x[:-1]].Features, ['Max Shadow']]
@@ -897,7 +908,7 @@ class Classifier:
             else:
                 if include_other is False:
                     if include_shadow is False:
-                        x_names = self.self.csv_file.columns[x[:-1]]
+                        x_names = self.csv_file.columns[x[:-1]]
                     else:
                         x_names = np.r_[self.csv_file.columns[x[:-1]], ['Max Shadow']]
                 else:
@@ -906,21 +917,27 @@ class Classifier:
                     else:
                         x_names = np.r_[self.csv_file.columns[x[:-2]], ['Other Accepted'], ['Max Shadow']]
 
-
         if include_rejected:
             x = []
             rejected_indices = np.where(csv_data.Decision == 'Rejected')[0]
             for i in rejected_indices:
                 if feat_names is None:
-                    x.append(int(i))
+                    if self.csv_file is None:
+                        x.append(int(i))
+                    else:
+                        x.append(int(csv_data.iloc[i].Features))
                 else:
                     x.append(int(csv_data.iloc[i].Features))
                 y.append(float(csv_data.iloc[i]['Average Feature Importance']))
                 y_err.append(float(csv_data.iloc[i]['Standard Deviation Importance']))
-            if feat_names is not None:
-                x_names = np.r_[x_names, feat_names[x]]
+
+            if feat_names is None:
+                if self.csv_file is None:
+                    x_names = np.r_[x_names, csv_data.iloc[x].Features]
+                else:
+                    x_names = np.r_[x_names, self.csv_file.columns[x]]
             else:
-                x_names = np.r_[x_names, csv_data.iloc[x].Features]
+                x_names = np.r_[x_names, feat_names[x]]
         
         y, y_err = np.array(y), np.array(y_err)
         fig, ax = plt.subplots()

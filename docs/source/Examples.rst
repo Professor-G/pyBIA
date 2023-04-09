@@ -117,7 +117,7 @@ Running these methods automatically updates the ``positive_class`` and ``negativ
 
 Rotating (``rotation``), skewing (``skew_angle``), and flipping images (``horizontal`` & ``vertical``) can make the training model more robust to variations in the orientation and perspective of the input images. Likewise, shifting left/right (``widtht_shift``) and up/down (``height_shift``) will help make the model translation invariant and thus robust to the position of the object of interest within the image.
 
-Image blending (``blend_multiplier``) can help to generate new samples through the combination of different images using a variety of blending criteria (``blend_functionc``). Note that by default two random images (``num_images_to_blend``) will be blended together to create one synthetic sample, and since this procedure is applied post-batch creation, the same unique sample may be randomly blended, which could be a problem if the configured augmentation parameters do not generate sufficient training feature variety.
+Image blending (``blend_multiplier``) can help to generate new samples through the combination of different images using a variety of blending criteria (``blend_function``). Note that by default two random images (``num_images_to_blend``) will be blended together to create one synthetic sample, and since this procedure is applied post-batch creation, the same unique sample may be randomly blended, which could be a problem if the configured augmentation parameters do not generate sufficient training feature variety.
 
 Random cutouts (``mask_size``) can help increase the diversity of the training set and reduce overfitting, as applying this technique prevents the training model from relying too heavily on specific features of the image, thus encouraging the model to learn more general image attributes.
 
@@ -128,7 +128,7 @@ These techniques, when enabled, are applied in the following order:
     - Random image skewness is applied, with the ``skew_angle`` controlling the maximum angle,
         in degrees, to distort the image from its original position.
     - The batch size is now increased by a factor of ``blend_multiplier``, where each unique sample is generated
-        by randomly merging ``num_images_to_blend`` together according to the blending function ``blend_functionc``. 
+        by randomly merging ``num_images_to_blend`` together according to the blending function ``blend_function``. 
         As per the random nature, an original sample may be blended together at this stage,
         but with enough variation this may not be a problem.
     - Circular cutouts of size ``mask_size`` are randomly placed in the image, whereby
@@ -173,10 +173,10 @@ To re-do the augmentations, simply reset the positive and negative class attribu
 .. code-block:: python
 
 	model.positive_class = lenses 
-	model.augment_positive(blend_multiplier=50, num_images_to_blend=3, blend_functionc='mean', image_size=image_size)
+	model.augment_positive(blend_multiplier=50, num_images_to_blend=3, blend_function='mean', image_size=image_size)
 
 	model.negative_class = other 
-	model.augment_negative(blend_multiplier=1, num_images_to_blend=3, blend_functionc='mean', image_size=image_size)
+	model.augment_negative(blend_multiplier=1, num_images_to_blend=3, blend_function='mean', image_size=image_size)
 
 In this attempt we apply only the blending routine, note that blend_multiplier is set to 1 for the negative class, so as to implement blending for the other class while keeping the original class size the same. When the classes are ready for training, simply call the ``create`` method. 
 

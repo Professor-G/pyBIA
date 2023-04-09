@@ -164,7 +164,7 @@ As exemplified in the previous section, the ``_plot_positive`` and ``_plot_negat
 .. code-block:: python
 
 	model._plot_positive()
-	model_plot_negative()
+	model._plot_negative()
 
 If an image appears dark, run the methods again but manually set the ``vmin`` and ``vmax`` arguments, as by the default these limits are derived using a robust scaling. 
 

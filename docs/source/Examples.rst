@@ -35,7 +35,7 @@ Currently, pyBIA supports the implementation of three popular CNN architectures:
 .. code-block:: python
 
 	model.clf = 'resnet18'
-	model = cnn_model.create()
+	model = model.create()
 
 By default, ``verbose`` is set to 0, but this can be set to 1 to visualize the model's performance as it trains, epoch-per-epoch. The ``epochs`` attribute controls the total training epochs, which is set to 25 by default. To input validation data, set the ``val_positive`` and/or the ``val_negative`` attributes. To configure early-stopping criteria, the ``patience`` attribute can be set to a non-zero integer. This parameter will determine the number of epochs to train to after no training improvement, which could be indicative of overfitting behavior.
 

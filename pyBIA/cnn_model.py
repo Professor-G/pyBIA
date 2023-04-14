@@ -743,9 +743,12 @@ class Classifier:
         if self.normalize:
             data[data > 1] = 1; data[data < 0] = 0
 
-        image_size = self.model.layers[0].input_shape[1:]
-        if data.shape[-1] != image_size:
-            print('Incorrect image size, the model requires size {}'.format(image_size)); print('Resizing...'); data = resize(data, image_size)
+        image_size = self.model.layers[0].input_shape[1:][0]
+        if data.shape[1] != image_size:
+            if data.shape[1] < image_size:
+                raise ValueError('Model requires images of size {}, but the input images are size {}!'.format(image_size, data.shape[1]))
+            print('Incorrect image size, the model requires size {}, resizing...'.format(image_size))
+            data = resize(data, image_size)
     
         predictions = self.model.predict(data)
 
@@ -1247,7 +1250,7 @@ class Classifier:
         else:
             plt.show()
 
-    def _plot_positive(self, index=0, channel=0, vmin=None, vmax=None, cmap='gray', title=''):
+    def _plot_positive(self, index=0, channel=0, default_scale=False, vmin=None, vmax=None, cmap='gray', title=''):
         """
         Plots the sample in the ``positive`` class, located an the specified index.
 
@@ -1259,10 +1262,13 @@ class Classifier:
     
         Args:
             index (int): The index of the sample to be displayed. Defaults to 0.
-            channel (int): The channel to plot, can be 0, 1, 2, or 'all'. Defaults to 0.      
-            cmap (str): Colormap to use when generating the image.
+            channel (int): The channel to plot, can be 0, 1, 2, or 'all'. Defaults to 0.  
+            default_scale (bool): If True the figure will be generated using the matplotlib 
+                imshow display, using the default scaling. If False, the vmin and vmax arguments must
+                be input. Defaults to True. 
             vmin (float): The vmin to control the colorbar scaling.
             vmax (float): The vmax to control the colorbar scaling. 
+            cmap (str): Colormap to use when generating the image.
             title (str, optional): Title displayed above the image. 
 
         Returns:
@@ -1273,27 +1279,27 @@ class Classifier:
         data = self.positive_class[index]
 
         if channel == 'all':
-            if vmin is None:
+            if vmin is None and default_scale is False:
                 plot(data)
             else:
-                index = np.where(np.isfinite(data[:,:,channel]))
-                std = np.median(np.abs(data[:,:,channel]-np.median(data[:,:,channel])))
-                vmin, vmax = np.median(data[:,:,channel]) - 3*std, np.median(data[:,:,channel]) + 10*std  
-                plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
-
+                if default_scale is False:
+                    plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
+                else:
+                    plt.imshow(data[:,:,channel], cmap=cmap); plt.title(title); plt.show()
+  
             return 
 
-        if vmin is None:
-            plot(self.positive_class[:,:,:,channel][index])
+        if vmin is None and default_scale is False:
+            plot(data[:,:,channel])
         else:   
-            index = np.where(np.isfinite(data[:,:,channel]))
-            std = np.median(np.abs(data[:,:,channel][index]-np.median(data[:,:,channel][index])))
-            vmin, vmax = np.median(data[:,:,channel][index]) - 3*std, np.median(data[:,:,channel][index]) + 10*std  
-            plt.imshow(data[:,:,channel][index], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title);plt.show()
-
+            if default_scale is False:
+                plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
+            else:
+                plt.imshow(data[:,:,channel], cmap=cmap); plt.title(title); plt.show()
+          
         return
 
-    def _plot_negative(self, index=0, channel=1, vmin=None, vmax=None, cmap='gray', title=''):
+    def _plot_negative(self, index=0, channel=1, default_scale=False, vmin=None, vmax=None, cmap='gray', title=''):
         """
         Plots the sample in the ``negative`` class, located an the specified index.
 
@@ -1305,7 +1311,10 @@ class Classifier:
     
         Args:
             index (int): The index of the sample to be displayed. Defaults to 0.
-            channel (int): The channel to plot, can be 0, 1, 2, or 'all'. Defaults to 0.      
+            channel (int): The channel to plot, can be 0, 1, 2, or 'all'. Defaults to 0.  
+            default_scale (bool): If True the figure will be generated using the matplotlib 
+                imshow display, using the default scaling. If False, the vmin and vmax arguments must
+                be input. Defaults to True.     
             cmap (str): Colormap to use when generating the image.
             vmin (float): The vmin to control the colorbar scaling.
             vmax (float): The vmax to control the colorbar scaling. 
@@ -1318,23 +1327,23 @@ class Classifier:
         data = self.negative_class[index]
 
         if channel == 'all':
-            if vmin is None:
+            if vmin is None and default_scale is False:
                 plot(data)
             else:
-                index = np.where(np.isfinite(data[:,:,channel]))
-                std = np.median(np.abs(data[:,:,channel]-np.median(data[:,:,channel])))
-                vmin, vmax = np.median(data[:,:,channel])-3*std, np.median(data[:,:,channel])+10*std  
-                plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
+                if default_scale is False:
+                    plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
+                else:
+                    plt.imshow(data[:,:,channel], cmap=cmap); plt.title(title); plt.show()
 
             return 
 
-        if vmin is None:
+        if vmin is None and default_scale is False:
             plot(data[:,:,channel])
         else:   
-            index = np.where(np.isfinite(data[:,:,channel]))
-            std = np.median(np.abs(data[:,:,channel]-np.median(data[:,:,channel])))
-            vmin, vmax = np.median(data[:,:,channel])-3*std, np.median(data[:,:,channel])+10*std  
-            plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
+            if default_scale is False:
+                plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
+            else:
+                plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
 
         return
 
@@ -2368,21 +2377,22 @@ def resnet_block(x, filters_in, filters_out, filter_size=3, activation='relu', s
     #Save the input tensor as the residual
     residual = x
     
-    #First convolutional layer
-    x = Conv2D(filters_in, kernel_size=filter_size, strides=stride, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
+    #Conv2D
+    x = Conv2D(filters_out, kernel_size=filter_size, activation=activation, strides=stride, padding=padding, kernel_initializer=kernel_initializer)(x)
     x = BatchNormalization()(x) if model_reg == 'batch_norm' else x
-    
-    #Second convolutional layer
-    x = Conv2D(filters_out, kernel_size=filter_size, strides=1, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
+    #Conv2D
+    x = Conv2D(filters_out, kernel_size=filter_size, activation=activation, strides=1, padding=padding, kernel_initializer=kernel_initializer)(x)
     x = BatchNormalization()(x) if model_reg == 'batch_norm' else x
-    
-    #Add the residual connection
-    x = x + residual
-    
-    #Apply the activation function
-    x = Activation(activation)(x)
-    
+
+    #This is the ResNet shortcut connection
+    if stride > 1 or filters_in != filters_out:
+        residual = Conv2D(filters_out, kernel_size=1, strides=stride, padding='valid', kernel_initializer=kernel_initializer)(residual)
+        residual = BatchNormalization()(residual) if model_reg == 'batch_norm' else residual
+
+    x = Add()([x, residual])
+
     return x
+    
 ### Score and Loss Functions ###
 
 def f1_score(y_true, y_pred):

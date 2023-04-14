@@ -48,9 +48,9 @@ Note that the ``Classifier`` does not support weighted loss functions, which are
 	model.smote_sampling = 1
 	model.create(overwrite_training=True)
 
-This will increase our 20 lense samples to 500, to match the size of the other class. Note that the ``overwrite_training`` parameter has been set to ``True``, which will replace the ``positive_class`` and ``negative_class`` class attributes with the data as it was right before the model training. This allows you to visualize the the final training data, applicable when applying data augmentation techniques. 
+This will increase our 20 lense samples to 500, to match the size of the other class. Note that the ``overwrite_training`` parameter has been set to ``True``, which will replace the ``positive_class`` and ``negative_class`` class attributes with the data as it was right before the model training. This allows you to visualize the the final training data, applicable when applying data augmentation techniques; although as SMOTE sampling is applied inside the model functions, setting `overwrite_training`` to True with only SMOTE enabled will not actually update the training set. 
 
-With ``overwrite_training`` enabled, once training is complete the ``positive_class`` attribute be assigned to be the oversampled images as synthesized by the SMOTE algorithm, which can be visualized as such:
+With ``overwrite_training`` enabled, once training is complete the ``positive_class`` attribute be assigned to be the oversampled images as synthesized by non-SMOTE data augmentation, which could be visualized with:
 
 .. code-block:: python
 
@@ -190,7 +190,7 @@ If you know what augmentation proecdures are appropriate for your dataset, but d
 	
         **batch_min** (int): The minimum number of augmentations to perform per image on the positive class, only applicable 
             if opt_aug=True. Defaults to 2.
-        ** batch_max**  (int): The maximum number of augmentations to perform per image on the positive class, only applicable 
+        ** batch_max** (int): The maximum number of augmentations to perform per image on the positive class, only applicable 
             if opt_aug=True. Defaults to 25.
         batch_other (int): The number of augmentations to perform to the other class, presumed to be the majority class.
             Defaults to 1. This is done to ensure augmentation techniques are applied consistently across both classes.        

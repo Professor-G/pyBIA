@@ -1239,7 +1239,7 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
 
 
 def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=None, median_bkg2=None, nsig=[0.5, 0.5], kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, cmap='viridis', path=None, filter1='Bw', filter2='Rw', title='Source Detection Threshold', savefig=False):
+    deblend=False, pix_conversion=5, cmap='viridis', path=None, filter1='Bw', filter2='Rw', name='Source Detection Threshold', savefig=False):
     """
     This is the function used to generate Figure 1 of the paper, used to visualize
     how the segmentation object differs when applying varying sigma thresholds.
@@ -1380,7 +1380,7 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
         with plt.rc_context({'axes.edgecolor':'white', 'xtick.color':'white', 
             'ytick.color':'white', 'figure.facecolor':'black'}):#, 'axes.titlesize':22}):
             fig, axes = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8,8))
-            fig.suptitle(title, x=.5, y=0.98, color='black', fontsize=16)
+            fig.suptitle(name, x=.5, y=0.98, color='black', fontsize=16)
             ((ax1, ax2), (ax4, ax3)) = axes
             ax1.set_aspect('equal')
             ax2.set_aspect('equal')

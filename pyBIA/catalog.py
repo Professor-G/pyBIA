@@ -937,7 +937,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
-                fig.savefig(path+name, dpi=dpi, bbox_inches='tight')
+                fig.savefig(path+name+'.png', dpi=dpi, bbox_inches='tight')
                 return
             plt.show()           
 
@@ -1232,7 +1232,7 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
-                fig.savefig(path+name, dpi=300, bbox_inches='tight')
+                fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
                 plt.clf()
                 return
             plt.show()
@@ -1547,7 +1547,7 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
-                fig.savefig(path+name, dpi=300, bbox_inches='tight')
+                fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
                 plt.clf()
                 return
             plt.show()

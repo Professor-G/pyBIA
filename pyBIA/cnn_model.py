@@ -263,6 +263,11 @@ class Classifier:
                 self.model, self.history = custom_model(self.positive_class, self.negative_class, img_num_channels=self.img_num_channels, normalize=self.normalize,
                     min_pixel=self.min_pixel, max_pixel=self.max_pixel, val_positive=self.val_positive, val_negative=self.val_negative, epochs=self.epochs, 
                     smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, save_training_data=save_training, path=self.path)          
+            
+            print('Complete! To save the final model and optimization results, call the save() method.') 
+            if overwrite_training:
+                print("Can only use overwrite_training=True if optimizing the model!")
+
             return      
 
         if self.best_params is None:
@@ -554,7 +559,7 @@ class Classifier:
                         batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
                         smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
         
-        print('Complete! To save the final model and optimization results, use save().') 
+        print('Complete! To save the final model and optimization results, call the save() method.') 
         if overwrite_training:
             self.positive_class, self.negative_class, self.val_positive, self.val_negative = class_1, class_2, val_class_1, val_class_2
 
@@ -1250,7 +1255,7 @@ class Classifier:
         else:
             plt.show()
 
-    def _plot_positive(self, index=0, channel=0, default_scale=False, vmin=None, vmax=None, cmap='gray', title=''):
+    def _plot_positive(self, index=0, channel=0, default_scale=True, vmin=None, vmax=None, cmap='gray', title=''):
         """
         Plots the sample in the ``positive`` class, located an the specified index.
 
@@ -1265,7 +1270,7 @@ class Classifier:
             channel (int): The channel to plot, can be 0, 1, 2, or 'all'. Defaults to 0.  
             default_scale (bool): If True the figure will be generated using the matplotlib 
                 imshow display, using the default scaling. If False, the vmin and vmax arguments must
-                be input. Defaults to True. 
+                be input, otherwise a robust vmin and vmax will be calculated. Defaults to True. 
             vmin (float): The vmin to control the colorbar scaling.
             vmax (float): The vmax to control the colorbar scaling. 
             cmap (str): Colormap to use when generating the image.
@@ -1275,8 +1280,11 @@ class Classifier:
             AxesImage.
         """
 
-
-        data = self.positive_class[index]
+        if len(self.positive_class.shape) == 3:
+            data = self.positive_class.reshape(self.positive_class.shape[0], self.positive_class.shape[1], self.positive_class.shape[2], 1)
+            data = data[index]
+        else:
+            data = self.positive_class[index]
 
         if channel == 'all':
             if vmin is None and default_scale is False:
@@ -1299,7 +1307,7 @@ class Classifier:
           
         return
 
-    def _plot_negative(self, index=0, channel=1, default_scale=False, vmin=None, vmax=None, cmap='gray', title=''):
+    def _plot_negative(self, index=0, channel=0, default_scale=True, vmin=None, vmax=None, cmap='gray', title=''):
         """
         Plots the sample in the ``negative`` class, located an the specified index.
 
@@ -1314,7 +1322,7 @@ class Classifier:
             channel (int): The channel to plot, can be 0, 1, 2, or 'all'. Defaults to 0.  
             default_scale (bool): If True the figure will be generated using the matplotlib 
                 imshow display, using the default scaling. If False, the vmin and vmax arguments must
-                be input. Defaults to True.     
+                be input, otherwise a robust vmin and vmax will be calculated. Defaults to True. 
             cmap (str): Colormap to use when generating the image.
             vmin (float): The vmin to control the colorbar scaling.
             vmax (float): The vmax to control the colorbar scaling. 
@@ -1324,7 +1332,11 @@ class Classifier:
             AxesImage.
         """
 
-        data = self.negative_class[index]
+        if len(self.negative_class.shape) == 3:
+            data = self.negative_class.reshape(self.negative_class.shape[0], self.negative_class.shape[1], self.negative_class.shape[2], 1)
+            data = data[index]
+        else:
+            data = self.negative_class[index]
 
         if channel == 'all':
             if vmin is None and default_scale is False:
@@ -1343,6 +1355,7 @@ class Classifier:
             if default_scale is False:
                 plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
             else:
+                import pdb; pdb.set_trace()
                 plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
 
         return

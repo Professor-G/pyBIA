@@ -1227,7 +1227,9 @@ class Classifier:
         plt.plot(range(1, len(metric1)+1), metric1, color='r', alpha=0.83, linestyle='-', label=label1)
         if combine:
             plt.plot(range(1, len(metric2)+1), metric2, color='b', alpha=0.83, linestyle='--', label=label2)
-
+            plt.legend(loc='upper center', frameon=False, ncol=2)
+        else:
+            plt.legend(loc='upper center', frameon=False)
         if ylabel is None:
             ylabel = metric
         if title is None:
@@ -1246,9 +1248,8 @@ class Classifier:
             plt.xscale('log')
         if ylog:
             plt.yscale('log')
-        plt.legend(loc='upper center', frameon=False) #ncol
+
         plt.rcParams['axes.facecolor']='white'
-        
         if savefig:
             plt.savefig('CNN_Training_History_'+metric+'.png', bbox_inches='tight', dpi=300)
             plt.clf()
@@ -1355,7 +1356,6 @@ class Classifier:
             if default_scale is False:
                 plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
             else:
-                import pdb; pdb.set_trace()
                 plt.imshow(data[:,:,channel], vmin=vmin, vmax=vmax, cmap=cmap); plt.title(title); plt.show()
 
         return

@@ -536,6 +536,10 @@ def resize(data, size=50):
     """
     Resizes the data by cropping out the outer boundaries outside the size x size limit.
     Can be either a 2D array containing one sample, or a 3D array for multiple samples.
+    
+    Note:
+        By design this function will not work if the data is a single sample, multiple channels (img_width, img_height, img_num_channels). 
+        In this case, reshape to be 4-D: data = data.reshape(1, img_width, img_height, img_num_channels)
 
     Args:
         data (array): 2D array to resize.

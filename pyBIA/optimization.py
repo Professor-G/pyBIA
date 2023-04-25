@@ -17,6 +17,8 @@ from pandas import DataFrame
 from warnings import filterwarnings
 filterwarnings("ignore", category=FutureWarning)
 from collections import Counter 
+from pathlib import Path
+import joblib   
 
 import sklearn.neighbors._base
 sys.modules['sklearn.neighbors.base'] = sklearn.neighbors._base
@@ -31,6 +33,7 @@ from skopt.plots import plot_convergence, plot_objective
 from skopt.space import Real, Integer, Categorical 
 from tensorflow.keras.backend import clear_session 
 from tensorflow.keras.callbacks import EarlyStopping, Callback
+from tensorflow.keras.models import save_model
 
 import optuna
 from BorutaShap import BorutaShap
@@ -159,7 +162,13 @@ class objective_cnn(object):
         zoom_range (tuple):
         batch_other (int): Can be set to zero.
         blending_func (str):
-        skew_angle
+        skew_angle (float):
+        save_models (bool): Whether to save to models after each Optuna trial. Note that this saves all models, not
+            just the best one. Defaults to False.
+        save_studies (bool): Whehter to save the study object created by Optuna. If set to True, this study object will be
+            saved and overwritted after each trial. Defaults to False.
+        path (str): Absolute path where the models and study object will be saved. Defaults to None, which saves the models and study
+            in the home directory.
 
     Returns:
         The performance metric.
@@ -170,7 +179,8 @@ class objective_cnn(object):
         test_positive=None, test_negative=None, batch_size_min=16, batch_size_max=64, opt_model=True, train_epochs=25, opt_cv=None,
         opt_aug=False, batch_min=2, batch_max=25, batch_other=1, balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, 
         mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, num_images_to_blend=2, blending_func='mean', blend_other=1, 
-        skew_angle=0, zoom_range=(0.9,1.1), limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0):
+        skew_angle=0, zoom_range=(0.9,1.1), limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0,
+        save_models=False, save_studies=False, path=None):
 
         self.positive_class = positive_class
         self.negative_class = negative_class
@@ -218,6 +228,12 @@ class objective_cnn(object):
         self.blend_other = blend_other
         self.zoom_range = zoom_range
         self.skew_angle = skew_angle
+
+        self.save_models = save_models
+        self.save_studies = save_studies
+        self.path = path 
+        self.path = str(Path.home()) if self.path is None else self.path
+        self.path += '/' if self.path[-1] != '/' else ''
 
         if 'all' not in self.metric and 'loss' not in self.metric and 'f1_score' not in self.metric and 'binary_accuracy' not in self.metric:
             raise ValueError("Invalid metric input, options are: 'loss', 'binary_accuracy', 'f1_score', or 'all', and the validation equivalents (add val_ at the beginning).")
@@ -700,14 +716,14 @@ class objective_cnn(object):
                     epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
                     beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
 
-        #If the patience is reached -- return should be a value that contains information regarding the num of completed epochs, otherwise if return 0 every time then the optimizer may get stuck#
+        #If the patience is reached -- return should be a value that contains information regarding the num of completed epochs, otherwise if return 0 every time then the optimizer will get stuck#
         if len(history.history['loss']) != self.train_epochs:
             print(); print('Training patience was reached...'); print()
             return (len(history.history['loss']) * 0.001) - 999.0
 
         #If the output is nan
         if np.isfinite(history.history['loss'][-1]):
-            models, histories = [], []
+            models, histories = [], [] #Will be used to append additional models, it opt_cv is enabled
             models.append(model), histories.append(history)
         else:
             print(); print('Training failed due to numerical instability, returning nan...')
@@ -715,16 +731,16 @@ class objective_cnn(object):
 
         ##### Cross-Validation Routine - implementation in which the validation data is inserted into the training data with the replacement serving as the new validation#####
         if self.opt_cv is not None:
-            if self.val_positive is None and self.val_negative is not None:
-                raise ValueError('CNN cross-validation is currently supported only if validation data is input.')
+            if self.val_positive is None and self.val_negative is None:
+                raise ValueError('CNN cross-validation is only supported if validation data is input.')
             if self.val_positive is not None:
                 if len(self.positive_class) / len(self.val_positive) < self.opt_cv-1:
-                    raise ValueError('Cannot evenly partition the training/validation data, refer to the pyBIA API documentation for instructions on how to use the opt_cv parameter.')
+                    raise ValueError('Cannot evenly partition the positive training/validation data, refer to the pyBIA API documentation for instructions on how to use the opt_cv parameter.')
             if self.val_negative is not None:
                 if len(self.negative_class) / len(self.val_negative) < self.opt_cv-1:
-                    raise ValueError('Cannot evenly partition the training/validation data, refer to the pyBIA API documentation for instructions on how to use the opt_cv parameter.')
+                    raise ValueError('Cannot evenly partition the negative training/validation data, refer to the pyBIA API documentation for instructions on how to use the opt_cv parameter.')
             
-            #The first model already ran therefore sutbract 1      
+            #The first model (therefore the first "fold") already ran, therefore sutbract 1      
             for k in range(self.opt_cv-1):          
                 #Make deep copies to avoid overwriting arrays
                 class_1, class_2 = copy.deepcopy(self.positive_class), copy.deepcopy(self.negative_class)
@@ -732,13 +748,13 @@ class objective_cnn(object):
 
                 #Sort the new data samples, no random shuffling, just a linear sequence
                 if val_class_1 is not None:
-                    val_hold_1 = copy.deepcopy(class_1[k*len(val_class_1):len(val_class_1)*(k+1)]) #The new validation data
-                    class_1[k*len(val_class_1):len(val_class_1)*(k+1)] = copy.deepcopy(val_class_1)
-                    val_class_1 = val_hold_1 #The new validation data
+                    val_hold_1 = copy.deepcopy(class_1[k*len(val_class_1):len(val_class_1)*(k+1)]) #The new positive validation data
+                    class_1[k*len(val_class_1):len(val_class_1)*(k+1)] = copy.deepcopy(val_class_1) #The new class_1, copying to avoid linkage between arrays
+                    val_class_1 = val_hold_1 
                 if val_class_2 is not None:
                     val_hold_2 = copy.deepcopy(class_2[k*len(val_class_2):len(val_class_2)*(k+1)]) #The new validation data
-                    class_2[k*len(val_class_2):len(val_class_2)*(k+1)] = copy.deepcopy(val_class_2)
-                    val_class_2 = val_hold_2 #The new validation data
+                    class_2[k*len(val_class_2):len(val_class_2)*(k+1)] = copy.deepcopy(val_class_2) #The new class_2, copying to avoid linkage between arrays
+                    val_class_2 = val_hold_2 
 
                 if self.opt_aug:
                     if self.img_num_channels == 1:
@@ -948,7 +964,7 @@ class objective_cnn(object):
         if self.test_positive is not None or self.test_negative is not None:
             if self.test_positive is not None and self.test_negative is not None:
                 positive_test_crop, negative_test_crop = resize(self.test_positive, size=image_size), resize(self.test_negative, size=image_size)
-                X_test, Y_test = create_training_set(positive_test_crop, negative_test_crop, normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, img_num_channels=self.img_num_channels)
+                X_test, Y_test = data_processing.create_training_set(positive_test_crop, negative_test_crop, normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, img_num_channels=self.img_num_channels)
             elif self.test_positive is not None:
                 positive_test_crop = resize(self.test_positive, size=image_size)
                 positive_class_data, positive_class_label = data_processing.process_class(positive_test_crop, label=1, normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, img_num_channels=self.img_num_channels)
@@ -1027,7 +1043,12 @@ class objective_cnn(object):
                 final_score = 1 - final_score
             if test_metric is not None:
                 final_score = (final_score + test_metric) / 2.0
-        
+
+        if self.save_models:
+            save_model(model, path+'model_trial_'+str(trial.number))
+        if self.save_studies:
+            joblib.dump(trial.study, path+'study')
+
         return final_score
 
 class objective_xgb(object):
@@ -1358,7 +1379,7 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
     test_positive=None, test_negative=None, opt_model=True, batch_size_min=16, batch_size_max=64, train_epochs=25, opt_cv=None,
     opt_aug=False, batch_min=2, batch_max=25, batch_other=1, balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, 
     mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, num_images_to_blend=2, blending_func='mean', blend_other=1, zoom_range=(0.9,1.1), skew_angle=0,
-    limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, return_study=True): 
+    limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, return_study=True, save_models=False, save_studies=False, path=None): 
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
 
@@ -1448,7 +1469,6 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
             disables this feature.
         average (bool): If False, the designated metric will be calculated according to its value at the end of the train_epochs. 
             If True, the metric will be averaged out across all train_epochs. Defaults to True.
-
         opt_model (bool): If True, the architecture parameters will be optimized. Defaults to True.
         opt_aug (bool): If True, the augmentation procedure will be optimized. Defaults to False.
         batch_min (int): The minimum number of augmentations to perform per image on the positive class, only applicable 
@@ -1474,7 +1494,13 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
             a value of 1 is used for progress bar mode, and 2 for one line per epoch mode. Defaults to 1.
         smote_sampling (float): The smote_sampling parameter is used in the SMOTE algorithm to specify the desired 
             ratio of the minority class to the majority class. Defaults to 0 which disables the procedure.
-        
+        save_models (bool): Whether to save to models after each Optuna trial. Note that this saves all models, not
+            just the best one. Defaults to False.
+        save_studies (bool): Whehter to save the study object created by Optuna. If set to True, this study object will be
+            saved and overwritted after each trial. Defaults to False.
+        path (str): Absolute path where the models and study object will be saved. Defaults to None, which saves the models and study
+            in the home directory.
+
     The folllowing arguments can be used to set early-stopping callbacks. These can be used to terminate trials that exceed
     pre-determined thresholds, which may be indicative of an overfit model.
 
@@ -1644,8 +1670,10 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
             opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, batch_other=batch_other, balance=balance, image_size_min=image_size_min, image_size_max=image_size_max, 
             shift=shift, opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix, mask_size=mask_size, num_masks=num_masks, smote_sampling=smote_sampling, 
             blend_max=blend_max, num_images_to_blend=num_images_to_blend, blending_func=blending_func, blend_other=blend_other, zoom_range=zoom_range, skew_angle=skew_angle,
-            limit_search=limit_search, monitor1=monitor1, monitor2=monitor2, monitor1_thresh=monitor1_thresh, monitor2_thresh=monitor2_thresh, verbose=verbose)      
-        study.optimize(objective, n_trials=n_iter, show_progress_bar=True, gc_after_trial=True)#, n_jobs=1)
+            limit_search=limit_search, monitor1=monitor1, monitor2=monitor2, monitor1_thresh=monitor1_thresh, monitor2_thresh=monitor2_thresh, verbose=verbose,
+            save_models=save_models, save_studies=save_studies, path=path)      
+        #study_stop_cb = StopWhenTrialKeepBeingPrunedCallback(prune_threshold)
+        study.optimize(objective, n_trials=n_iter, show_progress_bar=True, gc_after_trial=True)# callbacks=[study_stop_cb]), n_jobs=1)
         params = study.best_trial.params
 
     final_score = study.best_value
@@ -1866,6 +1894,26 @@ def KNN_imputation(data, imputer=None, k=3):
         return imputed_data, imputer
 
     return imputer.transform(data) 
+
+class StopWhenTrialKeepBeingPrunedCallback:
+    """
+    Class to create a custom callback that will stop
+    the Optuna optimization routine if a given number of
+    trials are pruned in a row. This value is controlled
+    by the threshold parameter.
+    """
+    def __init__(self, threshold: int):
+        self.threshold = threshold
+        self._consequtive_pruned_count = 0
+
+    def __call__(self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial) -> None:
+        if trial.state == optuna.trial.TrialState.PRUNED:
+            self._consequtive_pruned_count += 1
+        else:
+            self._consequtive_pruned_count = 0
+
+        if self._consequtive_pruned_count >= self.threshold:
+            study.stop()
 
 class InputTimeout:
     """

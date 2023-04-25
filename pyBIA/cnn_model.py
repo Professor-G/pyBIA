@@ -41,6 +41,7 @@ from pyBIA.data_processing import process_class, create_training_set, concat_cha
 from pyBIA.data_augmentation import augmentation, resize, smote_oversampling, plot
 from pyBIA import optimization
 
+#plt.style.use('/Users/daniel/Documents/plot_style.txt')
 
 class Classifier:
     """
@@ -139,7 +140,13 @@ class Classifier:
             when opt_aug=True, set to to greater than or equal to 1.1 (a minimum of 10% increase), which would thus try different values for this
             during the optimization between 1 and 1.1.
         blend_other (float): Greater than or equal to 1. Can be zero to not apply augmentation to the majority class.
-    
+        save_models (bool): Whether to save to models after each Optuna trial. Note that this saves all models, not
+            just the best one. Defaults to False.
+        save_studies (bool): Whehter to save the study object created by Optuna. If set to True, this study object will be
+            saved and overwritted after each trial. Defaults to False.
+        path (str): Absolute path where the models and study object will be saved. Defaults to None, which saves the models and study
+            in the home directory.
+
     """
 
     def __init__(self, positive_class=None, negative_class=None, val_positive=None, val_negative=None, img_num_channels=1, clf='alexnet', 
@@ -147,7 +154,7 @@ class Classifier:
         average=True, test_positive=None, test_negative=None, opt_model=True, train_epochs=25, opt_cv=None,
         opt_aug=False, batch_min=2, batch_max=25, batch_other=1, balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, 
         mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, blending_func='mean', num_images_to_blend=2, blend_other=1, zoom_range=(0.9,1.1), skew_angle=0,
-        limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, path=None, use_gpu=False):
+        limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, save_models=False, save_studies=False, path=None, use_gpu=False):
 
         self.positive_class = positive_class
         self.negative_class = negative_class
@@ -212,6 +219,11 @@ class Classifier:
         self.path = path
         #Whether to turn off GPU
         self.use_gpu = use_gpu
+        #Controls whether the models are saved after each optimization trial
+        self.save_models = save_models
+        #Controls whether the study object as the trials progress
+        self.save_studies = save_studies
+
 
         if self.use_gpu is False:
             os.environ['CUDA_VISIBLE_DEVICES'] = '-1' 
@@ -277,7 +289,7 @@ class Classifier:
                 opt_aug=self.opt_aug, batch_min=self.batch_min, batch_max=self.batch_max, batch_other=self.batch_other, balance=self.balance, image_size_min=self.image_size_min, image_size_max=self.image_size_max, shift=self.shift, 
                 opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, mask_size=self.mask_size, num_masks=self.num_masks, smote_sampling=self.smote_sampling, blend_max=self.blend_max, blend_other=self.blend_other, 
                 num_images_to_blend=self.num_images_to_blend, blending_func=self.blending_func, zoom_range=self.zoom_range, skew_angle=self.skew_angle, limit_search=self.limit_search, monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, 
-                monitor2_thresh=self.monitor2_thresh, verbose=self.verbose, return_study=True)
+                monitor2_thresh=self.monitor2_thresh, verbose=self.verbose, save_models=self.save_models, save_studies=self.save_studies, path=self.path, return_study=True)
             print("Fitting and returning final model...")
         else:
             print('Fitting model using the loaded best_params...')
@@ -1043,9 +1055,9 @@ class Classifier:
         else:
             ncol=2
 
-        if self.metric == 'val_accuracy':
+        if self.metric == 'val_accuracy' or self.metric == 'val_binary_accuracy':
             ylabel = 'Validation Accuracy'
-        elif self.metric == 'accuracy':
+        elif self.metric == 'accuracy' or self.metric == 'acc':
             ylabel = 'Training Accuracy'
         elif self.metric == 'val_loss':
             ylabel = '1 - Validation Loss'

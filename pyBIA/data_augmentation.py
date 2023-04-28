@@ -110,10 +110,10 @@ def augmentation(channel1, channel2=None, channel3=None, batch=1, width_shift=0,
     """
 
     if batch == 0: #Setting this in case the negative class is not set to be augmented during the CNN optimization routine.
-        if channel_2 is None:
+        if channel2 is None:
             return channel1 
         else:
-            if channel_3 is None:
+            if channel3 is None:
                 return channel1, channel2
             else:
                 return channel1, channel2, channel3

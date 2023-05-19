@@ -1401,7 +1401,7 @@ class Monitor_Tracker(Callback):
 
 def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels=1, clf='alexnet', 
     normalize=True, min_pixel=0, max_pixel=1000, n_iter=25, patience=5, metric='loss', metric2=None, average=True, 
-    test_positive=None, test_negative=None, opt_model=True, batch_size_min=16, batch_size_max=64, train_epochs=25, opt_cv=None,
+    test_positive=None, test_negative=None, test_acc_threshold=None, opt_model=True, batch_size_min=16, batch_size_max=64, train_epochs=25, opt_cv=None,
     opt_aug=False, batch_min=2, batch_max=25, batch_other=1, balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, 
     mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, num_images_to_blend=2, blending_func='mean', blend_other=1, zoom_range=(0.9,1.1), skew_angle=0,
     limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, return_study=True, save_models=False, save_studies=False, path=None): 
@@ -1487,6 +1487,9 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
         val_negative (ndarray, optional): Negative class data to be used for validation. Defaults to None.
         test_positive (ndarray, optional): Positive class data to be used for post-trial testing. Defaults to None.
         test_negative (ndarray, optional): Negative class data to be used for post-trial testing. Defaults to None.
+        test_acc_threshold (float, optional): If input, models that yield test accuracies lower than the threshold will
+            be rejected by the optimizer. The accuracy of both the test_positive and test_negative is asessed, if input.
+            This is used to reject models that have over or under fit the training data. Defaults to None.
         train_epochs (int): Number of epochs to the train the CNN to during the optimization trials. Defaults to 25.
         metric (str): Assesment metric to use when both pruning and scoring the hyperparameter optimization trial.
             Defaults to 'loss'. Options include: 'loss' 'binary_accuracy', 'f1_score' 'all' or the validation equivalents (e.g. 'val_loss').
@@ -1691,7 +1694,7 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
     else:
         objective = objective_cnn(data_x, data_y, val_positive=val_X, val_negative=val_Y, img_num_channels=img_num_channels, clf=clf, 
             normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, patience=patience, metric=metric, metric2=metric2, average=average,  
-            test_positive=test_positive, test_negative=test_negative, opt_model=opt_model, batch_size_min=batch_size_min, batch_size_max=batch_size_max, train_epochs=train_epochs, opt_cv=opt_cv,
+            test_positive=test_positive, test_negative=test_negative, test_acc_threshold=test_acc_threshold, opt_model=opt_model, batch_size_min=batch_size_min, batch_size_max=batch_size_max, train_epochs=train_epochs, opt_cv=opt_cv,
             opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, batch_other=batch_other, balance=balance, image_size_min=image_size_min, image_size_max=image_size_max, 
             shift=shift, opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix, mask_size=mask_size, num_masks=num_masks, smote_sampling=smote_sampling, 
             blend_max=blend_max, num_images_to_blend=num_images_to_blend, blending_func=blending_func, blend_other=blend_other, zoom_range=zoom_range, skew_angle=skew_angle,

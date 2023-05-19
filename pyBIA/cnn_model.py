@@ -41,8 +41,6 @@ from pyBIA.data_processing import process_class, create_training_set, concat_cha
 from pyBIA.data_augmentation import augmentation, resize, smote_oversampling, plot
 from pyBIA import optimization
 
-#plt.style.use('/Users/daniel/Documents/plot_style.txt')
-
 class Classifier:
     """
     Creates and trains the convolutional neural network. The built-in methods can be used predict new samples, and also optimize the engine and output visualizations.
@@ -999,8 +997,9 @@ class Classifier:
         plt.xlabel('t-SNE Dimension 2')
 
         if savefig:
+            _set_style_()
             plt.savefig('Images_tSNE_Projection.png', bbox_inches='tight', dpi=300)
-            plt.clf()
+            plt.clf(); plt.style.use('default')
         else:
             plt.show()
 
@@ -1090,8 +1089,9 @@ class Classifier:
         plt.rcParams['axes.facecolor']='white'
         
         if savefig:
+            _set_style_()
             plt.savefig('CNN_Hyperparameter_Optimization.png', bbox_inches='tight', dpi=300)
-            plt.clf()
+            plt.clf(); plt.style.use('default')
         else:
             plt.show()
 
@@ -1149,11 +1149,12 @@ class Classifier:
         #fig = plot_param_importances(self.optimization_results, target=lambda t: t.duration.total_seconds(), target_name="duration")
         #plt.tight_layout()
         if savefig:
+            _set_style_()
             if plot_time:
                 plt.savefig('CNN_Hyperparameter_Importance.png', bbox_inches='tight', dpi=300)
             else:
                 plt.savefig('CNN_Hyperparameter_Duration_Importance.png', bbox_inches='tight', dpi=300)
-            plt.clf()
+            plt.clf(); plt.style.use('default')
         else:
             plt.show()
 
@@ -1265,8 +1266,9 @@ class Classifier:
 
         plt.rcParams['axes.facecolor']='white'
         if savefig:
+            _set_style_()
             plt.savefig('CNN_Training_History_'+metric+'.png', bbox_inches='tight', dpi=300)
-            plt.clf()
+            plt.clf(); plt.style.use('default')
         else:
             plt.show()
 
@@ -2753,5 +2755,53 @@ def format_labels(labels: list) -> list:
     return new_labels
 
 
+def _set_style_():
+    """Function to configure the matplotlib.pyplot style. This function is called before any images are saved.
+    """
+    plt.rcParams["xtick.color"] = "323034"
+    plt.rcParams["ytick.color"] = "323034"
+    plt.rcParams["text.color"] = "323034"
+    plt.rcParams["lines.markeredgecolor"] = "black"
+    plt.rcParams["patch.facecolor"] = "bc80bd"
+    plt.rcParams["patch.force_edgecolor"] = True
+    plt.rcParams["patch.linewidth"] = 0.8
+    plt.rcParams["scatter.edgecolors"] = "black"
+    plt.rcParams["grid.color"] = "b1afb5"
+    plt.rcParams["axes.titlesize"] = 16
+    plt.rcParams["legend.title_fontsize"] = 12
+    plt.rcParams["xtick.labelsize"] = 16
+    plt.rcParams["ytick.labelsize"] = 16
+    plt.rcParams["font.size"] = 15
+    plt.rcParams["axes.prop_cycle"] = (cycler('color', ['bc80bd' ,'fb8072', 'b3de69','fdb462','fccde5','8dd3c7','ffed6f','bebada','80b1d3', 'ccebc5', 'd9d9d9']))
+    plt.rcParams["mathtext.fontset"] = "stix"
+    plt.rcParams["font.family"] = "STIXGeneral"
+    plt.rcParams["lines.linewidth"] = 2
+    plt.rcParams["lines.markersize"] = 6
+    plt.rcParams["legend.frameon"] = True
+    plt.rcParams["legend.framealpha"] = 0.8
+    plt.rcParams["legend.fontsize"] = 13
+    plt.rcParams["legend.edgecolor"] = "black"
+    plt.rcParams["legend.borderpad"] = 0.2
+    plt.rcParams["legend.columnspacing"] = 1.5
+    plt.rcParams["legend.labelspacing"] = 0.4
+    plt.rcParams["text.usetex"] = False
+    plt.rcParams["axes.labelsize"] = 17
+    plt.rcParams["axes.titlelocation"] = "center"
+    plt.rcParams["axes.formatter.use_mathtext"] = True
+    plt.rcParams["axes.autolimit_mode"] = "round_numbers"
+    plt.rcParams["axes.labelpad"] = 3
+    plt.rcParams["axes.formatter.limits"] = (-4, 4)
+    plt.rcParams["axes.labelcolor"] = "black"
+    plt.rcParams["axes.edgecolor"] = "black"
+    plt.rcParams["axes.linewidth"] = 1
+    plt.rcParams["axes.grid"] = False
+    plt.rcParams["axes.spines.right"] = True
+    plt.rcParams["axes.spines.left"] = True
+    plt.rcParams["axes.spines.top"] = True
+    plt.rcParams["figure.titlesize"] = 18
+    plt.rcParams["figure.autolayout"] = True
+    plt.rcParams["figure.dpi"] = 300
+
+    return
 
 

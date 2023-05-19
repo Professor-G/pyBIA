@@ -934,10 +934,12 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
             ax2.tick_params(axis="both", which='minor', length=5, color='w', direction='in')
 
             if savefig is True:
+                _set_style_()
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
                 fig.savefig(path+name+'.png', dpi=dpi, bbox_inches='tight')
+                plt.clf(); plt.style.use('default')
                 return
             plt.show()           
 
@@ -1229,11 +1231,12 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
            # ax4.tick_params(axis="both", colors="black", labeltop=False, labelleft=True, labelright=False, labelbottom=True, labelsize=14)
 
             if savefig is True:
+                _set_style_()
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
                 fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
-                plt.clf()
+                plt.clf(); plt.style.use('default')
                 return
             plt.show()
 
@@ -1544,12 +1547,63 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
            # ax4.tick_params(axis="both", colors="black", labeltop=False, labelleft=True, labelright=False, labelbottom=True, labelsize=14)
 
             if savefig is True:
+                _set_style_()
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
                 fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
-                plt.clf()
+                plt.clf(); plt.style.use('default')
                 return
             plt.show()
+
+
+def _set_style_():
+    """Function to configure the matplotlib.pyplot style. This function is called before any images are saved.
+    """
+    plt.rcParams["xtick.color"] = "323034"
+    plt.rcParams["ytick.color"] = "323034"
+    plt.rcParams["text.color"] = "323034"
+    plt.rcParams["lines.markeredgecolor"] = "black"
+    plt.rcParams["patch.facecolor"] = "bc80bd"
+    plt.rcParams["patch.force_edgecolor"] = True
+    plt.rcParams["patch.linewidth"] = 0.8
+    plt.rcParams["scatter.edgecolors"] = "black"
+    plt.rcParams["grid.color"] = "b1afb5"
+    plt.rcParams["axes.titlesize"] = 16
+    plt.rcParams["legend.title_fontsize"] = 12
+    plt.rcParams["xtick.labelsize"] = 16
+    plt.rcParams["ytick.labelsize"] = 16
+    plt.rcParams["font.size"] = 15
+    plt.rcParams["axes.prop_cycle"] = (cycler('color', ['bc80bd' ,'fb8072', 'b3de69','fdb462','fccde5','8dd3c7','ffed6f','bebada','80b1d3', 'ccebc5', 'd9d9d9']))
+    plt.rcParams["mathtext.fontset"] = "stix"
+    plt.rcParams["font.family"] = "STIXGeneral"
+    plt.rcParams["lines.linewidth"] = 2
+    plt.rcParams["lines.markersize"] = 6
+    plt.rcParams["legend.frameon"] = True
+    plt.rcParams["legend.framealpha"] = 0.8
+    plt.rcParams["legend.fontsize"] = 13
+    plt.rcParams["legend.edgecolor"] = "black"
+    plt.rcParams["legend.borderpad"] = 0.2
+    plt.rcParams["legend.columnspacing"] = 1.5
+    plt.rcParams["legend.labelspacing"] = 0.4
+    plt.rcParams["text.usetex"] = False
+    plt.rcParams["axes.labelsize"] = 17
+    plt.rcParams["axes.titlelocation"] = "center"
+    plt.rcParams["axes.formatter.use_mathtext"] = True
+    plt.rcParams["axes.autolimit_mode"] = "round_numbers"
+    plt.rcParams["axes.labelpad"] = 3
+    plt.rcParams["axes.formatter.limits"] = (-4, 4)
+    plt.rcParams["axes.labelcolor"] = "black"
+    plt.rcParams["axes.edgecolor"] = "black"
+    plt.rcParams["axes.linewidth"] = 1
+    plt.rcParams["axes.grid"] = False
+    plt.rcParams["axes.spines.right"] = True
+    plt.rcParams["axes.spines.left"] = True
+    plt.rcParams["axes.spines.top"] = True
+    plt.rcParams["figure.titlesize"] = 18
+    plt.rcParams["figure.autolayout"] = True
+    plt.rcParams["figure.dpi"] = 300
+
+    return
 
 

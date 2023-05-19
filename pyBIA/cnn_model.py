@@ -85,8 +85,9 @@ class Classifier:
             is not 1, the max_pixel should be a list containing two values, one for each band.
         metric (str): Assesment metric to use when both pruning and scoring the hyperparameter optimization trial.
             Defaults to 'loss'. Options include: 'loss' 'binary_accuracy', 'f1_score' 'all' or the validation equivalents (e.g. 'val_loss').
-        metric2 (str): Optional assesment metric.
-        patience (int): Number of epochs without improvement before the optimization trial is terminated. Defaults to 0, which
+        metric2 (str, optional): Additional metric to be used solely for early-stopping purposes. If input, the trial will stop if either
+            metric or metric2 stop improving after the same patience number of epochs, but only the value of metric is used to assess
+            the performance of the model after each trial. Defaults to None.        patience (int): Number of epochs without improvement before the optimization trial is terminated. Defaults to 0, which
             disables this feature.
         average (bool): If False, the designated metric will be calculated according to its value at the end of the train_epochs. 
             If True, the metric will be averaged out across all train_epochs. Defaults to True.

@@ -507,8 +507,9 @@ class Classifier:
         plt.xlabel('t-SNE Dimension 2')
 
         if savefig:
+            _set_style_()
             plt.savefig('tSNE_Projection.png', bbox_inches='tight', dpi=300)
-            plt.clf()
+            plt.clf(); plt.style.use('default')
         else:
             plt.show()
 
@@ -712,8 +713,9 @@ class Classifier:
         plt.title(label=title)#,fontsize=18)
 
         if savefig:
+            _set_style_()
             plt.savefig('Ensemble_ROC_Curve.png', bbox_inches='tight', dpi=300)
-            plt.clf()
+            plt.clf(); plt.style.use('default')
         else:
             plt.show()
 
@@ -794,8 +796,9 @@ class Classifier:
         plt.rcParams['axes.facecolor']='white'
         
         if savefig:
+            _set_style_()
             plt.savefig('Ensemble_Hyperparameter_Optimization.png', bbox_inches='tight', dpi=300)
-            plt.clf()
+            plt.clf(); plt.style.use('default')
         else:
             plt.show()
 
@@ -975,8 +978,9 @@ class Classifier:
         ax.legend([(lns, lns_sigma)], [r'$\pm$ 1$\sigma$'], loc='upper right', ncol=1, frameon=False, handlelength=2)
 
         if savefig:
+            _set_style_()
             plt.savefig('Feature_Importance.png', bbox_inches='tight', dpi=300)
-            plt.clf()
+            plt.clf(); plt.style.use('default')
         else:
             plt.show()
 
@@ -1034,11 +1038,12 @@ class Classifier:
         #fig = plot_param_importances(self.optimization_results, target=lambda t: t.duration.total_seconds(), target_name="duration")
         #plt.tight_layout()
         if savefig:
+            _set_style_()
             if plot_time:
                 plt.savefig('Ensemble_Hyperparameter_Importance.png', bbox_inches='tight', dpi=300)
             else:
                 plt.savefig('Ensemble_Hyperparameter_Duration_Importance.png', bbox_inches='tight', dpi=300)
-            plt.clf()
+            plt.clf(); plt.style.use('default')
         else:
             plt.show()
 
@@ -1178,8 +1183,9 @@ def generate_matrix(predicted_labels_list, actual_targets, classes, normalize=Tr
         generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title)
     
     if savefig:
+        _set_style_()
         plt.savefig('Ensemble_Confusion_Matrix.png', bbox_inches='tight', dpi=300)
-        plt.clf()
+        plt.clf(); plt.style.use('default')
     else:
         plt.show()
     
@@ -1248,3 +1254,51 @@ def min_max_norm(data_x):
 
     return new_array
     
+def _set_style_():
+    """Function to configure the matplotlib.pyplot style. This function is called before any images are saved.
+    """
+    plt.rcParams["xtick.color"] = "323034"
+    plt.rcParams["ytick.color"] = "323034"
+    plt.rcParams["text.color"] = "323034"
+    plt.rcParams["lines.markeredgecolor"] = "black"
+    plt.rcParams["patch.facecolor"] = "bc80bd"
+    plt.rcParams["patch.force_edgecolor"] = True
+    plt.rcParams["patch.linewidth"] = 0.8
+    plt.rcParams["scatter.edgecolors"] = "black"
+    plt.rcParams["grid.color"] = "b1afb5"
+    plt.rcParams["axes.titlesize"] = 16
+    plt.rcParams["legend.title_fontsize"] = 12
+    plt.rcParams["xtick.labelsize"] = 16
+    plt.rcParams["ytick.labelsize"] = 16
+    plt.rcParams["font.size"] = 15
+    plt.rcParams["axes.prop_cycle"] = (cycler('color', ['bc80bd' ,'fb8072', 'b3de69','fdb462','fccde5','8dd3c7','ffed6f','bebada','80b1d3', 'ccebc5', 'd9d9d9']))
+    plt.rcParams["mathtext.fontset"] = "stix"
+    plt.rcParams["font.family"] = "STIXGeneral"
+    plt.rcParams["lines.linewidth"] = 2
+    plt.rcParams["lines.markersize"] = 6
+    plt.rcParams["legend.frameon"] = True
+    plt.rcParams["legend.framealpha"] = 0.8
+    plt.rcParams["legend.fontsize"] = 13
+    plt.rcParams["legend.edgecolor"] = "black"
+    plt.rcParams["legend.borderpad"] = 0.2
+    plt.rcParams["legend.columnspacing"] = 1.5
+    plt.rcParams["legend.labelspacing"] = 0.4
+    plt.rcParams["text.usetex"] = False
+    plt.rcParams["axes.labelsize"] = 17
+    plt.rcParams["axes.titlelocation"] = "center"
+    plt.rcParams["axes.formatter.use_mathtext"] = True
+    plt.rcParams["axes.autolimit_mode"] = "round_numbers"
+    plt.rcParams["axes.labelpad"] = 3
+    plt.rcParams["axes.formatter.limits"] = (-4, 4)
+    plt.rcParams["axes.labelcolor"] = "black"
+    plt.rcParams["axes.edgecolor"] = "black"
+    plt.rcParams["axes.linewidth"] = 1
+    plt.rcParams["axes.grid"] = False
+    plt.rcParams["axes.spines.right"] = True
+    plt.rcParams["axes.spines.left"] = True
+    plt.rcParams["axes.spines.top"] = True
+    plt.rcParams["figure.titlesize"] = 18
+    plt.rcParams["figure.autolayout"] = True
+    plt.rcParams["figure.dpi"] = 300
+
+    return 

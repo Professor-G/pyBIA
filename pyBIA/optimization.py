@@ -102,6 +102,9 @@ class objective_cnn(object):
         val_negative (ndarray, optional): Negative class data to be used for validation. Defaults to None.
         test_positive (ndarray, optional): Positive class data to be used for post-trial testing. Defaults to None.
         test_negative (ndarray, optional): Negative class data to be used for post-trial testing. Defaults to None.
+        test_acc_threshold (float, optional): If input, models that yield test accuracies lower than the threshold will
+            be rejected by the optimizer. The accuracy of both the test_positive and test_negative is asessed, if input.
+            This is used to reject models that have over or under fit the training data. Defaults to None.
         train_epochs (int): Number of epochs to the train the CNN to during the optimization trials. Defaults to 25.
         metric (str): Assesment metric to use when both pruning and scoring the hyperparameter optimization trial.
             Defaults to 'loss'. Options include: 'loss' 'binary_accuracy', 'f1_score' 'all' or the validation equivalents (e.g. 'val_loss').
@@ -176,8 +179,9 @@ class objective_cnn(object):
 
     def __init__(self, positive_class, negative_class, val_positive=None, val_negative=None, img_num_channels=1, clf='alexnet', 
         normalize=True, min_pixel=0, max_pixel=1000, patience=5, metric='loss', metric2=None, average=True, 
-        test_positive=None, test_negative=None, batch_size_min=16, batch_size_max=64, opt_model=True, train_epochs=25, opt_cv=None,
-        opt_aug=False, batch_min=2, batch_max=25, batch_other=1, balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, 
+        test_positive=None, test_negative=None, test_acc_threshold=None, batch_size_min=16, batch_size_max=64, 
+        opt_model=True, train_epochs=25, opt_cv=None, opt_aug=False, batch_min=2, batch_max=25, batch_other=1, 
+        balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, 
         mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, num_images_to_blend=2, blending_func='mean', blend_other=1, 
         skew_angle=0, zoom_range=(0.9,1.1), limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0,
         save_models=False, save_studies=False, path=None):
@@ -192,9 +196,10 @@ class objective_cnn(object):
         self.val_negative = val_negative
         self.test_positive = test_positive
         self.test_negative = test_negative
+        self.test_acc_threshold = test_acc_threshold
+
         self.batch_size_min = batch_size_min
         self.batch_size_max = batch_size_max
-        
         self.train_epochs = train_epochs
         self.patience = patience 
         self.opt_model = opt_model  
@@ -253,6 +258,13 @@ class objective_cnn(object):
 
         if self.balance and self.smote_sampling > 0:
             print('WARNING: balance=True but SMOTE sampling will not be applied if the classes are balanced.')
+
+        if self.test_acc_threshold is not None:
+            if self.test_acc_threshold <= 0 or self.test_acc_threshold > 1:
+                raise ValueError('The test_acc_threshold parameter must be greater than 0 and less than or equal to 1!')
+            if self.test_positive is None and self.test_negative is None:
+                print('WARNING: The test_acc_threshold has been configured but no test data has been input! Setting test_acc_threshold=None...')
+                self.test_acc_threshold = None 
 
     def __call__(self, trial):
 
@@ -987,7 +999,14 @@ class objective_cnn(object):
             ###Loop through all the models to calculate the performance of each###
             test = []
             for _model_ in models:
+
                 test_loss, test_acc, test_f1_score = _model_.evaluate(X_test, Y_test, batch_size=len(X_test))
+
+                if self.test_acc_threshold is not None:
+                    if test_acc < self.test_acc_threshold:
+                        print(); print('The test data accuracy falls below the test_acc_threshold...'); print()
+                        return (len(history.history['loss']) * 0.001) - 999.0 + test_acc 
+
                 if 'loss' in self.metric:
                     test_metric = 1 - test_loss
                 elif 'acc' in self.metric:
@@ -1924,9 +1943,9 @@ class StopWhenTrialKeepBeingPrunedCallback:
 class InputTimeout:
     """
     A class for reading user input with a timeout on Linux, used in the CNN optimization routine. 
+    Not currently used by the program!
 
     Example:
-
         input_timeout = InputTimeout("Enter your input: ", 5)
         try:
             user_input = input_timeout.inputimeout()

@@ -997,6 +997,7 @@ class objective_cnn(object):
                     X_test, Y_test = positive_class_data, positive_class_label
             else:
                 if self.test_negative is not None:
+                    negative_test_crop = resize(self.test_negative, size=image_size)
                     X_test, Y_test = data_processing.process_class(negative_test_crop, label=0, normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, img_num_channels=self.img_num_channels)
              
             ###Loop through all the models to calculate the performance of each###

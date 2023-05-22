@@ -487,7 +487,7 @@ class objective_cnn(object):
                 if self.opt_cv is not None:
                     print(); print('***********  CV - 1 ***********'); print()
                 if self.opt_aug:
-                    print(); print('======= Image Parameters ======'); print(); print('Num Augmentations :', num_aug); print('Image Size : ', image_size); print('Max Pixel(s) :', max_pix)
+                    print(); print('======= Image Parameters ======'); print(); print('Num Augmentations :', num_aug); print('Image Size : ', image_size); print('Max Pixel(s) :', max_pix); print('Num Masks :', num_masks); print('Mask Size :', mask_size); print('Blend Multiplier :', blend_multiplier)
 
             if self.clf == 'alexnet':
 
@@ -723,11 +723,8 @@ class objective_cnn(object):
             if self.opt_cv is not None:
                 print(); print('***********  CV - 1 ***********'); print()
             if self.opt_aug:
-                print(); print('======= Image Parameters ======'); print()
-                print('Num Augmentations : ', num_aug)
-                print('Image Size : ', image_size)
-                print('Max Pixel(s) : ', max_pix)
-
+                print(); print('======= Image Parameters ======'); print(); print('Num Augmentations :', num_aug); print('Image Size : ', image_size); print('Max Pixel(s) :', max_pix); print('Num Masks :', num_masks); print('Mask Size :', mask_size); print('Blend Multiplier :', blend_multiplier)
+     
             if self.clf == 'alexnet':
                 model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
                     normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 

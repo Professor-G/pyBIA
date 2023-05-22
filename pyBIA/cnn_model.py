@@ -109,9 +109,13 @@ class Classifier:
             if opt_aug=True. Defaults to 10 pixels.
         mask_size (int, optional): If enabled, this will set the pixel length of a square cutout, to be randomly placed
             somewhere in the augmented image. This cutout will replace the image values with 0, therefore serving as a 
-            regularizear. Only applicable if opt_aug=True. Defaults to None.
-        num_masks (int, optional): The number of masks to create, to be used alongside the mask_size parameter. If 
-            this is set to a value greater than one, overlap may occur. 
+            regularizer. Only applicable if opt_aug=True. This value can either be an integer to hard-set the mask size everytime,
+            or can be a tuple representing the lower and upper bounds, respectively, in which case the mask size will be optimized. 
+            Defaults to None.
+        num_masks (int, optional): The number of masks to create, to be used alongside the mask_size parameter. Note that if 
+            this is set to a value greater than one, overlap may occur. This value can either be an integer to hard-set the number
+            of masks everytime, or it can be a tuple representing the lower and upper bounds, respectively, in which case the number
+            of masks will be optimized. Defaults to None.
         verbose (int): Controls the amount of output printed during the training process. A value of 0 is for silent mode, 
             a value of 1 is used for progress bar mode, and 2 for one line per epoch mode. Defaults to 1.
         opt_cv (int): Cross-validations to perform when assesing the performance at each
@@ -325,10 +329,12 @@ class Classifier:
                 horizontal = vertical = rotation = True 
                 blend_multiplier = self.best_params['blend_multiplier'] if self.blend_max >= 1.1 else 0
                 skew_angle = self.best_params['skew_angle'] if self.skew_angle > 0 else 0
+                mask_size = self.best_params['mask_size'] if isinstance(self.mask_size, tuple) else self.mask_size
+                num_masks = self.best_params['num_masks'] if isinstance(self.num_masks, tuple) else self.num_masks
 
                 augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.best_params['num_aug'], 
                     width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
-                    image_size=self.best_params['image_size'], mask_size=self.mask_size, num_masks=self.num_masks, blend_multiplier=blend_multiplier, 
+                    image_size=self.best_params['image_size'], mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, 
                     blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
 
                 #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
@@ -354,7 +360,7 @@ class Classifier:
                 
                 augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
                     width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
-                    image_size=self.best_params['image_size'], mask_size=self.mask_size, num_masks=self.num_masks, blend_multiplier=self.blend_other, 
+                    image_size=self.best_params['image_size'], mask_size=mask_size, num_masks=num_masks, blend_multiplier=self.blend_other, 
                     blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
                 
                 #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB

@@ -266,7 +266,7 @@ class objective_cnn(object):
         if not isinstance(self.mask_size, int) and not isinstance(self.mask_size, tuple):
             raise ValueError('The mask_size parameter must either be an integer or a tuple!')
 
-        if not isinstance(self.num_masks, int) and not instance(self.num_masks, tuple):
+        if not isinstance(self.num_masks, int) and not isinstance(self.num_masks, tuple):
             raise ValueError('The num_masks parameter must either be an integer or a tuple!')
 
         if self.balance and self.smote_sampling > 0:
@@ -297,8 +297,8 @@ class objective_cnn(object):
             blend_multiplier = trial.suggest_float('blend_multiplier', 1.0, self.blend_max, step=0.05) if self.blend_max >= 1.1 else 0
             skew_angle = trial.suggest_int('skew_angle', 0, self.skew_angle, step=1) if self.skew_angle > 0 else 0
             image_size = trial.suggest_int('image_size', self.image_size_min, self.image_size_max, step=1)
-            mask_size = trial.suggest_int('mask_size', self.mask_size[0], self.mask_size[1], step=1) if instance(self.mask_size, tuple) else self.mask_size
-            num_masks = trial.suggest_int('num_masks', self.num_masks[0], self.num_masks[1], step=1) if instance(self.num_masks, tuple) else self.num_masks
+            mask_size = trial.suggest_int('mask_size', self.mask_size[0], self.mask_size[1], step=1) if isinstance(self.mask_size, tuple) else self.mask_size
+            num_masks = trial.suggest_int('num_masks', self.num_masks[0], self.num_masks[1], step=1) if isinstance(self.num_masks, tuple) else self.num_masks
 
             augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=num_aug, 
                 width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 

@@ -876,7 +876,7 @@ class Classifier:
                     np.savetxt(path+'model_val_metrics', np.c_[self.history.history['val_binary_accuracy'], self.history.history['val_loss'], self.history.history['val_f1_score']], header='val_binary_accuracy\tval_loss\tval_f1_score')
             else:
                 counter=0
-                for counter in range(len(self.model))::
+                for counter in range(len(self.model)):
                     save_model(self.model[counter], path+'Keras_Model_CV_'+str(counter+1)+'.h5')#,  custom_objects={'f1_score': f1_score})
                     np.savetxt(path+'model_train_metrics_CV_'+str(counter+1), np.c_[self.history[counter].history['binary_accuracy'], self.history[counter].history['loss'], self.history[counter].history['f1_score']], header='binary_accuracy\tloss\tf1_score')
                     if self.val_positive is not None:

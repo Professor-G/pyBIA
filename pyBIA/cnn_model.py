@@ -265,6 +265,9 @@ class Classifier:
             Trained classifier.
         """
 
+        if self.positive_class is None or self.negative_class is None:
+            raise ValueError('No training data found! Input both the positive_class and the negative_class.')
+            
         if self.optimize is False and self.best_params is None:
             if self.clf == 'alexnet':
                 print("Returning base AlexNet model...")
@@ -308,6 +311,9 @@ class Classifier:
         if self.epochs != 0:
 
             clear_session()
+
+            if self.opt_cv is not None and self.verbose == 1:
+                    print(); print('***********  CV - 1 ***********'); print()
 
             if self.opt_aug:
                 if self.img_num_channels == 1:
@@ -601,7 +607,11 @@ class Classifier:
                     raise ValueError('Cannot evenly partition the negative training/validation data, refer to the pyBIA API documentation for instructions on how to use the opt_cv parameter.')
             
             #The first model (therefore the first "fold") already ran, therefore sutbract 1      
-            for k in range(self.opt_cv-1):          
+            for k in range(self.opt_cv-1):        
+
+                if self.verbose == 1:
+                    print(); print('***********  CV - {} ***********'.format(k+2)); print()
+                      
                 #Make deep copies to avoid overwriting arrays
                 class_1, class_2 = copy.deepcopy(self.positive_class), copy.deepcopy(self.negative_class)
                 val_class_1, val_class_2 = copy.deepcopy(self.val_positive), copy.deepcopy(self.val_negative)
@@ -624,9 +634,9 @@ class Classifier:
                     else:
                         channel1, channel2, channel3 = copy.deepcopy(class_1[:,:,:,0]), copy.deepcopy(class_1[:,:,:,1]), copy.deepcopy(class_1[:,:,:,2])
 
-                    augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=num_aug, 
+                    augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.best_params['num_aug'], 
                         width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
-                        image_size=image_size, mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, 
+                        image_size=self.best_params['image_size'], mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, 
                         blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
 
                     if self.img_num_channels > 1:

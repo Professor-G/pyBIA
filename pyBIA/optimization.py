@@ -1089,12 +1089,14 @@ class objective_cnn(object):
             if test_metric is not None:
                 final_score = (final_score + test_metric) / 2.0
 
+        #REMINDER TO MOVE INCLUDE THESE BEFORE EVERY RETURN! IF TRIAL STOPS EARLY IT DOESN'T REACH THE END
         if self.save_models:
             save_model(model, path+'model_trial_'+str(trial.number))
         if self.save_studies:
             joblib.dump(trial.study, path+'study')
 
         return final_score
+        
 
 class objective_xgb(object):
     """

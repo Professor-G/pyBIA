@@ -584,7 +584,241 @@ class Classifier:
                         batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
                         smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
         
-        print('Complete! To save the final model and optimization results, call the save() method.') 
+        #################################
+
+        ##### Cross-Validation Routine - implementation in which the validation data is inserted into the training data with the replacement serving as the new validation#####
+        if self.opt_cv is not None:
+
+            models, histories = [], [] #Will be used to append additional models, it opt_cv is enabled
+
+            if self.val_positive is None and self.val_negative is None:
+                raise ValueError('CNN cross-validation is only supported if validation data is input.')
+            if self.val_positive is not None:
+                if len(self.positive_class) / len(self.val_positive) < self.opt_cv-1:
+                    raise ValueError('Cannot evenly partition the positive training/validation data, refer to the pyBIA API documentation for instructions on how to use the opt_cv parameter.')
+            if self.val_negative is not None:
+                if len(self.negative_class) / len(self.val_negative) < self.opt_cv-1:
+                    raise ValueError('Cannot evenly partition the negative training/validation data, refer to the pyBIA API documentation for instructions on how to use the opt_cv parameter.')
+            
+            #The first model (therefore the first "fold") already ran, therefore sutbract 1      
+            for k in range(self.opt_cv-1):          
+                #Make deep copies to avoid overwriting arrays
+                class_1, class_2 = copy.deepcopy(self.positive_class), copy.deepcopy(self.negative_class)
+                val_class_1, val_class_2 = copy.deepcopy(self.val_positive), copy.deepcopy(self.val_negative)
+
+                #Sort the new data samples, no random shuffling, just a linear sequence
+                if val_class_1 is not None:
+                    val_hold_1 = copy.deepcopy(class_1[k*len(val_class_1):len(val_class_1)*(k+1)]) #The new positive validation data
+                    class_1[k*len(val_class_1):len(val_class_1)*(k+1)] = copy.deepcopy(val_class_1) #The new class_1, copying to avoid linkage between arrays
+                    val_class_1 = val_hold_1 
+                if val_class_2 is not None:
+                    val_hold_2 = copy.deepcopy(class_2[k*len(val_class_2):len(val_class_2)*(k+1)]) #The new validation data
+                    class_2[k*len(val_class_2):len(val_class_2)*(k+1)] = copy.deepcopy(val_class_2) #The new class_2, copying to avoid linkage between arrays
+                    val_class_2 = val_hold_2 
+
+                if self.opt_aug:
+                    if self.img_num_channels == 1:
+                        channel1, channel2, channel3 = copy.deepcopy(class_1), None, None 
+                    elif self.img_num_channels == 2:
+                        channel1, channel2, channel3 = copy.deepcopy(class_1[:,:,:,0]), copy.deepcopy(class_1[:,:,:,1]), None 
+                    else:
+                        channel1, channel2, channel3 = copy.deepcopy(class_1[:,:,:,0]), copy.deepcopy(class_1[:,:,:,1]), copy.deepcopy(class_1[:,:,:,2])
+
+                    augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=num_aug, 
+                        width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
+                        image_size=image_size, mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, 
+                        blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
+
+                    if self.img_num_channels > 1:
+                        class_1=[]
+                        if self.img_num_channels == 2:
+                            for i in range(len(augmented_images[0])):
+                                class_1.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i]))
+                        else:
+                            for i in range(len(augmented_images[0])):
+                                class_1.append(data_processing.concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
+                        class_1 = np.array(class_1)
+                    else:
+                        class_1 = augmented_images
+
+                    #Perform same augmentation techniques on negative class data, batch_other=1 by default
+                    if self.img_num_channels == 1:
+                        channel1, channel2, channel3 = copy.deepcopy(class_2), None, None 
+                    elif self.img_num_channels == 2:
+                        channel1, channel2, channel3 = copy.deepcopy(class_2[:,:,:,0]), copy.deepcopy(class_2[:,:,:,1]), None 
+                    elif self.img_num_channels == 3:
+                        channel1, channel2, channel3 = copy.deepcopy(class_2[:,:,:,0]), copy.deepcopy(class_2[:,:,:,1]), copy.deepcopy(class_2[:,:,:,2])
+                    
+                    augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
+                        width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
+                        image_size=image_size, mask_size=mask_size, num_masks=num_masks, blend_multiplier=self.blend_other, 
+                        blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
+
+                    #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
+                    if self.img_num_channels > 1:
+                        class_2=[]
+                        if self.img_num_channels == 2:
+                            for i in range(len(augmented_images_negative[0])):
+                                class_2.append(data_processing.concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i]))
+                        else:
+                            for i in range(len(augmented_images_negative[0])):
+                                class_2.append(data_processing.concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i], augmented_images_negative[2][i]))
+                        class_2 = np.array(class_2)
+                    else:
+                        class_2 = augmented_images_negative
+
+                    #Balance the class sizes if necessary
+                    if self.balance:
+                        if self.batch_other > 1: #Must shuffle!!!
+                            ix = np.random.permutation(len(class_2))
+                            class_2 = class_2[ix]
+                        class_2 = class_2[:len(class_1)]   
+
+                    if self.img_num_channels == 1:
+                        class_2 = resize(class_2, size=image_size)
+                    else:
+                        channel1 = resize(class_2[:,:,:,0], size=image_size)
+                        channel2 = resize(class_2[:,:,:,1], size=image_size)
+                        if self.img_num_channels == 2:
+                            class_2 = data_processing.concat_channels(channel1, channel2)
+                        else:
+                            channel3 = resize(class_2[:,:,:,2], size=image_size)
+                            class_2 = data_processing.concat_channels(channel1, channel2, channel3)
+
+                    if val_class_1 is not None:
+                        if self.img_num_channels == 1:
+                            val_class_1 = resize(val_class_1, size=image_size)
+                        else:
+                            val_channel1 = resize(val_class_1[:,:,:,0], size=image_size)
+                            val_channel2 = resize(val_class_1[:,:,:,1], size=image_size)
+                            if self.img_num_channels == 2:
+                                val_class_1 = data_processing.concat_channels(val_channel1, val_channel2)
+                            else:
+                                val_channel3 = resize(val_class_1[:,:,:,2], size=image_size)
+                                val_class_1 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
+
+                    if val_class_2 is not None:
+                        if self.img_num_channels == 1:
+                            val_class_2 = resize(val_class_2, size=image_size)
+                        elif self.img_num_channels > 1:
+                            val_channel1 = resize(val_class_2[:,:,:,0], size=image_size)
+                            val_channel2 = resize(val_class_2[:,:,:,1], size=image_size)
+                            if self.img_num_channels == 2:
+                                val_class_2 = data_processing.concat_channels(val_channel1, val_channel2)
+                            else:
+                                val_channel3 = resize(val_class_2[:,:,:,2], size=image_size)
+                                val_class_2 = data_processing.concat_channels(val_channel1, val_channel2, val_channel3)
+
+                if self.verbose == 1:
+                    print(); print('***********  CV - {} ***********'.format(k+2)); print()
+
+                clear_session()
+                if self.opt_model is False:
+                    if self.clf == 'alexnet':
+                        model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
+                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                            epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+                    elif self.clf == 'custom_cnn':
+                        model, history = cnn_model.custom_model(class_1, class_2, img_num_channels=self.img_num_channels, 
+                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                            epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+                    elif self.clf == 'vgg16':
+                        model, history = cnn_model.VGG16(class_1, class_2, img_num_channels=self.img_num_channels, 
+                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                            epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+                    elif self.clf == 'resnet18':
+                        model, history = cnn_model.Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, 
+                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                            epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+                else:
+                    if self.clf == 'alexnet':
+                        if self.limit_search:
+                            model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
+                                normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                                epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                                beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, 
+                                conv_init=conv_init, dense_init=dense_init, model_reg=model_reg, pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, 
+                                smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+                        else:
+                            model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
+                                normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                                epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                                beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, 
+                                conv_init=conv_init, dense_init=dense_init, model_reg=model_reg, 
+                                filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, pooling_1=pooling_1, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1,
+                                filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, pooling_2=pooling_2, pool_size_2=pool_size_2, pool_stride_2=pool_stride_2,
+                                filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, pooling_3=pooling_3, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3,
+                                filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_4, 
+                                filter_5=filter_5, filter_size_5=filter_size_5, strides_5=strides_5,
+                                dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, dropout_1=dropout_1, dropout_2=dropout_2, 
+                                smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+                    elif self.clf == 'custom_cnn':
+                        model, history = cnn_model.custom_model(class_1, class_2, img_num_channels=self.img_num_channels, 
+                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                            epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, 
+                            conv_init=conv_init, dense_init=dense_init, model_reg=model_reg, 
+                            filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, pooling_1=pooling_1, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1, 
+                            filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, pooling_2=pooling_2, pool_size_2=pool_size_2, pool_stride_2=pool_stride_2, 
+                            filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, pooling_3=pooling_3, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, 
+                            dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, dense_neurons_3=dense_neurons_3, 
+                            dropout_1=dropout_1, dropout_2=dropout_2, dropout_3=dropout_3, smote_sampling=self.smote_sampling, 
+                            early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)  
+                    elif self.clf == 'vgg16':
+                        if self.limit_search:
+                            model, history = cnn_model.VGG16(class_1, class_2, img_num_channels=self.img_num_channels, 
+                                normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                                epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                                beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, 
+                                conv_init=conv_init, dense_init=dense_init, model_reg=model_reg,
+                                pooling_1=pooling_1, pooling_2=pooling_2, pooling_3=pooling_3, pooling_4=pooling_4, pooling_5=pooling_5,
+                                smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+                        else:
+                            model, history = cnn_model.VGG16(class_1, class_2, img_num_channels=self.img_num_channels, 
+                                normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                                epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                                beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, 
+                                conv_init=conv_init, dense_init=dense_init, model_reg=model_reg,                      
+                                filter_1=filter_1, filter_size_1=filter_size_1, strides_1=strides_1, pooling_1=pooling_1, pool_size_1=pool_size_1, pool_stride_1=pool_stride_1,
+                                filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, pooling_2=pooling_2, pool_size_2=pool_size_2, pool_stride_2=pool_stride_2,
+                                filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, pooling_3=pooling_3, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3,
+                                filter_4=filter_4, filter_size_4=filter_size_4, strides_4=strides_4, pooling_4=pooling_4, pool_size_4=pool_size_4, pool_stride_4=pool_stride_4,
+                                filter_5=filter_5, filter_size_5=filter_size_5, strides_5=strides_5, pooling_5=pooling_5, pool_size_5=pool_size_5, pool_stride_5=pool_stride_5,
+                                dense_neurons_1=dense_neurons_1, dense_neurons_2=dense_neurons_2, dropout_1=dropout_1, dropout_2=dropout_2, 
+                                smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+                    elif self.clf == 'resnet18':
+                        if self.limit_search:
+                            model, history = cnn_model.Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, 
+                                normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                                epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                                beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, 
+                                conv_init=conv_init, dense_init=dense_init, model_reg=model_reg, pooling=pooling,
+                                smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+                        else:
+                            model, history = cnn_model.Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, 
+                                normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                                epochs=self.train_epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                                beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=loss, activation_conv=activation_conv, activation_dense=activation_dense, 
+                                conv_init=conv_init, dense_init=dense_init, model_reg=model_reg, filters=filters, filter_size=filter_size, strides=strides,  
+                                pooling=pooling, pool_size=pool_size, pool_stride=pool_stride, block_filters_1=block_filters_1, block_filters_2=block_filters_2, 
+                                block_filters_3=block_filters_3, block_filters_4=block_filters_4, block_filters_size=block_filters_size, 
+                                smote_sampling=self.smote_sampling, early_stop_callback=callbacks, checkpoint=False, verbose=self.verbose)
+
+                models.append(model), histories.append(history)
+                if np.isfinite(history.history['loss'][-1]) is False:
+                    print(); print(f"NOTE: Training failed during fold {k} due to numerical instability...")
+
+        #################################
+        if self.opt_cv is None:
+            print('Complete! To save the final model and optimization results, call the save() method.') 
+        else:
+            self.model, self.history = models, histories
+            print('Complete!'); print('NOTE: Cross-validation was enabled, therefore the model and history class attribute are lists containing all! To save, call the save() method.') 
+
         if overwrite_training:
             self.positive_class, self.negative_class, self.val_positive, self.val_negative = class_1, class_2, val_class_1, val_class_2
 
@@ -635,11 +869,19 @@ class Classifier:
         
         path += 'pyBIA_cnn_model/'
         if self.model is not None:
-            save_model(self.model, path+'Keras_Model.h5')#,  custom_objects={'f1_score': f1_score})
-            np.savetxt(path+'model_train_metrics', np.c_[self.history.history['binary_accuracy'], self.history.history['loss'], self.history.history['f1_score']], header='binary_accuracy\tloss\tf1_score')
-            if self.val_positive is not None:
-                np.savetxt(path+'model_val_metrics', np.c_[self.history.history['val_binary_accuracy'], self.history.history['val_loss'], self.history.history['val_f1_score']], header='val_binary_accuracy\tval_loss\tval_f1_score')
-            
+            if isinstance(self.model, list) is False:
+                save_model(self.model, path+'Keras_Model.h5')#,  custom_objects={'f1_score': f1_score})
+                np.savetxt(path+'model_train_metrics', np.c_[self.history.history['binary_accuracy'], self.history.history['loss'], self.history.history['f1_score']], header='binary_accuracy\tloss\tf1_score')
+                if self.val_positive is not None:
+                    np.savetxt(path+'model_val_metrics', np.c_[self.history.history['val_binary_accuracy'], self.history.history['val_loss'], self.history.history['val_f1_score']], header='val_binary_accuracy\tval_loss\tval_f1_score')
+            else:
+                counter=0
+                for counter in range(len(self.model))::
+                    save_model(self.model[counter], path+'Keras_Model_CV_'+str(counter+1)+'.h5')#,  custom_objects={'f1_score': f1_score})
+                    np.savetxt(path+'model_train_metrics_CV_'+str(counter+1), np.c_[self.history[counter].history['binary_accuracy'], self.history[counter].history['loss'], self.history[counter].history['f1_score']], header='binary_accuracy\tloss\tf1_score')
+                    if self.val_positive is not None:
+                        np.savetxt(path+'model_val_metrics_CV_'+str(counter+1), np.c_[self.history[counter].history['val_binary_accuracy'], self.history[counter].history['val_loss'], self.history[counter].history['val_f1_score']], header='val_binary_accuracy\tval_loss\tval_f1_score')
+
         if self.best_params is not None:
             joblib.dump(self.best_params, path+'Best_Params')
         if self.optimization_results is not None:

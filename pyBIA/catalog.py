@@ -10,11 +10,11 @@ filterwarnings("ignore", category=AstropyWarning) #Ignore NaN & inf warnings
 filterwarnings("ignore", category=RuntimeWarning) #Ignore sigma_clipping NaN warning
 from astropy.io import fits 
 from astropy.wcs import WCS
-import matplotlib.pyplot as plt
-#plt.style.use('/Users/daniel/Documents/plot_style.txt') 
-import matplotlib.ticker as tck 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.ticker as tck
+from cycler import cycler 
 
 from photutils.detection import DAOStarFinder
 from photutils import detect_threshold, detect_sources, deblend_sources, segmentation

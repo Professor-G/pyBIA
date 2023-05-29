@@ -15,6 +15,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors 
 from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
+from cycler import cycler
 from warnings import warn
 from pathlib import Path
 from collections import Counter  

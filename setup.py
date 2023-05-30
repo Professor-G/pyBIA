@@ -8,7 +8,7 @@ from setuptools import setup, find_packages, Extension
 
 setup(
     name="pyBIA",
-    version="1.3.2",
+    version="1.3.3",
     author="Daniel Godines",
     author_email="danielgodinez123@gmail.com",
     description="Convolutional Neural Network for Ly-alpha Blob Detection",

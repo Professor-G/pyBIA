@@ -311,7 +311,7 @@ class Classifier:
                 monitor2_thresh=self.monitor2_thresh, verbose=self.verbose, save_models=self.save_models, save_studies=self.save_studies, path=self.path, return_study=True)
             print("Fitting and returning final model...")
         else:
-            print('Fitting model using the loaded best_params...')
+            print('Fitting model using the best_params, if the class attributes were not loaded ensure they have been enabled...')
             
         if self.epochs != 0:
 
@@ -342,6 +342,8 @@ class Classifier:
                 skew_angle = self.best_params['skew_angle'] if self.skew_angle > 0 else 0
                 mask_size = self.best_params['mask_size'] if isinstance(self.mask_size, tuple) else self.mask_size
                 num_masks = self.best_params['num_masks'] if isinstance(self.num_masks, tuple) else self.num_masks
+
+                print(); print('======= Image Parameters ======'); print(); print('Num Augmentations :', self.best_params['num_aug']); print('Image Size : ', self.best_params['image_size']); print('Max Pixel(s) :', max_pix); print('Num Masks :', num_masks); print('Mask Size :', mask_size); print('Blend Multiplier :', blend_multiplier); print('Skew Angle :', skew_angle)
 
                 augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.best_params['num_aug'], 
                     width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
@@ -454,7 +456,7 @@ class Classifier:
                 beta_1 = beta_2 = 0; amsgrad = False
             elif optimizer == 'adam' or optimizer == 'adamax' or optimizer == 'nadam':
                 beta_1 = self.best_params['beta_1']
-                beta_2 = self.best_params['beta_1']
+                beta_2 = self.best_params['beta_2']
                 amsgrad = self.best_params['amsgrad'] if optimizer == 'adam' else False
                 momentum, nesterov = 0.0, False
             elif optimizer == 'adadelta' or optimizer == 'rmsprop':
@@ -466,7 +468,7 @@ class Classifier:
 
             if self.opt_model:
                 #If opt_model=True, the optimization routine will tune the model regularizer and the pooling types
-                #If limit_search=False, the layer parameters (filters, pool sizes, etc) will be tuned as well (might crash machine!)
+                #If limit_search=False, the layer parameters (filters, pool sizes, etc) will be tuned as well (might crash machine due to memory allocation error!)
                 if self.clf == 'alexnet':
                     if self.limit_search:
                         self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
@@ -874,7 +876,7 @@ class Classifier:
         else:
             self.model, self.history = models, histories
             self.model_train_metrics = [] 
-            for i in range(1, 101): #If more than 100 CVs then this will break 
+            for i in range(100): #If more than 100 CVs then this will break 
                 try:
                     model_train_metrics = np.c_[self.history[i].history['binary_accuracy'], self.history[i].history['loss'], self.history[i].history['f1_score']]
                     self.model_train_metrics.append(model_train_metrics)
@@ -883,7 +885,7 @@ class Classifier:
 
             if self.val_positive is not None:
                 self.model_val_metrics = []
-                for i in range(1, 101): #If more than 100 CVs then this will break 
+                for i in range(100): #If more than 100 CVs then this will break 
                     try:
                         model_val_metrics = np.c_[self.history[i].history['val_binary_accuracy'], self.history[i].history['val_loss'], self.history[i].history['val_f1_score']]
                         self.model_val_metrics.append(model_val_metrics)
@@ -1984,7 +1986,7 @@ def custom_model(positive_class, negative_class, img_num_channels=1, normalize=T
             dense_init, activation_dense, filter_1, filter_2, filter_3, filter_4, filter_5, filter_size_1, filter_size_2, 
             filter_size_3, filter_size_4, filter_size_5, pooling_1, pooling_2, pooling_3, pooling_4, pooling_5, pool_size_1, 
             pool_size_2, pool_size_3, pool_size_4, pool_size_5, conv_reg, dense_reg, dense_neurons_1, dense_neurons_2, 
-            dense_neurons_3, dropout_1, dropout_2, dropout_3)
+            dense_neurons_3, dropout_1, dropout_2, dropout_3, beta_1, beta_2, amsgrad, rho)
 
     #Uniform scaling initializer
     conv_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None) if conv_init == 'uniform_scaling' else conv_init
@@ -2262,7 +2264,7 @@ def AlexNet(positive_class, negative_class, img_num_channels=1, normalize=True,
             dense_init, activation_dense, filter_1, filter_2, filter_3, filter_4, filter_5, filter_size_1, filter_size_2, 
             filter_size_3, filter_size_4, filter_size_5, pooling_1, pooling_2, pooling_3, pooling_4, pooling_5, pool_size_1, 
             pool_size_2, pool_size_3, pool_size_4, pool_size_5, conv_reg, dense_reg, dense_neurons_1, dense_neurons_2, 
-            dense_neurons_3, dropout_1, dropout_2, dropout_3)
+            dense_neurons_3, dropout_1, dropout_2, dropout_3, beta_1, beta_2, amsgrad, rho)
 
     #Uniform scaling initializer
     conv_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None) if conv_init == 'uniform_scaling' else conv_init
@@ -2502,7 +2504,7 @@ def VGG16(positive_class, negative_class, img_num_channels=1, normalize=True,
             dense_init, activation_dense, filter_1, filter_2, filter_3, filter_4, filter_5, filter_size_1, filter_size_2, 
             filter_size_3, filter_size_4, filter_size_5, pooling_1, pooling_2, pooling_3, pooling_4, pooling_5, pool_size_1, 
             pool_size_2, pool_size_3, pool_size_4, pool_size_5, conv_reg, dense_reg, dense_neurons_1, dense_neurons_2, 
-            dense_neurons_3, dropout_1, dropout_2, dropout_3)
+            dense_neurons_3, dropout_1, dropout_2, dropout_3, beta_1, beta_2, amsgrad, rho)
 
     #Uniform scaling initializer
     conv_init = VarianceScaling(scale=1.0, mode='fan_in', distribution='uniform', seed=None) if conv_init == 'uniform_scaling' else conv_init
@@ -3108,7 +3110,7 @@ def print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer,
     filter_size_3, filter_size_4, filter_size_5, pooling_1, pooling_2, pooling_3,
     pooling_4, pooling_5, pool_size_1, pool_size_2, pool_size_3, pool_size_4, pool_size_5,
     conv_reg, dense_reg, dense_neurons_1, dense_neurons_2, dense_neurons_3, dropout_1, dropout_2, 
-    dropout_3):
+    dropout_3, beta_1, beta_2, amsgrad, rho):
     """
     Prints the model training parameters and architecture parameters.
 
@@ -3127,31 +3129,27 @@ def print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer,
         activation_dense (str): The activation function used for the dense layers.
     """
 
-    print()
-    print('===== Training Parameters =====')
-    print()
+    print(); print('===== Training Parameters ====='); print()
     print('|| Batch Size : '+str(batch_size), '|| Loss Function : '+loss, '||')
+
     if optimizer == 'sgd':
         print('|| Optimizer : '+optimizer, '|| lr : '+str(np.round(lr, 7)), '|| Decay : '+str(np.round(decay, 5)), '|| Momentum : '+str(momentum), '|| Nesterov : '+str(nesterov)+' ||')
-    elif optimizer == 'rmsprop':
-        print('|| Optimizer : '+optimizer, '|| lr : '+str(np.round(lr, 7)), '|| Decay : '+str(np.round(decay, 5))+' ||')
-    else:
-        print('|| Optimizer : '+optimizer, '|| lr : '+str(np.round(lr, 7))+' ||')
-    print()
-    print('=== Architecture Parameters ===')
-    print()
+    elif optimizer == 'adadelta' or optimizer == 'rmsprop':
+        print('|| Optimizer : '+optimizer, '|| lr : '+str(np.round(lr, 7)), '|| rho : '+str(np.round(rho, 5)), '|| Decay : '+str(np.round(decay, 5))+' ||')
+    elif optimizer == 'adam' or optimizer == 'adamax' or optimizer == 'nadam':
+        print('|| Optimizer : '+optimizer, '|| lr : '+str(np.round(lr, 7)), '|| Beta 1 : '+str(np.round(beta_1, 5)), '|| Beta 2 : '+str(np.round(beta_2, 5)), '||  amsgrad : '+str(amsgrad)+' ||')
+    
+    print(); print('=== Architecture Parameters ==='); print()
     print('Model Regularizer : '+ str(model_reg))
     print('Convolutional L2 Regularizer : '+ str(conv_reg))
     print('Convolutional Initializer : '+ conv_init)
     print('Convolutional Activation Fn : '+ activation_conv)
     print('Dense L2 Regularizer : '+ str(dense_reg))
     print('Dense Initializer : '+ dense_init)
-    print('Dense Activation Fn : '+ activation_dense)
-    print()
+    print('Dense Activation Fn : '+ activation_dense); print()
 
     if dropout_3 != 'N/A': #This is AlexNet and custom_model since droput_3 = N/A is set for VGG16 and Resnet-18 only
-        print('======= Conv2D Layer Parameters ======')
-        print()
+        print('======= Conv2D Layer Parameters ======'); print()
         print('Filter 1 || Num: {}, Size : {}, Pooling : {}, Pooling Size : {}'.format(filter1, filter_size_1, pooling_1, pool_size_1))
         if filter_size_2 > 0:
             print('Filter 2 || Num: {}, Size : {}, Pooling : {}, Pooling Size : {}'.format(filter2, filter_size_2, pooling_2, pool_size_2))
@@ -3161,21 +3159,17 @@ def print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer,
             print('Filter 4 || Num: {}, Size : {}, Pooling : {}, Pooling Size : {}'.format(filter4, filter_size_4, pooling_4, pool_size_4))
         if filter_size_5 > 0:
             print('Filter 5 || Num: {}, Size : {}, Pooling : {}, Pooling Size : {}'.format(filter5, filter_size_5, pooling_5, pool_size_5))
-        print()
-        print('======= Dense Layer Parameters ======')
-        print()
+        
+        print(); print('======= Dense Layer Parameters ======'); print()
         print('Neurons 1 || Num : {}, Dropout : {}'.format(dense_neurons_1, dropout_1))
         if dense_neurons_2 > 0:
             print('Neurons 2 || Num : {}, Dropout : {}'.format(dense_neurons_2, dropout_2))
         if dense_neurons_3 > 0:
             print('Neurons 3 || Num : {}, Dropout : {}'.format(dense_neurons_3, dropout_3))
-        print()
-        print('===============================')
-        print()
+        print(); print('==============================='); print()
     else:
         if activation_dense == 'N/A': #For Resnet-18 
-            print('======= Conv2D Layer Parameters ======')
-            print()
+            print('======= Conv2D Layer Parameters ======'); print()
             print('Filter 1 || Num: {}, Size : {}, Pooling : {}'.format(filter1, filter_size_1, pooling_1, pool_size_1))
             if filter_size_2 > 0:
                 print('Residual Block 1 || Num: {}, Size : {}'.format(filter2, filter_size_2))
@@ -3185,25 +3179,18 @@ def print_params(batch_size, lr, decay, momentum, nesterov, loss, optimizer,
                 print('Residual Block 3 || Num: {}, Size : {}'.format(filter4, filter_size_4))
             if filter_size_5 > 0:
                 print('Residual Block 4 || Num: {}, Size : {},'.format(filter5, filter_size_5))
-            print()
-            print('===============================')
-            print()
+            print(); print('==============================='); print()
         else: #For VGG16
-            print('======= Conv2D Layer Parameters ======')
-            print()
+            print('======= Conv2D Layer Parameters ======'); print()
             print('Block 1 || Num: {}, Size : {}, Pooling : {}'.format(filter1, filter_size_1, pooling_1, pool_size_1))
             print('Block 2 || Num: {}, Size : {}'.format(filter2, filter_size_2))
             print('Block 3 || Num: {}, Size : {}'.format(filter3, filter_size_3))
             print('Block 4 || Num: {}, Size : {}'.format(filter4, filter_size_4))
             print('Block 5 || Num: {}, Size : {},'.format(filter5, filter_size_5))
-            print()
-            print('======= Dense Layer Parameters ======')
-            print()
+            print(); print('======= Dense Layer Parameters ======'); print()
             print('Neurons 1 || Num : {}, Dropout : {}'.format(dense_neurons_1, dropout_1))
             print('Neurons 2 || Num : {}, Dropout : {}'.format(dense_neurons_2, dropout_2))    
-            print()
-            print('===============================')
-            print()
+            print(); print('==============================='); print()
 
 def format_labels(labels: list) -> list:
     """
@@ -3226,7 +3213,6 @@ def format_labels(labels: list) -> list:
         new_labels.append(label.title())
 
     return new_labels
-
 
 def _set_style_():
     """

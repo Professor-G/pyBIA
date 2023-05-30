@@ -490,7 +490,7 @@ class objective_cnn(object):
                 if self.opt_cv is not None:
                     print(); print('***********  CV - 1 ***********'); print()
                 if self.opt_aug:
-                    print(); print('======= Image Parameters ======'); print(); print('Num Augmentations :', num_aug); print('Image Size : ', image_size); print('Max Pixel(s) :', max_pix); print('Num Masks :', num_masks); print('Mask Size :', mask_size); print('Blend Multiplier :', blend_multiplier)
+                    print(); print('======= Image Parameters ======'); print(); print('Num Augmentations :', num_aug); print('Image Size : ', image_size); print('Max Pixel(s) :', max_pix); print('Num Masks :', num_masks); print('Mask Size :', mask_size); print('Blend Multiplier :', blend_multiplier); print('Skew Angle :', skew_angle)
 
             if self.clf == 'alexnet':
 
@@ -726,7 +726,7 @@ class objective_cnn(object):
             if self.opt_cv is not None:
                 print(); print('***********  CV - 1 ***********'); print()
             if self.opt_aug:
-                print(); print('======= Image Parameters ======'); print(); print('Num Augmentations :', num_aug); print('Image Size : ', image_size); print('Max Pixel(s) :', max_pix); print('Num Masks :', num_masks); print('Mask Size :', mask_size); print('Blend Multiplier :', blend_multiplier)
+                print(); print('======= Image Parameters ======'); print(); print('Num Augmentations :', num_aug); print('Image Size : ', image_size); print('Max Pixel(s) :', max_pix); print('Num Masks :', num_masks); print('Mask Size :', mask_size); print('Blend Multiplier :', blend_multiplier); print('Skew Angle :', skew_angle)
      
             if self.clf == 'alexnet':
                 model, history = cnn_model.AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 

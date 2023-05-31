@@ -1703,7 +1703,7 @@ class Classifier:
             for i in range(len(metric1)):
                 marker = markers[i % len(markers)]  # Wrap around the markers list
                 plt.plot(range(1, len(metric1[i])+1), metric1[i], color=color[i % len(color)], alpha=0.83, linestyle='-', label=label1+' CV '+str(i+1))
-            
+
             if combine:
                 for i in range(len(metric2)):
                     marker = markers[i % len(markers)]  # Wrap around the markers list
@@ -1731,7 +1731,13 @@ class Classifier:
         if xlim is not None:
             plt.xlim(xlim)
         else:
-            plt.xlim((1, len(metric1)))
+            if cv_model == 'all':
+                len_ = []
+                for _metric_ in self.model_train_metrics:
+                    len_.append(len(_metric_))
+                plt.xlim(1, np.max(len_))
+            else:
+                plt.xlim((1, len(metric1)))
         if ylim is not None:
             plt.ylim(ylim)
         if xlog:

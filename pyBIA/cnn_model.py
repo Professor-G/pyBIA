@@ -1160,7 +1160,6 @@ class Classifier:
             predictions = model.predict(data)
 
             output, probas = [], [] 
-
             for i in range(len(predictions)):
                 if np.argmax(predictions[i]) == 1:
                     prediction = target
@@ -1170,13 +1169,16 @@ class Classifier:
                     probas.append(predictions[i][0])
                 output.append(prediction)
 
+            output = np.c_[output, probas] if return_proba else np.array(output)
+            
         else: #cv_model='all' 
 
             model_outputs, model_probas = [], []
             for __model__ in self.model:
-                predictions = __model__.predict(data)
-                output, probas = [], [] 
 
+                predictions = __model__.predict(data)
+
+                output, probas = [], []                 
                 for i in range(len(predictions)):
                     if np.argmax(predictions[i]) == 1:
                         prediction = target
@@ -1189,15 +1191,14 @@ class Classifier:
                 model_outputs.append(output); model_probas.append(probas)
 
             average_output, average_proba = [], [] 
-            for i in range(len(model_outputs)):
-                avg_output, avg_proba = [], []
-                for j in range(len(output)):
-                    avg_output.append(model_outputs[i][j]); avg_proba.append(model_probas[i][j])
-                
-                average_output.append(target) if avg_output.count(target) > avg_output.count('OTHER') else average_output.append('OTHER')
-                average_proba.append(np.mean(avg_proba))
+            for j in range(len(model_outputs[0])):
+                column = [model_outputs[i][j] for i in range(len(model_outputs))]
+                avg_output = target if column.count(target) >= column.count('OTHER') else 'OTHER'
+                avg_proba = np.mean([model_probas[i][j] for i in range(len(model_probas))])
 
-        output = np.c_[output, probas] if return_proba else np.array(output)
+                average_output.append(avg_output); average_proba.append(avg_proba)
+
+            output = np.c_[average_output, average_proba] if return_proba else np.array(average_output)
             
         return output
 

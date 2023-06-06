@@ -21,6 +21,7 @@ from pathlib import Path
 from collections import Counter  
 
 from sklearn import decomposition
+from sklearn.svm import OneClassSVM
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
@@ -154,9 +155,10 @@ class Classifier:
                     y[index] = i
                 self.data_y = y 
                 print('________________________________')
-
+        elif self.clf == 'ocsvm':
+            model = OneClassSVM()
         else:
-            raise ValueError('clf argument must either be "rf", "nn", or "xgb".')
+            raise ValueError('clf argument must either be "rf", "nn", "ocsvm", or "xgb".')
         
         if self.impute is False and self.optimize is False:
             if np.any(np.isfinite(self.data_x)==False):
@@ -1303,3 +1305,4 @@ def _set_style_():
     plt.rcParams["figure.dpi"] = 300
 
     return 
+

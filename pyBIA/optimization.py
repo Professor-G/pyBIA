@@ -22,7 +22,7 @@ import joblib
 
 import sklearn.neighbors._base
 sys.modules['sklearn.neighbors.base'] = sklearn.neighbors._base
-from sklearn.impute import KNNImputer
+from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score
@@ -175,6 +175,9 @@ class objective_cnn(object):
         batch_other (int): Can be set to zero.
         blending_func (str):
         skew_angle (float):
+        rotation (bool):
+        horizontal (bool):
+        vertical (bool): 
         save_models (bool): Whether to save to models after each Optuna trial. Note that this saves all models, not
             just the best one. Defaults to False.
         save_studies (bool): Whehter to save the study object created by Optuna. If set to True, this study object will be
@@ -190,8 +193,8 @@ class objective_cnn(object):
         normalize=True, min_pixel=0, max_pixel=1000, patience=5, metric='loss', metric2=None, average=True, 
         test_positive=None, test_negative=None, post_metric=True, test_acc_threshold=None, batch_size_min=16, batch_size_max=64, 
         opt_model=True, train_epochs=25, opt_cv=None, opt_aug=False, batch_min=2, batch_max=25, batch_other=1, 
-        balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, 
-        mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, num_images_to_blend=2, blending_func='mean', blend_other=1, 
+        balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, rotation=False, horizontal=False,
+        vertical=False, mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, num_images_to_blend=2, blending_func='mean', blend_other=1, 
         skew_angle=0, zoom_range=(0.9,1.1), limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0,
         save_models=False, save_studies=False, path=None):
 
@@ -244,6 +247,9 @@ class objective_cnn(object):
         self.blend_other = blend_other
         self.zoom_range = zoom_range
         self.skew_angle = skew_angle
+        self.rotation = rotation
+        self.horizontal = horizontal
+        self.vertical = vertical
 
         self.save_models = save_models
         self.save_studies = save_studies
@@ -266,11 +272,11 @@ class objective_cnn(object):
             if self.opt_max_min_pix is None:
                 raise ValueError('To optimize min/max normalization pixel value, both opt_min_pix and opt_max_pix must be input')
 
-        if not isinstance(self.mask_size, int) and not isinstance(self.mask_size, tuple):
-            raise ValueError('The mask_size parameter must either be an integer or a tuple!')
+        if not isinstance(self.mask_size, int) and not isinstance(self.mask_size, tuple) and self.mask_size is not None:
+            raise ValueError('The mask_size parameter must either be an integer, tuple, or None!')
 
-        if not isinstance(self.num_masks, int) and not isinstance(self.num_masks, tuple):
-            raise ValueError('The num_masks parameter must either be an integer or a tuple!')
+        if not isinstance(self.num_masks, int) and not isinstance(self.num_masks, tuple) and self.num_masks is not None:
+            raise ValueError('The num_masks parameter must either be an integerl, tuple, or None!')
 
         if self.balance and self.smote_sampling > 0:
             print('WARNING: balance=True but SMOTE sampling will not be applied if the classes are balanced.')
@@ -295,7 +301,6 @@ class objective_cnn(object):
                 raise ValueError('Only three filters are supported!')
 
         if self.opt_aug:
-            rotation = horizontal = vertical = True 
             num_aug = trial.suggest_int('num_aug', self.batch_min, self.batch_max, step=1)
             blend_multiplier = trial.suggest_float('blend_multiplier', 1.0, self.blend_max, step=0.05) if self.blend_max >= 1.1 else 0
             skew_angle = trial.suggest_int('skew_angle', 0, self.skew_angle, step=1) if self.skew_angle > 0 else 0
@@ -304,7 +309,7 @@ class objective_cnn(object):
             num_masks = trial.suggest_int('num_masks', self.num_masks[0], self.num_masks[1], step=1) if isinstance(self.num_masks, tuple) else self.num_masks
 
             augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=num_aug, 
-                width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
+                width_shift=self.shift, height_shift=self.shift, horizontal=self.horizontal, vertical=self.vertical, rotation=self.rotation, 
                 image_size=image_size, mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, 
                 blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
 
@@ -331,7 +336,7 @@ class objective_cnn(object):
                 channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), copy.deepcopy(self.negative_class[:,:,:,2])
             
             augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
-                width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
+                width_shift=self.shift, height_shift=self.shift, horizontal=self.horizontal, vertical=self.vertical, rotation=self.rotation, 
                 image_size=image_size, mask_size=mask_size, num_masks=num_masks, blend_multiplier=self.blend_other, 
                 blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
 
@@ -798,7 +803,7 @@ class objective_cnn(object):
                         channel1, channel2, channel3 = copy.deepcopy(class_1[:,:,:,0]), copy.deepcopy(class_1[:,:,:,1]), copy.deepcopy(class_1[:,:,:,2])
 
                     augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=num_aug, 
-                        width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
+                        width_shift=self.shift, height_shift=self.shift, horizontal=self.horizontal, vertical=self.vertical, rotation=self.rotation, 
                         image_size=image_size, mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, 
                         blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
 
@@ -823,7 +828,7 @@ class objective_cnn(object):
                         channel1, channel2, channel3 = copy.deepcopy(class_2[:,:,:,0]), copy.deepcopy(class_2[:,:,:,1]), copy.deepcopy(class_2[:,:,:,2])
                     
                     augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
-                        width_shift=self.shift, height_shift=self.shift, horizontal=horizontal, vertical=vertical, rotation=rotation, 
+                        width_shift=self.shift, height_shift=self.shift, horizontal=self.horizontal, vertical=self.vertical, rotation=self.rotation, 
                         image_size=image_size, mask_size=mask_size, num_masks=num_masks, blend_multiplier=self.blend_other, 
                         blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
 
@@ -1425,8 +1430,8 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
     normalize=True, min_pixel=0, max_pixel=1000, n_iter=25, patience=5, metric='loss', metric2=None, average=True, 
     test_positive=None, test_negative=None, test_acc_threshold=None, post_metric=True, opt_model=True, batch_size_min=16, batch_size_max=64, train_epochs=25, opt_cv=None,
     opt_aug=False, batch_min=2, batch_max=25, batch_other=1, balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, 
-    mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, num_images_to_blend=2, blending_func='mean', blend_other=1, zoom_range=(0.9,1.1), skew_angle=0,
-    limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, return_study=True, save_models=False, save_studies=False, path=None): 
+    rotation=False, horizontal=False, vertical=False, mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, num_images_to_blend=2, blending_func='mean', blend_other=1, 
+    zoom_range=(0.9,1.1), skew_angle=0, limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, return_study=True, save_models=False, save_studies=False, path=None): 
     """
     Optimizes hyperparameters using a k-fold cross validation splitting strategy.
 
@@ -1724,7 +1729,7 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
             normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, patience=patience, metric=metric, metric2=metric2, average=average,  
             test_positive=test_positive, test_negative=test_negative, test_acc_threshold=test_acc_threshold, post_metric=post_metric, opt_model=opt_model, batch_size_min=batch_size_min, batch_size_max=batch_size_max, 
             train_epochs=train_epochs, opt_cv=opt_cv, opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, batch_other=batch_other, balance=balance, image_size_min=image_size_min, image_size_max=image_size_max, 
-            shift=shift, opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix, mask_size=mask_size, num_masks=num_masks, smote_sampling=smote_sampling, 
+            shift=shift, opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix, rotation=rotation, horizontal=horizontal, vertical=vertical, mask_size=mask_size, num_masks=num_masks, smote_sampling=smote_sampling, 
             blend_max=blend_max, num_images_to_blend=num_images_to_blend, blending_func=blending_func, blend_other=blend_other, zoom_range=zoom_range, skew_angle=skew_angle,
             limit_search=limit_search, monitor1=monitor1, monitor2=monitor2, monitor1_thresh=monitor1_thresh, monitor2_thresh=monitor2_thresh, verbose=verbose,
             save_models=save_models, save_studies=save_studies, path=path)      
@@ -1843,58 +1848,55 @@ def boruta_opt(data_x, data_y):
 
     feats = np.array([str(feat) for feat in feat_selector.support_])
     index = np.where(feats == 'True')[0]
+
     print('Feature selection complete, {} selected out of {}!'.format(len(index),len(feat_selector.support)))
+
     return index
 
-def Strawman_imputation(data):
+from sklearn.impute import SimpleImputer, KNNImputer
+
+def impute_missing_values(data, strategy='knn', k=3, constant_value=None):
     """
-    Perform Strawman imputation, a time-efficient algorithm
-    in which missing data values are replaced with the median
-    value of the entire, non-NaN sample. If the data is a hot-encoded
-    boolean (as the RF does not allow True or False), then the 
-    instance that is used the most will be computed as the median. 
-
-    This is the baseline algorithm used by (Tang & Ishwaran 2017).
-    See: https://arxiv.org/pdf/1701.05305.pdf
-
-    Note:
-        This function assumes each row corresponds to one sample, and 
-        that missing values are masked as either NaN or inf. 
+    Impute missing values in the input data array using various imputation strategies.
 
     Args:
-        data (ndarray): 1D array if single parameter is input. If
-            data is 2-dimensional, the medians will be calculated
-            using the non-missing values in each corresponding column.
+        data (ndarray): Input data array with missing values.
+        strategy (str, optional): Imputation strategy to use. Defaults to 'knn'.
+            - 'mean': Fill missing values with the mean of the non-missing values in the same column.
+            - 'median': Fill missing values with the median of the non-missing values in the same column.
+            - 'mode': Fill missing values with the mode (most frequent value) of the non-missing values in the same column.
+            - 'constant': Fill missing values with a constant value provided by the user.
+            - 'knn': Fill missing values using k-Nearest Neighbor imputation.
+        k (int, optional): Number of nearest neighbors to consider for k-Nearest Neighbor imputation.
+            Only applicable if strategy is set to 'knn'. Defaults to 3.
+        constant_value (float or int, optional): Constant value to use for constant imputation.
+            Only applicable if strategy is set to 'constant'. Defaults to None.
 
     Returns:
-        The data array with the missing values filled in. 
+        ndarray: The imputed data array with the missing values filled in.
+
+    Raises:
+        ValueError: If an invalid imputation strategy is provided or if constant_value is None for constant imputation.
     """
 
-    if np.all(np.isfinite(data)):
-        print('No missing values in data, returning original array.')
-        return data 
+    if strategy == 'mean':
+        imputer = SimpleImputer(strategy='mean')
+    elif strategy == 'median':
+        imputer = SimpleImputer(strategy='median')
+    elif strategy == 'mode':
+        imputer = SimpleImputer(strategy='most_frequent')
+    elif strategy == 'constant':
+        if constant_value is None:
+            raise ValueError("Constant value must be provided for constant imputation.")
+        imputer = SimpleImputer(strategy='constant', fill_value=constant_value)
+    elif strategy == 'knn':
+        imputer = KNNImputer(n_neighbors=k)
+    else:
+        raise ValueError("Invalid imputation strategy. Please choose from 'mean', 'median', 'mode', 'constant', or 'knn'.")
 
-    if len(data.shape) == 1:
-        mask = np.where(np.isfinite(data))[0]
-        median = np.median(data[mask])
-        data[np.isnan(data)] = median 
+    imputed_data = imputer.fit_transform(data)
 
-        return data
-
-    Ny, Nx = data.shape
-    imputed_data = np.zeros((Ny,Nx))
-
-    for i in range(Nx):
-        mask = np.where(np.isfinite(data[:,i]))[0]
-        median = np.median(data[:,i][mask])
-
-        for j in range(Ny):
-            if np.isnan(data[j,i]) == True or np.isinf(data[j,i]) == True:
-                imputed_data[j,i] = median
-            else:
-                imputed_data[j,i] = data[j,i]
-
-    return imputed_data 
+    return imputed_data
 
 def KNN_imputation(data, imputer=None, k=3):
     """
@@ -1950,6 +1952,58 @@ def KNN_imputation(data, imputer=None, k=3):
         return imputed_data, imputer
 
     return imputer.transform(data) 
+
+def Strawman_imputation(data):
+    """
+    Perform Strawman imputation, a time-efficient algorithm
+    in which missing data values are replaced with the median
+    value of the entire, non-NaN sample. If the data is a hot-encoded
+    boolean (as the RF does not allow True or False), then the 
+    instance that is used the most will be computed as the median. 
+
+    This is the baseline algorithm used by (Tang & Ishwaran 2017).
+    See: https://arxiv.org/pdf/1701.05305.pdf
+
+    Note:
+        This function assumes each row corresponds to one sample, and 
+        that missing values are masked as either NaN or inf. 
+
+    Args:
+        data (ndarray): 1D array if single parameter is input. If
+            data is 2-dimensional, the medians will be calculated
+            using the non-missing values in each corresponding column.
+
+    Returns:
+        The data array with the missing values filled in. 
+    """
+
+    if np.all(np.isfinite(data)):
+        print('No missing values in data, returning original array.')
+        return data 
+
+    if len(data.shape) == 1:
+        mask = np.where(np.isfinite(data))[0]
+        median = np.median(data[mask])
+        data[np.isnan(data)] = median 
+
+        return data
+
+    Ny, Nx = data.shape
+    imputed_data = np.zeros((Ny,Nx))
+
+    for i in range(Nx):
+        mask = np.where(np.isfinite(data[:,i]))[0]
+        median = np.median(data[:,i][mask])
+
+        for j in range(Ny):
+            if np.isnan(data[j,i]) == True or np.isinf(data[j,i]) == True:
+                imputed_data[j,i] = median
+            else:
+                imputed_data[j,i] = data[j,i]
+
+    return imputed_data 
+
+
 
 class StopWhenTrialKeepBeingPrunedCallback:
     """

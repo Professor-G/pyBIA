@@ -215,10 +215,8 @@ class Catalog:
                 positions.append((self.x[i], self.y[i]))
 
             aper_stats = ApertureStats(self.data, CircularAperture(positions, r=self.aperture), error=self.error)
-            if self.error is None:
-                flux_err = None 
-            else:
-                flux_err = aper_stats.sum_err
+
+            flux_err = None if self.error is None else aper_stats.sum_err
 
             if self.morph_params == True:
                 prop_list, moment_list = morph_parameters(data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=None, 
@@ -298,11 +296,7 @@ class Catalog:
                 median_bkg=self.bkg, deblend=self.deblend, name=name)
         else:
             if len(self.cat.shape) == 2:
-                if obj_name is not None:
-                    mask = np.where(self.cat['obj_name'] == obj_name)[0]
-                else:
-                    mask = int(index)
-                    
+                mask = np.where(self.cat['obj_name'] == obj_name)[0] if obj_name is not None else int(index)
                 data = self.cat.iloc[mask]
                 xpix, ypix = float(data['xpix']), float(data['ypix'])
             else:
@@ -724,6 +718,7 @@ def subtract_background(data, length=150):
         padded_matrix[int(y)-initial_y:int(y)+initial_y,int(x)-initial_x:int(x)+initial_x] -= background
 
     data = padded_matrix[:-int(pad_y),:-int(pad_x)] #Slice away the padding 
+
     return data
 
 def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, kernel_size=21, invert=False,
@@ -796,6 +791,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
         AxesImage.
 
     """
+    
     if median_bkg != 0 and median_bkg is not None:
         if isinstance(median_bkg, np.ndarray) is False:
             median_bkg = np.array(median_bkg)

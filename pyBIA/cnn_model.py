@@ -315,291 +315,293 @@ class Classifier:
                 monitor2_thresh=self.monitor2_thresh, verbose=self.verbose, save_models=self.save_models, save_studies=self.save_studies, path=self.path, return_study=True)
             print("Fitting and returning final model...")
         else:
-            print('Fitting model using the best_params, if the class attributes were not loaded ensure they have been enabled...')
-            
-        if self.epochs != 0:
-
-            clear_session()
-
-            if self.opt_aug:
-                if self.img_num_channels == 1:
-                    channel1, channel2, channel3 = copy.deepcopy(self.positive_class), None, None 
-                elif self.img_num_channels == 2:
-                    channel1, channel2, channel3 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), None 
-                elif self.img_num_channels == 3:
-                    channel1, channel2, channel3 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), copy.deepcopy(self.positive_class[:,:,:,2])
-                else:
-                    raise ValueError('Only three filters are supported!')
-
-                if self.opt_max_min_pix is not None:
-                    self.normalize = True #In case it's mistakenly set to False by user
-                    min_pix, max_pix = self.min_pixel, [] #Will append to a list because it's 1 max pix valuer per band!
-                    max_pix.append(self.best_params['max_pixel_1']) if self.img_num_channels >= 1 else None
-                    max_pix.append(self.best_params['max_pixel_2']) if self.img_num_channels >= 2 else None
-                    max_pix.append(self.best_params['max_pixel_3']) if self.img_num_channels == 3 else None
-                    self.max_pixel = max_pix; print('Setting max_pixel attribute to the tuned value(s)...')
-                else:
-                    min_pix, max_pix = self.min_pixel, self.max_pixel
-
-                blend_multiplier = self.best_params['blend_multiplier'] if self.blend_max >= 1.1 else 0
-                skew_angle = self.best_params['skew_angle'] if self.skew_angle > 0 else 0
-                mask_size = self.best_params['mask_size'] if isinstance(self.mask_size, tuple) else self.mask_size
-                num_masks = self.best_params['num_masks'] if isinstance(self.num_masks, tuple) else self.num_masks
-
-                print(); print('======= Image Parameters ======'); print(); print('Num Augmentations :', self.best_params['num_aug']); print('Image Size : ', self.best_params['image_size']); print('Max Pixel(s) :', max_pix); print('Num Masks :', num_masks); print('Mask Size :', mask_size); print('Blend Multiplier :', blend_multiplier); print('Skew Angle :', skew_angle)
-
-                augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.best_params['num_aug'], 
-                    width_shift=self.shift, height_shift=self.shift, horizontal=self.horizontal, vertical=self.vertical, rotation=self.rotation, 
-                    image_size=self.best_params['image_size'], mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, 
-                    blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
-
-                #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
-                if self.img_num_channels > 1:
-                    class_1=[]
-                    if self.img_num_channels == 2:
-                        for i in range(len(augmented_images[0])):
-                            class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i]))
-                    else:
-                        for i in range(len(augmented_images[0])):
-                            class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
-                    class_1 = np.array(class_1)
-                else:
-                    class_1 = augmented_images
-
-                #Perform same augmentation techniques on other data, batch_other=1 by default
-                if self.img_num_channels == 1:
-                    channel1, channel2, channel3 = copy.deepcopy(self.negative_class), None, None 
-                elif self.img_num_channels == 2:
-                    channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), None 
-                elif self.img_num_channels == 3:
-                    channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), copy.deepcopy(self.negative_class[:,:,:,2])
-                
-                augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
-                    width_shift=self.shift, height_shift=self.shift, horizontal=self.horizontal, vertical=self.vertical, rotation=self.rotation, 
-                    image_size=self.best_params['image_size'], mask_size=mask_size, num_masks=num_masks, blend_multiplier=self.blend_other, 
-                    blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
-                
-                #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
-                if self.img_num_channels > 1:
-                    class_2=[]
-                    if self.img_num_channels == 2:
-                        for i in range(len(augmented_images_negative[0])):
-                            class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i]))
-                    else:
-                        for i in range(len(augmented_images_negative[0])):
-                            class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i], augmented_images_negative[2][i]))
-                    class_2 = np.array(class_2)
-                else:
-                    class_2 = augmented_images_negative
-
-                #Balance the class sizes if necessary
-                if self.balance:
-                    if self.batch_other > 1: #Must shuffle!!!
-                        ix = np.random.permutation(len(class_2))
-                        class_2 = class_2[ix]
-                    class_2 = class_2[:len(class_1)]     
-
-                if self.img_num_channels == 1:
-                    class_2 = resize(class_2, size=self.best_params['image_size'])
-                else:
-                    channel1 = resize(class_2[:,:,:,0], size=self.best_params['image_size'])
-                    channel2 = resize(class_2[:,:,:,1], size=self.best_params['image_size'])
-                    if self.img_num_channels == 2:
-                        class_2 = concat_channels(channel1, channel2)
-                    else:
-                        channel3 = resize(class_2[:,:,:,2], size=self.best_params['image_size'])
-                        class_2 = concat_channels(channel1, channel2, channel3)
-
-                if self.val_positive is not None:
-                    if self.img_num_channels == 1:
-                        val_class_1 = resize(self.val_positive, size=self.best_params['image_size'])
-                    else:
-                        val_channel1 = resize(self.val_positive[:,:,:,0], size=self.best_params['image_size'])
-                        val_channel2 = resize(self.val_positive[:,:,:,1], size=self.best_params['image_size'])
-                        if self.img_num_channels == 2:
-                            val_class_1 = concat_channels(val_channel1, val_channel2)
-                        else:
-                            val_channel3 = resize(self.val_positive[:,:,:,2], size=self.best_params['image_size'])
-                            val_class_1 = concat_channels(val_channel1, val_channel2, val_channel3)
-                else:
-                    val_class_1 = None
-
-                if self.val_negative is not None:
-                    if self.img_num_channels == 1:
-                        val_class_2 = resize(self.val_negative, size=self.best_params['image_size'])
-                    elif self.img_num_channels > 1:
-                        val_channel1 = resize(self.val_negative[:,:,:,0], size=self.best_params['image_size'])
-                        val_channel2 = resize(self.val_negative[:,:,:,1], size=self.best_params['image_size'])
-                        if self.img_num_channels == 2:
-                            val_class_2 = concat_channels(val_channel1, val_channel2)
-                        else:
-                            val_channel3 = resize(self.val_negative[:,:,:,2], size=self.best_params['image_size'])
-                            val_class_2 = concat_channels(val_channel1, val_channel2, val_channel3)
-                else:
-                    val_class_2 = None
+            if self.epochs != 0:
+                print('Fitting model using the best_params, if the class attributes were not loaded ensure they have been enabled...')
             else:
-                class_1, class_2 = self.positive_class, self.negative_class
-                val_class_1, val_class_2 = self.val_positive, self.val_negative
+                print('The epochs parameter is zero, returning nothing...')
+                return 
+
+        clear_session()
+
+        if self.opt_aug:
+            if self.img_num_channels == 1:
+                channel1, channel2, channel3 = copy.deepcopy(self.positive_class), None, None 
+            elif self.img_num_channels == 2:
+                channel1, channel2, channel3 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), None 
+            elif self.img_num_channels == 3:
+                channel1, channel2, channel3 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), copy.deepcopy(self.positive_class[:,:,:,2])
+            else:
+                raise ValueError('Only three filters are supported!')
+
+            if self.opt_max_min_pix is not None:
+                self.normalize = True #In case it's mistakenly set to False by user
+                min_pix, max_pix = self.min_pixel, [] #Will append to a list because it's 1 max pix valuer per band!
+                max_pix.append(self.best_params['max_pixel_1']) if self.img_num_channels >= 1 else None
+                max_pix.append(self.best_params['max_pixel_2']) if self.img_num_channels >= 2 else None
+                max_pix.append(self.best_params['max_pixel_3']) if self.img_num_channels == 3 else None
+                self.max_pixel = max_pix; print('Setting max_pixel attribute to the tuned value(s)...')
+            else:
                 min_pix, max_pix = self.min_pixel, self.max_pixel
 
-            #Set the batch_size and learning parameters
-            if self.batch_size_min == self.batch_size_max:
-                batch_size = self.batch_size_max 
+            blend_multiplier = self.best_params['blend_multiplier'] if self.blend_max >= 1.1 else 0
+            skew_angle = self.best_params['skew_angle'] if self.skew_angle > 0 else 0
+            mask_size = self.best_params['mask_size'] if isinstance(self.mask_size, tuple) else self.mask_size
+            num_masks = self.best_params['num_masks'] if isinstance(self.num_masks, tuple) else self.num_masks
+
+            print(); print('======= Image Parameters ======'); print(); print('Num Augmentations :', self.best_params['num_aug']); print('Image Size : ', self.best_params['image_size']); print('Max Pixel(s) :', max_pix); print('Num Masks :', num_masks); print('Mask Size :', mask_size); print('Blend Multiplier :', blend_multiplier); print('Skew Angle :', skew_angle)
+
+            augmented_images = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.best_params['num_aug'], 
+                width_shift=self.shift, height_shift=self.shift, horizontal=self.horizontal, vertical=self.vertical, rotation=self.rotation, 
+                image_size=self.best_params['image_size'], mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, 
+                blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
+
+            #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
+            if self.img_num_channels > 1:
+                class_1=[]
+                if self.img_num_channels == 2:
+                    for i in range(len(augmented_images[0])):
+                        class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i]))
+                else:
+                    for i in range(len(augmented_images[0])):
+                        class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
+                class_1 = np.array(class_1)
             else:
-                batch_size = self.best_params['batch_size']
+                class_1 = augmented_images
 
-            lr = self.best_params['lr']
-            optimizer = self.best_params['optimizer']
-            decay = 0
+            #Perform same augmentation techniques on other data, batch_other=1 by default
+            if self.img_num_channels == 1:
+                channel1, channel2, channel3 = copy.deepcopy(self.negative_class), None, None 
+            elif self.img_num_channels == 2:
+                channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), None 
+            elif self.img_num_channels == 3:
+                channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), copy.deepcopy(self.negative_class[:,:,:,2])
+            
+            augmented_images_negative = augmentation(channel1=channel1, channel2=channel2, channel3=channel3, batch=self.batch_other, 
+                width_shift=self.shift, height_shift=self.shift, horizontal=self.horizontal, vertical=self.vertical, rotation=self.rotation, 
+                image_size=self.best_params['image_size'], mask_size=mask_size, num_masks=num_masks, blend_multiplier=self.blend_other, 
+                blending_func=self.blending_func, num_images_to_blend=self.num_images_to_blend, zoom_range=self.zoom_range, skew_angle=skew_angle)
+            
+            #The augmentation routine returns an output for each filter, e.g. 3 outputs for RGB
+            if self.img_num_channels > 1:
+                class_2=[]
+                if self.img_num_channels == 2:
+                    for i in range(len(augmented_images_negative[0])):
+                        class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i]))
+                else:
+                    for i in range(len(augmented_images_negative[0])):
+                        class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i], augmented_images_negative[2][i]))
+                class_2 = np.array(class_2)
+            else:
+                class_2 = augmented_images_negative
 
-            #Inverse time decay is set to 0, optimizzing beta and rho parameters instead.
-            if optimizer == 'sgd':
-                momentum = self.best_params['momentum']
-                nesterov = self.best_params['nesterov']
-                beta_1 = beta_2 = 0; amsgrad = False
-            elif optimizer == 'adam' or optimizer == 'adamax' or optimizer == 'nadam':
-                beta_1 = self.best_params['beta_1']
-                beta_2 = self.best_params['beta_2']
-                amsgrad = self.best_params['amsgrad'] if optimizer == 'adam' else False
-                momentum, nesterov = 0.0, False
-            elif optimizer == 'adadelta' or optimizer == 'rmsprop':
-                rho = self.best_params['rho']
-                momentum = beta_1 = beta_2 = 0; nesterov = amsgrad = False
+            #Balance the class sizes if necessary
+            if self.balance:
+                if self.batch_other > 1: #Must shuffle!!!
+                    ix = np.random.permutation(len(class_2))
+                    class_2 = class_2[ix]
+                class_2 = class_2[:len(class_1)]     
 
-            if self.opt_cv is not None and self.verbose == 1:
-                    print(); print('***********  CV - 1 ***********'); print()
+            if self.img_num_channels == 1:
+                class_2 = resize(class_2, size=self.best_params['image_size'])
+            else:
+                channel1 = resize(class_2[:,:,:,0], size=self.best_params['image_size'])
+                channel2 = resize(class_2[:,:,:,1], size=self.best_params['image_size'])
+                if self.img_num_channels == 2:
+                    class_2 = concat_channels(channel1, channel2)
+                else:
+                    channel3 = resize(class_2[:,:,:,2], size=self.best_params['image_size'])
+                    class_2 = concat_channels(channel1, channel2, channel3)
 
-            if self.opt_model:
-                #If opt_model=True, the optimization routine will tune the model regularizer and the pooling types
-                #If limit_search=False, the layer parameters (filters, pool sizes, etc) will be tuned as well (might crash machine due to memory allocation error!)
-                if self.clf == 'alexnet':
-                    if self.limit_search:
-                        self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
-                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
-                            epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
-                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
-                            activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
-                            model_reg=self.best_params['model_reg'], pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], pooling_3=self.best_params['pooling_3'], 
-                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
+            if self.val_positive is not None:
+                if self.img_num_channels == 1:
+                    val_class_1 = resize(self.val_positive, size=self.best_params['image_size'])
+                else:
+                    val_channel1 = resize(self.val_positive[:,:,:,0], size=self.best_params['image_size'])
+                    val_channel2 = resize(self.val_positive[:,:,:,1], size=self.best_params['image_size'])
+                    if self.img_num_channels == 2:
+                        val_class_1 = concat_channels(val_channel1, val_channel2)
                     else:
-                        self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
-                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
-                            epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
-                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
-                            activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], model_reg=self.best_params['model_reg'], 
-                            filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'], pooling_1=self.best_params['pooling_1'], pool_size_1=self.best_params['pool_size_1'], pool_stride_1=self.best_params['pool_stride_1'],
-                            filter_2=self.best_params['filter_2'], filter_size_2=self.best_params['filter_size_2'], strides_2=self.best_params['strides_2'], pooling_2=self.best_params['pooling_2'], pool_size_2=self.best_params['pool_size_2'], pool_stride_2=self.best_params['pool_stride_2'],
-                            filter_3=self.best_params['filter_3'], filter_size_3=self.best_params['filter_size_3'], strides_3=self.best_params['strides_3'], pooling_3=self.best_params['pooling_3'], pool_size_3=self.best_params['pool_size_3'], pool_stride_3=self.best_params['pool_stride_3'], 
-                            filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], strides_4=self.best_params['strides_4'], 
-                            filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], strides_5=self.best_params['strides_5'], 
-                            dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
-                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
+                        val_channel3 = resize(self.val_positive[:,:,:,2], size=self.best_params['image_size'])
+                        val_class_1 = concat_channels(val_channel1, val_channel2, val_channel3)
+            else:
+                val_class_1 = None
 
-                elif self.clf == 'resnet18':
-                    if self.limit_search:
-                        self.model, self.history = Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, 
-                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
-                            epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
-                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
-                            activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
-                            model_reg=self.best_params['model_reg'], pooling=self.best_params['pooling'],
-                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
+            if self.val_negative is not None:
+                if self.img_num_channels == 1:
+                    val_class_2 = resize(self.val_negative, size=self.best_params['image_size'])
+                elif self.img_num_channels > 1:
+                    val_channel1 = resize(self.val_negative[:,:,:,0], size=self.best_params['image_size'])
+                    val_channel2 = resize(self.val_negative[:,:,:,1], size=self.best_params['image_size'])
+                    if self.img_num_channels == 2:
+                        val_class_2 = concat_channels(val_channel1, val_channel2)
                     else:
-                        self.model, self.history = Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, 
-                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
-                            epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
-                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
-                            activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
-                            model_reg=self.best_params['model_reg'], filters=self.best_params['filters'], filter_size=self.best_params['filter_size'], strides=self.best_params['strides'],  
-                            pooling=self.best_params['pooling'], pool_size=self.best_params['pool_size'], pool_stride=self.best_params['pool_stride'], block_filters_1=self.best_params['block_filters_1'], 
-                            block_filters_2=self.best_params['block_filters_2'], block_filters_3=self.best_params['block_filters_3'], block_filters_4=self.best_params['block_filters_4'], 
-                            block_filters_size=self.best_params['block_filters_size'], smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
-                
-                elif self.clf == 'vgg16':
-                    if self.limit_search:
-                        self.model, self.history = VGG16(class_1, class_2, img_num_channels=self.img_num_channels, 
-                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
-                            epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
-                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
-                            activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
-                            model_reg=self.best_params['model_reg'], pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], pooling_3=self.best_params['pooling_3'], 
-                            pooling_4=self.best_params['pooling_4'], pooling_5=self.best_params['pooling_5'], smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
-                    else:
-                        self.model, self.history = VGG16(class_1, class_2, img_num_channels=self.img_num_channels, 
-                            normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
-                            epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
-                            beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
-                            activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], model_reg=self.best_params['model_reg'],                 
-                            filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'], pooling_1=self.best_params['pooling_1'], pool_size_1=self.best_params['pool_size_1'], pool_stride_1=self.best_params['pool_stride_1'],
-                            filter_2=self.best_params['filter_2'], filter_size_2=self.best_params['filter_size_2'], strides_2=self.best_params['strides_2'], pooling_2=self.best_params['pooling_2'], pool_size_2=self.best_params['pool_size_2'], pool_stride_2=self.best_params['pool_stride_2'],
-                            filter_3=self.best_params['filter_3'], filter_size_3=self.best_params['filter_size_3'], strides_3=self.best_params['strides_3'], pooling_3=self.best_params['pooling_3'], pool_size_3=self.best_params['pool_size_3'], pool_stride_3=self.best_params['pool_stride_3'],
-                            filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], strides_4=self.best_params['strides_4'], pooling_4=self.best_params['pooling_4'], pool_size_4=self.best_params['pool_size_4'], pool_stride_4=self.best_params['pool_stride_4'],
-                            filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], strides_5=self.best_params['strides_5'], pooling_5=self.best_params['pooling_5'], pool_size_5=self.best_params['pool_size_5'], pool_stride_5=self.best_params['pool_stride_5'],
-                            dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
-                            smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
-                
-                elif self.clf == 'custom_cnn':
-                    #Need to extract the second and third layers manually 
-                    #Conv2D and Pooling Layers
-                    strides_1 = pool_stride_1 = 1 
-                    if self.best_params['num_conv_layers'] == 1:
-                        filter_2 = filter_size_2 = strides_2 = pool_size_2 = pool_stride_2 = filter_3 = filter_size_3 = strides_3 = pool_size_3 = pool_stride_3 = 0; pooling_2 = pooling_3 = None
-                    if self.best_params['num_conv_layers'] >= 2:
-                        filter_2 = self.best_params['filter_2']
-                        filter_size_2 = self.best_params['filter_size_2'] 
-                        pooling_2 = self.best_params['pooling_2']
-                        pool_size_2 = self.best_params['pool_size_2']
-                        strides_2 = pool_stride_2 = 1; filter_3 = filter_size_3 = strides_3 = pool_size_3 = pool_stride_3 = 0; pooling_3 = None
-                    if self.best_params['num_conv_layers'] == 3:
-                        filter_3 = self.best_params['filter_3']
-                        filter_size_3 = self.best_params['filter_size_3']
-                        pooling_3 = self.best_params['pooling_3']
-                        pool_size_3 = self.best_params['pool_size_3']
-                        strides_3 = pool_stride_3 = 1
-                    #Dense Layers
-                    if self.best_params['num_dense_layers'] == 1:
-                        dense_neurons_2 = dropout_2 = dense_neurons_3 = dropout_3 = 0
-                    if self.best_params['num_dense_layers'] >= 2:
-                        dense_neurons_2 = self.best_params['dense_neurons_2']
-                        dropout_2 = self.best_params['dropout_2'] 
-                        dense_neurons_3 = dropout_3 = 0
-                    if self.best_params['num_dense_layers'] == 3:
-                        dense_neurons_3 =  self.best_params['dense_neurons_3']                         
-                        dropout_3 = self.best_params['dropout_3'] 
+                        val_channel3 = resize(self.val_negative[:,:,:,2], size=self.best_params['image_size'])
+                        val_class_2 = concat_channels(val_channel1, val_channel2, val_channel3)
+            else:
+                val_class_2 = None
+        else:
+            class_1, class_2 = self.positive_class, self.negative_class
+            val_class_1, val_class_2 = self.val_positive, self.val_negative
+            min_pix, max_pix = self.min_pixel, self.max_pixel
 
-                    self.model, self.history = custom_model(class_1, class_2, img_num_channels=self.img_num_channels, 
+        #Set the batch_size and learning parameters
+        if self.batch_size_min == self.batch_size_max:
+            batch_size = self.batch_size_max 
+        else:
+            batch_size = self.best_params['batch_size']
+
+        lr = self.best_params['lr']
+        optimizer = self.best_params['optimizer']
+        decay = 0
+
+        #Inverse time decay is set to 0, optimizzing beta and rho parameters instead.
+        if optimizer == 'sgd':
+            momentum = self.best_params['momentum']
+            nesterov = self.best_params['nesterov']
+            beta_1 = beta_2 = 0; amsgrad = False
+        elif optimizer == 'adam' or optimizer == 'adamax' or optimizer == 'nadam':
+            beta_1 = self.best_params['beta_1']
+            beta_2 = self.best_params['beta_2']
+            amsgrad = self.best_params['amsgrad'] if optimizer == 'adam' else False
+            momentum, nesterov = 0.0, False
+        elif optimizer == 'adadelta' or optimizer == 'rmsprop':
+            rho = self.best_params['rho']
+            momentum = beta_1 = beta_2 = 0; nesterov = amsgrad = False
+
+        if self.opt_cv is not None and self.verbose == 1:
+                print(); print('***********  CV - 1 ***********'); print()
+
+        if self.opt_model:
+            #If opt_model=True, the optimization routine will tune the model regularizer and the pooling types
+            #If limit_search=False, the layer parameters (filters, pool sizes, etc) will be tuned as well (might crash machine due to memory allocation error!)
+            if self.clf == 'alexnet':
+                if self.limit_search:
+                    self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
                         normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
                         epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
                         beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
-                        activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], model_reg=self.best_params['model_reg'],
-                        filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=strides_1, pooling_1=self.best_params['pooling_1'], pool_size_1=self.best_params['pool_size_1'], pool_stride_1=pool_stride_1, 
-                        filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, pooling_2=pooling_2, pool_size_2=pool_size_2, pool_stride_2=pool_stride_2, 
-                        filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, pooling_3=pooling_3, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, 
-                        dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=dense_neurons_2, dense_neurons_3=dense_neurons_3, 
-                        dropout_1=self.best_params['dropout_1'], dropout_2=dropout_2, dropout_3=dropout_3, 
+                        activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
+                        model_reg=self.best_params['model_reg'], pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], pooling_3=self.best_params['pooling_3'], 
                         smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
-            else: 
-                if self.clf == 'alexnet':
-                    self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                        min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
-                        batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                else:
+                    self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, 
+                        normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                        epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                        beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
+                        activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], model_reg=self.best_params['model_reg'], 
+                        filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'], pooling_1=self.best_params['pooling_1'], pool_size_1=self.best_params['pool_size_1'], pool_stride_1=self.best_params['pool_stride_1'],
+                        filter_2=self.best_params['filter_2'], filter_size_2=self.best_params['filter_size_2'], strides_2=self.best_params['strides_2'], pooling_2=self.best_params['pooling_2'], pool_size_2=self.best_params['pool_size_2'], pool_stride_2=self.best_params['pool_stride_2'],
+                        filter_3=self.best_params['filter_3'], filter_size_3=self.best_params['filter_size_3'], strides_3=self.best_params['strides_3'], pooling_3=self.best_params['pooling_3'], pool_size_3=self.best_params['pool_size_3'], pool_stride_3=self.best_params['pool_stride_3'], 
+                        filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], strides_4=self.best_params['strides_4'], 
+                        filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], strides_5=self.best_params['strides_5'], 
+                        dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
                         smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
-                elif self.clf == 'custom_cnn':
-                    self.model, self.history = custom_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                        min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
-                        batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+
+            elif self.clf == 'resnet18':
+                if self.limit_search:
+                    self.model, self.history = Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, 
+                        normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                        epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                        beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
+                        activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
+                        model_reg=self.best_params['model_reg'], pooling=self.best_params['pooling'],
                         smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
-                elif self.clf == 'vgg16':
-                    self.model, self.history = VGG16(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                        min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
-                        batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                else:
+                    self.model, self.history = Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, 
+                        normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                        epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                        beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
+                        activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
+                        model_reg=self.best_params['model_reg'], filters=self.best_params['filters'], filter_size=self.best_params['filter_size'], strides=self.best_params['strides'],  
+                        pooling=self.best_params['pooling'], pool_size=self.best_params['pool_size'], pool_stride=self.best_params['pool_stride'], block_filters_1=self.best_params['block_filters_1'], 
+                        block_filters_2=self.best_params['block_filters_2'], block_filters_3=self.best_params['block_filters_3'], block_filters_4=self.best_params['block_filters_4'], 
+                        block_filters_size=self.best_params['block_filters_size'], smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
+            
+            elif self.clf == 'vgg16':
+                if self.limit_search:
+                    self.model, self.history = VGG16(class_1, class_2, img_num_channels=self.img_num_channels, 
+                        normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                        epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                        beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
+                        activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], 
+                        model_reg=self.best_params['model_reg'], pooling_1=self.best_params['pooling_1'], pooling_2=self.best_params['pooling_2'], pooling_3=self.best_params['pooling_3'], 
+                        pooling_4=self.best_params['pooling_4'], pooling_5=self.best_params['pooling_5'], smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
+                else:
+                    self.model, self.history = VGG16(class_1, class_2, img_num_channels=self.img_num_channels, 
+                        normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                        epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                        beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
+                        activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], model_reg=self.best_params['model_reg'],                 
+                        filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=self.best_params['strides_1'], pooling_1=self.best_params['pooling_1'], pool_size_1=self.best_params['pool_size_1'], pool_stride_1=self.best_params['pool_stride_1'],
+                        filter_2=self.best_params['filter_2'], filter_size_2=self.best_params['filter_size_2'], strides_2=self.best_params['strides_2'], pooling_2=self.best_params['pooling_2'], pool_size_2=self.best_params['pool_size_2'], pool_stride_2=self.best_params['pool_stride_2'],
+                        filter_3=self.best_params['filter_3'], filter_size_3=self.best_params['filter_size_3'], strides_3=self.best_params['strides_3'], pooling_3=self.best_params['pooling_3'], pool_size_3=self.best_params['pool_size_3'], pool_stride_3=self.best_params['pool_stride_3'],
+                        filter_4=self.best_params['filter_4'], filter_size_4=self.best_params['filter_size_4'], strides_4=self.best_params['strides_4'], pooling_4=self.best_params['pooling_4'], pool_size_4=self.best_params['pool_size_4'], pool_stride_4=self.best_params['pool_stride_4'],
+                        filter_5=self.best_params['filter_5'], filter_size_5=self.best_params['filter_size_5'], strides_5=self.best_params['strides_5'], pooling_5=self.best_params['pooling_5'], pool_size_5=self.best_params['pool_size_5'], pool_stride_5=self.best_params['pool_stride_5'],
+                        dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=self.best_params['dense_neurons_2'], dropout_1=self.best_params['dropout_1'], dropout_2=self.best_params['dropout_2'],
                         smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
-                elif self.clf == 'resnet18':
-                    self.model, self.history = Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
-                        min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
-                        batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
-                        smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
-        
+            
+            elif self.clf == 'custom_cnn':
+                #Need to extract the second and third layers manually 
+                #Conv2D and Pooling Layers
+                strides_1 = pool_stride_1 = 1 
+                if self.best_params['num_conv_layers'] == 1:
+                    filter_2 = filter_size_2 = strides_2 = pool_size_2 = pool_stride_2 = filter_3 = filter_size_3 = strides_3 = pool_size_3 = pool_stride_3 = 0; pooling_2 = pooling_3 = None
+                if self.best_params['num_conv_layers'] >= 2:
+                    filter_2 = self.best_params['filter_2']
+                    filter_size_2 = self.best_params['filter_size_2'] 
+                    pooling_2 = self.best_params['pooling_2']
+                    pool_size_2 = self.best_params['pool_size_2']
+                    strides_2 = pool_stride_2 = 1; filter_3 = filter_size_3 = strides_3 = pool_size_3 = pool_stride_3 = 0; pooling_3 = None
+                if self.best_params['num_conv_layers'] == 3:
+                    filter_3 = self.best_params['filter_3']
+                    filter_size_3 = self.best_params['filter_size_3']
+                    pooling_3 = self.best_params['pooling_3']
+                    pool_size_3 = self.best_params['pool_size_3']
+                    strides_3 = pool_stride_3 = 1
+                #Dense Layers
+                if self.best_params['num_dense_layers'] == 1:
+                    dense_neurons_2 = dropout_2 = dense_neurons_3 = dropout_3 = 0
+                if self.best_params['num_dense_layers'] >= 2:
+                    dense_neurons_2 = self.best_params['dense_neurons_2']
+                    dropout_2 = self.best_params['dropout_2'] 
+                    dense_neurons_3 = dropout_3 = 0
+                if self.best_params['num_dense_layers'] == 3:
+                    dense_neurons_3 =  self.best_params['dense_neurons_3']                         
+                    dropout_3 = self.best_params['dropout_3'] 
+
+                self.model, self.history = custom_model(class_1, class_2, img_num_channels=self.img_num_channels, 
+                    normalize=self.normalize, min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, 
+                    epochs=self.epochs, batch_size=batch_size, optimizer=optimizer, lr=lr, decay=decay, momentum=momentum, nesterov=nesterov, 
+                    beta_1=beta_1, beta_2=beta_2, amsgrad=amsgrad, loss=self.best_params['loss'], activation_conv=self.best_params['activation_conv'], 
+                    activation_dense=self.best_params['activation_dense'], conv_init=self.best_params['conv_init'], dense_init=self.best_params['dense_init'], model_reg=self.best_params['model_reg'],
+                    filter_1=self.best_params['filter_1'], filter_size_1=self.best_params['filter_size_1'], strides_1=strides_1, pooling_1=self.best_params['pooling_1'], pool_size_1=self.best_params['pool_size_1'], pool_stride_1=pool_stride_1, 
+                    filter_2=filter_2, filter_size_2=filter_size_2, strides_2=strides_2, pooling_2=pooling_2, pool_size_2=pool_size_2, pool_stride_2=pool_stride_2, 
+                    filter_3=filter_3, filter_size_3=filter_size_3, strides_3=strides_3, pooling_3=pooling_3, pool_size_3=pool_size_3, pool_stride_3=pool_stride_3, 
+                    dense_neurons_1=self.best_params['dense_neurons_1'], dense_neurons_2=dense_neurons_2, dense_neurons_3=dense_neurons_3, 
+                    dropout_1=self.best_params['dropout_1'], dropout_2=dropout_2, dropout_3=dropout_3, 
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
+        else: 
+            if self.clf == 'alexnet':
+                self.model, self.history = AlexNet(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                    min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
+                    batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
+            elif self.clf == 'custom_cnn':
+                self.model, self.history = custom_model(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                    min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
+                    batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
+            elif self.clf == 'vgg16':
+                self.model, self.history = VGG16(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                    min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
+                    batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
+            elif self.clf == 'resnet18':
+                self.model, self.history = Resnet18(class_1, class_2, img_num_channels=self.img_num_channels, normalize=self.normalize,
+                    min_pixel=min_pix, max_pixel=max_pix, val_positive=val_class_1, val_negative=val_class_2, epochs=self.epochs,
+                    batch_size=batch_size, optimizer=optimizer, lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, 
+                    smote_sampling=self.smote_sampling, patience=self.patience, metric=self.metric, checkpoint=False, verbose=self.verbose, save_training_data=save_training, path=self.path)
+    
         #################################
 
         ##### Cross-Validation Routine - implementation in which the validation data is inserted into the training data with the replacement serving as the new validation#####
@@ -895,7 +897,7 @@ class Classifier:
                     except:
                         break
 
-            print('Complete!'); print('NOTE: Cross-validation was enabled, therefore the model and history class attribute are arrays containing all! To save, call the save() method.') 
+            print('Complete!'); print('NOTE: Cross-validation was enabled, therefore the model and history class attribute are lists containing all. To save, call the save() method.') 
 
         if overwrite_training:
             self.positive_class, self.negative_class, self.val_positive, self.val_negative = class_1, class_2, val_class_1, val_class_2

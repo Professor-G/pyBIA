@@ -1111,7 +1111,7 @@ class objective_xgb(object):
     
     Note:
         If opt_cv is between 0 and 1, a pruning procedure will be initiliazed (a procedure incompatible with cross-validation),
-        so as to speed up the XGB optimization. If opt_cv is between 0 and 1, a random validation data will be generated according to this ratio,
+        so as to speed up the XGB optimization. A random validation data will be generated according to this ratio,
         which will replace the cross-validation method used by default. It will prune according
         to the f1-score of the validation data, which would be 10% of the training data if opt_cv=0.1, for example. 
         Need more testing to make this more robust.
@@ -1322,6 +1322,61 @@ class objective_rf(object):
             clf = RandomForestClassifier(n_estimators=n_estimators, criterion=criterion, max_depth=max_depth,
                 min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
                 max_features=max_features, bootstrap=bootstrap, random_state=1909)
+        except:
+            print("Invalid hyperparameter combination, skipping trial")
+            return 0.0
+
+        cv = cross_validate(clf, self.data_x, self.data_y, cv=self.opt_cv)
+        final_score = np.mean(cv['test_score'])
+
+        return final_score
+
+class ObjectiveOneClassSVM(object):
+    """
+    Optimization objective function for the scikit-learn implementation of the
+    One-Class SVM. The Optuna software for hyperparameter optimization
+    was published in 2019 by Akiba et al. Paper: https://arxiv.org/abs/1907.10902
+
+    Args:
+        data_x (ndarray): 2D array of size (n x m), where n is the number of samples,
+            and m is the number of features.
+        data_y (ndarray, str): 1D array containing the corresponding labels.
+        opt_cv (int): Cross-validations to perform when assessing the performance at each
+            hyperparameter optimization trial. For example, if cv=3, then each optimization trial
+            will be assessed according to the 3-fold cross-validation accuracy.
+
+    Returns:
+        The performance metric, determined using the cross-fold validation method.
+    """
+
+    def __init__(self, data_x, data_y, opt_cv):
+        self.data_x = data_x
+        self.data_y = data_y
+        self.opt_cv = opt_cv
+
+    def __call__(self, trial):
+        """
+        Define the optimization objective function for the One-Class SVM.
+
+        Args:
+            trial (optuna.trial.Trial): A Trial object containing the current state of the optimization.
+
+        Returns:
+            float: The performance metric, determined using cross-validation.
+        """
+
+        kernel = trial.suggest_categorical('kernel', ['linear', 'poly', 'rbf', 'sigmoid', 'precomputed'])
+        degree = trial.suggest_int('degree', 0, 10)
+        gamma = trial.suggest_categorical('gamma', ['scale', 'auto'])
+        coef0 = trial.suggest_float('coef0', 0.0, 1.0)
+        tol = trial.suggest_float('tol', 1e-6, 1e-2, log=True)
+        nu = trial.suggest_float('nu', 0.1, 1.0)
+        shrinking = trial.suggest_categorical('shrinking', [True, False])
+        cache_size = trial.suggest_float('cache_size', 100, 1000)
+
+        try:
+            clf = OneClassSVM(kernel=kernel, degree=degree, gamma=gamma, coef0=coef0, tol=tol,
+                              nu=nu, shrinking=shrinking, cache_size=cache_size)
         except:
             print("Invalid hyperparameter combination, skipping trial")
             return 0.0

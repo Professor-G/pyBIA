@@ -109,7 +109,7 @@ class Classifier:
                 print('NOTE: data_x and data_y parameters are required to output visualizations.')
         
         if self.data_y is not None:
-            self.data_y_ = copy.deepcopy(self.data_y) #For plotting purposes, save the original label array as it will be overwrite with the numerical labels when plotting only
+            self.data_y_ = copy.deepcopy(self.data_y) #For plotting purposes, save the original label array as it will be overwritten with the numerical labels when plotting
             if self.clf == 'xgb':
                 if all(isinstance(val, (int, str)) for val in self.data_y):
                     print('XGBoost classifier requires numerical class labels! Converting class labels as follows:')

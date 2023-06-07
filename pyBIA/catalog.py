@@ -40,6 +40,7 @@ class Catalog:
         bkg (None, optional): If bkg=0 the data is assumed to be background-subtracted.
             The other optional is bkg=None, in which case the background will be
             automatically calculated for local regions.
+        zp (float)
         error (ndarray, optional): 2D array containing the rms error map.
         morph_params (bool, optional): If True, image segmentation is performed and
             morphological parameters are computed. Defaults to True. 

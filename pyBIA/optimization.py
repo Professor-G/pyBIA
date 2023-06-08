@@ -1376,7 +1376,7 @@ class ObjectiveOneClassSVM(object):
 
         try:
             clf = OneClassSVM(kernel=kernel, degree=degree, gamma=gamma, coef0=coef0, tol=tol,
-                              nu=nu, shrinking=shrinking, cache_size=cache_size)
+                nu=nu, shrinking=shrinking, cache_size=cache_size)
         except:
             print("Invalid hyperparameter combination, skipping trial")
             return 0.0
@@ -1908,14 +1908,25 @@ def boruta_opt(data_x, data_y):
 
     return index
 
-from sklearn.impute import SimpleImputer, KNNImputer
-
-def impute_missing_values(data, strategy='knn', k=3, constant_value=None):
+def impute_missing_values(data, imputer=None, strategy='knn', k=3, constant_value=0):
     """
     Impute missing values in the input data array using various imputation strategies.
+    By default the imputer will be created and returned, unless
+    the imputer argument is set, in which case only the transformed
+    data is output. 
+    
+    Note:
+        As the KNN imputation method bundles neighbors according to their eucledian distance,
+        it is sensitive to outliers. Furthermore, it can also yield weak predictions if the
+        training features are heaviliy correlated. Tang & Ishwaran 2017 reported that if there is 
+        low to medium correlation in the dataset, Random Forest imputation algorithms perform 
+        better than KNN imputation
 
     Args:
         data (ndarray): Input data array with missing values.
+        imputer (optional): A KNNImputer class instance, configured using sklearn.impute.KNNImputer.
+            Defaults to None, in which case the transformation is created using
+            the data itself. 
         strategy (str, optional): Imputation strategy to use. Defaults to 'knn'.
             - 'mean': Fill missing values with the mean of the non-missing values in the same column.
             - 'median': Fill missing values with the median of the non-missing values in the same column.
@@ -1925,74 +1936,7 @@ def impute_missing_values(data, strategy='knn', k=3, constant_value=None):
         k (int, optional): Number of nearest neighbors to consider for k-Nearest Neighbor imputation.
             Only applicable if strategy is set to 'knn'. Defaults to 3.
         constant_value (float or int, optional): Constant value to use for constant imputation.
-            Only applicable if strategy is set to 'constant'. Defaults to None.
-
-    Returns:
-        ndarray: The imputed data array with the missing values filled in.
-
-    Raises:
-        ValueError: If an invalid imputation strategy is provided or if constant_value is None for constant imputation.
-    """
-
-    if strategy == 'mean':
-        imputer = SimpleImputer(strategy='mean')
-    elif strategy == 'median':
-        imputer = SimpleImputer(strategy='median')
-    elif strategy == 'mode':
-        imputer = SimpleImputer(strategy='most_frequent')
-    elif strategy == 'constant':
-        if constant_value is None:
-            raise ValueError("Constant value must be provided for constant imputation.")
-        imputer = SimpleImputer(strategy='constant', fill_value=constant_value)
-    elif strategy == 'knn':
-        imputer = KNNImputer(n_neighbors=k)
-    else:
-        raise ValueError("Invalid imputation strategy. Please choose from 'mean', 'median', 'mode', 'constant', or 'knn'.")
-
-    imputed_data = imputer.fit_transform(data)
-
-    return imputed_data
-
-def KNN_imputation(data, imputer=None, k=3):
-    """
-    Performs k-Nearest Neighbor imputation and transformation.
-    By default the imputer will be created and returned, unless
-    the imputer argument is set, in which case only the transformed
-    data is output. 
-
-    As this bundles neighbors according to their eucledian distance,
-    it is sensitive to outliers. Can also yield weak predictions if the
-    training features are heaviliy correlated.
-    
-    Args:
-        imputer (optional): A KNNImputer class instance, configured using sklearn.impute.KNNImputer.
-            Defaults to None, in which case the transformation is created using
-            the data itself. 
-        data (ndarray): 1D array if single parameter is input. If
-            data is 2-dimensional, the medians will be calculated
-            using the non-missing values in each corresponding column.
-        k (int, optional): If imputer is None, this is the number
-            of nearest neighbors to consider when computing the imputation.
-            Defaults to 3. If imputer argument is set, this variable is ignored.
-
-    Note:
-        Tang & Ishwaran 2017 reported that if there is low to medium
-        correlation in the dataset, RF imputation algorithms perform 
-        better than KNN imputation
-
-    Example:
-        If we have our training data in an array called training_set, we 
-        can create the imputer so that we can call it to transform new data
-        when making on-the-field predictions.
-
-        >>> imputed_data, knn_imputer = KNN_imputation(data=training_set, imputer=None)
-        
-        Now we can use the imputed data to create our machine learning model.
-        Afterwards, when new data is input for prediction, we will insert our 
-        imputer into the pipelinen by calling this function again, but this time
-        with the imputer argument set:
-
-        >>> new_data = knn_imputation(new_data, imputer=knn_imputer)
+            Only applicable if strategy is set to 'constant'. Defaults to 0 if used.
 
     Returns:
         The first output is the data array with with the missing values filled in. 
@@ -2001,7 +1945,21 @@ def KNN_imputation(data, imputer=None, k=3):
     """
 
     if imputer is None:
-        imputer = KNNImputer(n_neighbors=k)
+        if strategy == 'mean':
+            imputer = SimpleImputer(strategy='mean')
+        elif strategy == 'median':
+            imputer = SimpleImputer(strategy='median')
+        elif strategy == 'mode':
+            imputer = SimpleImputer(strategy='most_frequent')
+        elif strategy == 'constant':
+            if constant_value is None:
+                raise ValueError("The constant_value parameter must be provided if strategy='constant'.")
+            imputer = SimpleImputer(strategy='constant', fill_value=constant_value)
+        elif strategy == 'knn':
+            imputer = KNNImputer(n_neighbors=k)
+        else:
+            raise ValueError("Invalid imputation strategy. Please choose from 'mean', 'median', 'mode', 'constant', or 'knn'.")
+
         imputer.fit(data)
         imputed_data = imputer.transform(data)
         return imputed_data, imputer
@@ -2057,8 +2015,6 @@ def Strawman_imputation(data):
                 imputed_data[j,i] = data[j,i]
 
     return imputed_data 
-
-
 
 class StopWhenTrialKeepBeingPrunedCallback:
     """

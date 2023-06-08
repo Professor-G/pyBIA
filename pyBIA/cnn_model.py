@@ -1342,10 +1342,7 @@ class Classifier:
             AxesImage. 
         """
 
-        try:
-            __ = len(self.positive_class)
-            __ = len(self.negative_class)
-        except:
+        if not (hasattr(self, 'positive_class') and hasattr(self, 'negative_class')):
             raise ValueError('The training data is missing! Make sure the positive_class and negative_class are input.')
 
         #Reshape if 3D array (single-band) -- need 4D array first.
@@ -1659,16 +1656,11 @@ class Classifier:
             AxesImage
         """
 
-        try:
-           __ = len(self.model_train_metrics)
-        except:
+        if not hasattr(self, 'model_train_metrics'):
             raise ValueError('Training history not found! Run the load() method first!')
 
-        if combine:
-            try:
-                __ = len(self.model_val_metrics)
-            except:
-                raise ValueError('combine=True but no validation metrics found!')
+        if combine and not hasattr(self, 'model_val_metrics'):
+            raise ValueError('combine=True but no validation metrics found!')
 
         if metric == 'acc':
             index = 0 

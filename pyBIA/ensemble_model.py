@@ -1154,23 +1154,25 @@ def min_max_norm(data_x):
     
 def _set_style_():
     """
-    Function to configure the matplotlib.pyplot style. This function is called before any images are saved.
+    Function to configure the matplotlib.pyplot style. This function is called before any images are saved,
+    after which the style is reset to the default.
     """
+
     plt.rcParams["xtick.color"] = "323034"
     plt.rcParams["ytick.color"] = "323034"
     plt.rcParams["text.color"] = "323034"
     plt.rcParams["lines.markeredgecolor"] = "black"
-    plt.rcParams["patch.facecolor"] = "bc80bd"
+    plt.rcParams["patch.facecolor"] = "#bc80bd"  # Replace with a valid color code
     plt.rcParams["patch.force_edgecolor"] = True
     plt.rcParams["patch.linewidth"] = 0.8
     plt.rcParams["scatter.edgecolors"] = "black"
-    plt.rcParams["grid.color"] = "b1afb5"
+    plt.rcParams["grid.color"] = "#b1afb5"  # Replace with a valid color code
     plt.rcParams["axes.titlesize"] = 16
     plt.rcParams["legend.title_fontsize"] = 12
     plt.rcParams["xtick.labelsize"] = 16
     plt.rcParams["ytick.labelsize"] = 16
     plt.rcParams["font.size"] = 15
-    plt.rcParams["axes.prop_cycle"] = (cycler('color', ['bc80bd' ,'fb8072', 'b3de69','fdb462','fccde5','8dd3c7','ffed6f','bebada','80b1d3', 'ccebc5', 'd9d9d9']))
+    plt.rcParams["axes.prop_cycle"] = (cycler('color', ['#bc80bd', '#fb8072', '#b3de69', '#fdb462', '#fccde5', '#8dd3c7', '#ffed6f', '#bebada', '#80b1d3', '#ccebc5', '#d9d9d9']))  # Replace with valid color codes
     plt.rcParams["mathtext.fontset"] = "stix"
     plt.rcParams["font.family"] = "STIXGeneral"
     plt.rcParams["lines.linewidth"] = 2
@@ -1199,6 +1201,8 @@ def _set_style_():
     plt.rcParams["figure.titlesize"] = 18
     plt.rcParams["figure.autolayout"] = True
     plt.rcParams["figure.dpi"] = 300
+
+    return
 
     return 
 

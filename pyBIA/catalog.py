@@ -177,8 +177,8 @@ class Catalog:
             raise ValueError('The radius of the inner and out annuli must be larger than the aperture radius.')
         if self.x is not None:
             try: #If position array is a single number it will be converted to a list of unit length
-                len(self.x)
-            except TypeError:
+                __ = len(self.x)
+            except:
                 self.x, self.y = [self.x], [self.y]
             if len(self.x) != len(self.y):
                 raise ValueError("The two position arrays (x & y) must be the same size.")
@@ -366,8 +366,8 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
     if data.shape[0] < 100:
         print('Small image warning: results may be unstable if the object does not fit entirely within the frame.')
     try: #If position array is a single number it will be converted into a list of unit length
-        len(x)
-    except TypeError:
+        __ = len(x)
+    except:
         x, y = [x], [y]
 
     size = size if data.shape[0] > size and data.shape[1] > size else min(data.shape[0],data.shape[1])
@@ -597,8 +597,8 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
         return df
 
     try:
-        len(table)
-    except TypeError:
+        __ = len(table)
+    except: #TypeError
         table = [table]
 
     for i in range(len(prop_list)):
@@ -722,10 +722,46 @@ def subtract_background(data, length=150):
 
     return data
 
+def align_error_array(data, error, data_coords, error_coords):
+    """
+    Aligns the error array with the data array by shifting and padding the error array.
+    This can be used in the event that the error map size does not match the data size.
+    By manually identifying the coordinates of a prominent object in both arrays,
+    this function can be used to perform the proper alignment and padding/cropping. 
+    This was used as the NDWFS Bootes R-band data size was inconsistent with the corresponding rms maps.
+
+    Args:
+        data (ndarray): The data array.
+        error (ndarray): The error array.
+        data_coords (tuple): The (x, y) coordinates of an object in the data array. Must be integers.
+        error_coords (tuple): The (x, y) coordinates of the same object in the error array. Must be integers.
+
+    Returns:
+        ndarray: The aligned and padded error array.
+    """
+    #Calculate the required shifts in x and y directions
+    x_shift, y_shift = data_coords[0] - error_coords[0], data_coords[1] - error_coords[1]
+
+    #Pad the error array with zeros to match the data array size
+    padded_error = np.zeros_like(data)
+
+    #Determine the start and end indices for the error array
+    error_start_x, error_end_x = max(0, -x_shift), min(error.shape[1], data.shape[1] - x_shift)
+    error_start_y, error_end_y = max(0, -y_shift), min(error.shape[0], data.shape[0] - y_shift)
+    
+    #Determine the start and end indices for the data array
+    data_start_x, data_end_x = max(0, x_shift), min(data.shape[1], error.shape[1] + x_shift)
+    data_start_y, data_end_y = max(0, y_shift), min(data.shape[0], error.shape[0] + y_shift)
+    
+    #Copy the relevant portion of the error array to the padded_error array
+    padded_error[data_start_y:data_end_y, data_start_x:data_end_x] = error[error_start_y:error_end_y, error_start_x:error_end_x]
+    
+    return padded_error
+
 def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, kernel_size=21, invert=False,
     deblend=False, pix_conversion=5, cmap='viridis', path=None, name='', savefig=False, dpi=300):
     """
-    Returns two subplots: source and segementation object. 
+    Returns two subplots: source and corresponding segementation object. 
 
     If no x & y positions are input, the whole image will be used. If there are
     position areguments then a subimage of area size x size will be cropped out 
@@ -792,6 +828,9 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
         AxesImage.
 
     """
+
+    if data.max() == 0 and data.min() == 0:
+        raise ValueError('The input data array contains only zeroes!')
     
     if median_bkg != 0 and median_bkg is not None:
         if isinstance(median_bkg, np.ndarray) is False:
@@ -801,7 +840,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
         raise ValueError('Data must be 2 dimensional, 3d images not currently supported.')
     try:
         if len(median_bkg) != len(xpix):
-                raise ValueError('If more than one median_bkg is input, the size of the array must be the number of sources (xpix, ypix) input.')
+            raise ValueError('If more than one median_bkg is input, the size of the array must be the number of sources (xpix, ypix) input.')
     except:
         pass
 
@@ -819,16 +858,16 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
         size = data.shape[1]
 
     try: 
-        len(xpix)
-    except TypeError:
+        __ = len(xpix)
+    except:
         xpix = [xpix]
     try:
-        len(ypix)
-    except TypeError:
+        __ = len(ypix)
+    except:
         ypix = [ypix]
     try:
-        len(median_bkg)
-    except TypeError:
+        __ = len(median_bkg)
+    except:
         if median_bkg is not None:
             median_bkg = [median_bkg]
             
@@ -839,6 +878,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
             new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
 
         if median_bkg is None: #Hard coding annuli size, inner:25 -> outer:35
+            print("Subtracting background...")
             if new_data.shape[0] > 200 and len(xpix) == 1:
                 print('Calculating background in local regions, this will take a while... if data is background subtracted set median_bkg=0.')
                 new_data = subtract_background(new_data)
@@ -992,6 +1032,9 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
 
     """
 
+    if data.max() == 0 and data.min() == 0:
+        raise ValueError('The input data array contains only zeroes!')
+
     if isinstance(nsig, np.ndarray) is False:
         nsig = np.array(nsig)
 
@@ -1021,16 +1064,16 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
         size = data.shape[1]
 
     try: 
-        len(xpix)
-    except TypeError:
+        __ = len(xpix)
+    except:
         xpix = [xpix]
     try:
-        len(ypix)
-    except TypeError:
+        __ = len(ypix)
+    except:
         ypix = [ypix]
     try:
-        len(median_bkg)
-    except TypeError:
+        __ = len(median_bkg)
+    except:
         if median_bkg is not None:
             median_bkg = [median_bkg]
             
@@ -1041,6 +1084,7 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
 
         if median_bkg is None: #Hard coding annuli size, inner:25 -> outer:35
+            print("Subtracting background...")
             if new_data.shape[0] > 200 and len(xpix) == 1:
                 print('Calculating background in local regions, this will take a while... if data is background subtracted set median_bkg=0.')
                 new_data = subtract_background(new_data)
@@ -1057,17 +1101,9 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
         segm2, convolved_data2 = segm_find(new_data, nsig=nsig[1], kernel_size=kernel_size, deblend=deblend)
         segm3, convolved_data3 = segm_find(new_data, nsig=nsig[2], kernel_size=kernel_size, deblend=deblend)
 
-        #props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
-
         plt.rcParams["mathtext.fontset"] = "stix"
         plt.rcParams["font.family"] = "STIXGeneral"
-        #plt.rcParams["font.size"] = 15
-        #plt.rcParams["font.weight"] = "bold"
-        #plt.rcParams["axes.labelweight"] = "bold"
-        #plt.rcParams['figure.figsize'] = 5, 7
         plt.rcParams["axes.formatter.use_mathtext"]=True
-        #plt.rcParams['xtick.major.pad'] = 6
-        #plt.rcParams['ytick.major.pad'] = 6
         plt.rcParams['text.usetex']=False
 
         with plt.rc_context({'axes.edgecolor':'white', 'xtick.color':'white', 
@@ -1102,9 +1138,7 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             leg3 = ax4.legend(handlelength=0, handletextpad=0, fancybox=True, loc='lower left', prop={'size':16})
             for item in leg3.legendHandles:
                 item.set_visible(False)  
-         
-            #'seismic', 'twilight', 'YlGnBu_r', 'bone', 'cividis' #best cmaps
-            
+                     
             plt.gcf().set_facecolor("white")
             fig.subplots_adjust(wspace=0, hspace=0)
             ax1.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
@@ -1112,18 +1146,6 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax3.grid(True, alpha=0.35, linestyle='--')
             ax4.grid(True, alpha=0.35, linestyle='--')
 
-            """ 
-            ax1.tick_params(axis="both", which="both", colors="white", direction="in", labeltop=False, labelbottom=False,
-                labelright=False, length=10, width=2, bottom=False, top=False, left=False, right=False, labelsize=12)
-            ax2.tick_params(axis="both", which="both", colors="white", direction="in", labeltop=False, labelbottom=False,
-                labelleft=False, length=10, width=2, bottom=False, top=False, left=False, right=False, labelsize=12)
-            ax3.tick_params(axis="both", which="both", colors="white", direction="in", labeltop=False, labelbottom=False,
-                labelleft=False, length=10, width=2, bottom=False, top=False, left=False, right=False, labelsize=12)
-            ax4.tick_params(axis="both", which="both", colors="white", direction="in", labeltop=False, labelbottom=False,
-                labelleft=False, length=10, width=2, bottom=False, top=False, left=False, right=False, labelsize=12)
-            """
-           # ax1.set_xticks([-10, -5, 0, 5, 10])
-           # ax2.set_xticks([-10, -5, 0, 5])
             for axis in ['right', 'left', 'bottom', 'top']:
                 ax1.spines[axis].set_color("silver")
                 ax1.spines[axis].set_linewidth(0.95)
@@ -1157,10 +1179,6 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
             ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=17)
             ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
-            
-            #ax2_twin.set_ylabel(r'$\Delta\delta$ [arcsec]', fontweight='ultralight', color='snow', size=18)
-            #ax3_twin.set_ylabel(r'$\Delta\delta$ [arcsec]', fontweight='ultralight', color='snow', size=18)
-            #ax1.yaxis.tick_right()
 
             ax1.xaxis.set_major_locator(plt.MaxNLocator(5))
             ax1.yaxis.set_major_locator(plt.MaxNLocator(5))
@@ -1179,17 +1197,6 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax3.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
             ax4.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
             ax4.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
-
-            
-            #ax1.tick_params(axis="both", which='minor', length=5, width=2, color='black', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax2.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax3.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax4.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            
-            #ax1.tick_params(axis="both", which='major', length=10, width=2, color='black', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax2.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax3.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax4.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
 
             length = new_data.shape[0]
             x_label_list_1 = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
@@ -1222,11 +1229,6 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax4.set_yticks(ticks_2)
             ax4.set_yticklabels(x_label_list_2, color='black', fontsize=16)
 
-           # ax1.tick_params(axis="both", colors="black", labeltop=False, labelleft=True, labelright=False, labelbottom=False, labelsize=14)
-           # ax2.tick_params(axis="both", colors="black", labeltop=True, labelleft=False, labelright=True, labelbottom=False, labelsize=14)
-           # ax3.tick_params(axis="both", colors="black", labeltop=False, labelleft=False, labelright=True, labelbottom=True, labelsize=14)
-           # ax4.tick_params(axis="both", colors="black", labeltop=False, labelleft=True, labelright=False, labelbottom=True, labelsize=14)
-
             if savefig is True:
                 _set_style_()
                 if path is None:
@@ -1237,18 +1239,19 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
                 return
             plt.show()
 
-
-def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=None, median_bkg2=None, nsig=[0.5, 0.5], kernel_size=21, invert=False,
+def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0, median_bkg2=0, nsig=[0.5, 0.5], kernel_size=21, invert=False,
     deblend=False, pix_conversion=5, cmap='viridis', path=None, filter1='Bw', filter2='Rw', name='Source Detection Threshold', savefig=False):
     """
-    This is the function used to generate Figure 1 of the paper, used to visualize
-    how the segmentation object differs when applying varying sigma thresholds.
+    This is the function used to plot the same object in two different bands.
 
     If no x & y positions are input, the whole image will be used. If there are
     position areguments then a subimage of area size x size will be cropped out 
     first, centered around a given (x, y). By default size=100, although this should
     be a window size that comfortably encapsulates all objects. If this is too large
     the automatic background measurements will be less robust.
+
+    Note:
+        If median_bkg1 is None both images will be assumed to not be background subtracted!
 
     Args:
         data (ndarray): 2D array of a single image.
@@ -1290,6 +1293,12 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
 
     """
 
+    if data1.max() == 0 and data1.min() == 0:
+        raise ValueError('The input data1 array contains only zeroes!')
+
+    if data2.max() == 0 and data2.min() == 0:
+        raise ValueError('The input data2 array contains only zeroes!')
+
     if isinstance(nsig, np.ndarray) is False:
         nsig = np.array(nsig)
 
@@ -1324,21 +1333,21 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
         size = data1.shape[1]
 
     try: 
-        len(xpix)
-    except TypeError:
+        __ = len(xpix)
+    except:
         xpix = [xpix]
     try:
-        len(ypix)
-    except TypeError:
+        __ = len(ypix)
+    except:
         ypix = [ypix]
     try:
-        len(median_bkg1)
-    except TypeError:
+        __ = len(median_bkg1)
+    except:
         if median_bkg1 is not None:
             median_bkg1 = [median_bkg1]
     try:
-        len(median_bkg2)
-    except TypeError:
+        __ = len(median_bkg2)
+    except:
         if median_bkg2 is not None:
             median_bkg2 = [median_bkg2]
             
@@ -1351,6 +1360,7 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
             new_data2 = data_processing.crop_image(data2, int(xpix[i]), int(ypix[i]), size, invert=invert)
 
         if median_bkg1 is None: #Hard coding annuli size, inner:25 -> outer:35
+            print("Subtracting background...")
             if new_data1.shape[0] > 200 and len(xpix) == 1:
                 print('Calculating background in local regions, this will take a while... if data is background subtracted set median_bkg=0.')
                 new_data1 = subtract_background(new_data1)
@@ -1370,7 +1380,6 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
 
         segm1, convolved_data1 = segm_find(new_data1, nsig=nsig[0], kernel_size=kernel_size, deblend=deblend)
         segm2, convolved_data2 = segm_find(new_data2, nsig=nsig[1], kernel_size=kernel_size, deblend=deblend)
-        #props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
 
         plt.rcParams["mathtext.fontset"] = "stix"
         plt.rcParams["font.family"] = "STIXGeneral"
@@ -1399,22 +1408,7 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
             
             ax4.imshow(segm1.data, origin='lower', cmap=segm2.make_cmap(seed=19))
             ax3.imshow(segm2.data, origin='lower', cmap=segm2.make_cmap(seed=19))
-            """
-            ax2.plot(0,0,label=str(nsig[0])+r'$\sigma$', color='none')
-            leg1 = ax2.legend(handlelength=0, handletextpad=0, fancybox=True, loc='upper right', prop={'size':16})
-            for item in leg1.legendHandles:
-                item.set_visible(False)
-
-            ax3.plot(0,0,label=str(nsig[1])+r'$\sigma$', color='none')
-            leg2 = ax3.legend(handlelength=0, handletextpad=0, fancybox=True, loc='lower right', prop={'size':16})
-            for item in leg2.legendHandles:
-                item.set_visible(False)
-                
-            ax4.plot(0,0,label=str(nsig[2])+r'$\sigma$', color='none')
-            leg3 = ax4.legend(handlelength=0, handletextpad=0, fancybox=True, loc='lower left', prop={'size':16})
-            for item in leg3.legendHandles:
-                item.set_visible(False)  
-            """
+        
             #'seismic', 'twilight', 'YlGnBu_r', 'bone', 'cividis' #best cmaps
             
             plt.gcf().set_facecolor("white")
@@ -1424,18 +1418,6 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
             ax3.grid(True, alpha=0.35, linestyle='--')
             ax4.grid(True, alpha=0.35, linestyle='--')
 
-            """ 
-            ax1.tick_params(axis="both", which="both", colors="white", direction="in", labeltop=False, labelbottom=False,
-                labelright=False, length=10, width=2, bottom=False, top=False, left=False, right=False, labelsize=12)
-            ax2.tick_params(axis="both", which="both", colors="white", direction="in", labeltop=False, labelbottom=False,
-                labelleft=False, length=10, width=2, bottom=False, top=False, left=False, right=False, labelsize=12)
-            ax3.tick_params(axis="both", which="both", colors="white", direction="in", labeltop=False, labelbottom=False,
-                labelleft=False, length=10, width=2, bottom=False, top=False, left=False, right=False, labelsize=12)
-            ax4.tick_params(axis="both", which="both", colors="white", direction="in", labeltop=False, labelbottom=False,
-                labelleft=False, length=10, width=2, bottom=False, top=False, left=False, right=False, labelsize=12)
-            """
-           # ax1.set_xticks([-10, -5, 0, 5, 10])
-           # ax2.set_xticks([-10, -5, 0, 5])
             for axis in ['right', 'left', 'bottom', 'top']:
                 ax1.spines[axis].set_color("silver")
                 ax1.spines[axis].set_linewidth(0.95)
@@ -1473,10 +1455,6 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
             ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
             ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=17)
             ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
-            
-            #ax2_twin.set_ylabel(r'$\Delta\delta$ [arcsec]', fontweight='ultralight', color='snow', size=18)
-            #ax3_twin.set_ylabel(r'$\Delta\delta$ [arcsec]', fontweight='ultralight', color='snow', size=18)
-            #ax1.yaxis.tick_right()
 
             ax1.xaxis.set_major_locator(plt.MaxNLocator(5))
             ax1.yaxis.set_major_locator(plt.MaxNLocator(5))
@@ -1495,17 +1473,6 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
             ax3.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
             ax4.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
             ax4.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
-
-            
-            #ax1.tick_params(axis="both", which='minor', length=5, width=2, color='black', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax2.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax3.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax4.tick_params(axis="both", which='minor', length=5, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            
-            #ax1.tick_params(axis="both", which='major', length=10, width=2, color='black', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax2.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax3.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
-            #ax4.tick_params(axis="both", which='major', length=10, width=2, color='w', direction='in', top=True, left=True, right=True, bottom=True, labelsize=16)
 
             length = new_data1.shape[0]
             x_label_list_1 = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
@@ -1538,11 +1505,6 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
             ax4.set_yticks(ticks_2)
             ax4.set_yticklabels(x_label_list_2, color='black', fontsize=16)
 
-           # ax1.tick_params(axis="both", colors="black", labeltop=False, labelleft=True, labelright=False, labelbottom=False, labelsize=14)
-           # ax2.tick_params(axis="both", colors="black", labeltop=True, labelleft=False, labelright=True, labelbottom=False, labelsize=14)
-           # ax3.tick_params(axis="both", colors="black", labeltop=False, labelleft=False, labelright=True, labelbottom=True, labelsize=14)
-           # ax4.tick_params(axis="both", colors="black", labeltop=False, labelleft=True, labelright=False, labelbottom=True, labelsize=14)
-
             if savefig is True:
                 _set_style_()
                 if path is None:
@@ -1555,7 +1517,8 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=N
 
 
 def _set_style_():
-    """Function to configure the matplotlib.pyplot style. This function is called before any images are saved.
+    """
+    Function to configure the matplotlib.pyplot style. This function is called before any images are saved.
     """
     plt.rcParams["xtick.color"] = "323034"
     plt.rcParams["ytick.color"] = "323034"

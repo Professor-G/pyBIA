@@ -113,6 +113,9 @@ class objective_cnn(object):
         metric2 (str, optional): Additional metric to be used solely for early-stopping purposes. If input, the trial will stop if either
             metric or metric2 stop improving after the same patience number of epochs, but only the value of metric is used to assess
             the performance of the model after each trial. Defaults to None.
+        metric3 (str, optional): Additional metric to be used solely for early-stopping purposes. If input, the trial will stop if either
+            metric or metric3 stop improving after the same patience number of epochs, but only the value of metric is used to assess
+            the performance of the model after each trial. Defaults to None.
         patience (int): Number of epochs without improvement before the optimization trial is terminated. Defaults to 0, which
             disables this feature.
         average (bool): If False, the designated metric will be calculated according to its value at the end of the train_epochs. 
@@ -190,7 +193,7 @@ class objective_cnn(object):
     """
 
     def __init__(self, positive_class, negative_class, val_positive=None, val_negative=None, img_num_channels=1, clf='alexnet', 
-        normalize=True, min_pixel=0, max_pixel=1000, patience=5, metric='loss', metric2=None, average=True, 
+        normalize=True, min_pixel=0, max_pixel=1000, patience=5, metric='loss', metric2=None, metric3=None, average=True, 
         test_positive=None, test_negative=None, post_metric=True, test_acc_threshold=None, batch_size_min=16, batch_size_max=64, 
         opt_model=True, train_epochs=25, opt_cv=None, opt_aug=False, batch_min=2, batch_max=25, batch_other=1, 
         balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, rotation=False, horizontal=False,
@@ -227,6 +230,7 @@ class objective_cnn(object):
         self.opt_max_max_pix = opt_max_max_pix
         self.metric = metric 
         self.metric2 = metric2
+        self.metric3 = metric3
         self.average = average
         self.shift = shift 
         self.opt_cv = opt_cv
@@ -446,6 +450,11 @@ class objective_cnn(object):
             mode2 = 'min' if 'loss' in self.metric2 else 'max'
             callbacks.append(EarlyStopping(monitor=self.metric2, mode=mode2, patience=self.patience))
             print('Setting additional early stopping criteria: {}'.format(self.metric2))
+        
+        if self.metric3 is not None:
+            mode3 = 'min' if 'loss' in self.metric3 else 'max'
+            callbacks.append(EarlyStopping(monitor=self.metric3, mode=mode3, patience=self.patience))
+            print('Setting additional early stopping criteria: {}'.format(self.metric3))
             
         ### ### ### ### ### ### ### ### ### 
              ## Optimize CNN Model ##
@@ -1482,7 +1491,7 @@ class Monitor_Tracker(Callback):
 
 
 def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels=1, clf='alexnet', 
-    normalize=True, min_pixel=0, max_pixel=1000, n_iter=25, patience=5, metric='loss', metric2=None, average=True, 
+    normalize=True, min_pixel=0, max_pixel=1000, n_iter=25, patience=5, metric='loss', metric2=None, metric3=None, average=True, 
     test_positive=None, test_negative=None, test_acc_threshold=None, post_metric=True, opt_model=True, batch_size_min=16, batch_size_max=64, train_epochs=25, opt_cv=None,
     opt_aug=False, batch_min=2, batch_max=25, batch_other=1, balance=True, image_size_min=50, image_size_max=100, shift=10, opt_max_min_pix=None, opt_max_max_pix=None, 
     rotation=False, horizontal=False, vertical=False, mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, num_images_to_blend=2, blending_func='mean', blend_other=1, 
@@ -1781,7 +1790,7 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
        
     else:
         objective = objective_cnn(data_x, data_y, val_positive=val_X, val_negative=val_Y, img_num_channels=img_num_channels, clf=clf, 
-            normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, patience=patience, metric=metric, metric2=metric2, average=average,  
+            normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, patience=patience, metric=metric, metric2=metric2, metric3=metric3, average=average,  
             test_positive=test_positive, test_negative=test_negative, test_acc_threshold=test_acc_threshold, post_metric=post_metric, opt_model=opt_model, batch_size_min=batch_size_min, batch_size_max=batch_size_max, 
             train_epochs=train_epochs, opt_cv=opt_cv, opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, batch_other=batch_other, balance=balance, image_size_min=image_size_min, image_size_max=image_size_max, 
             shift=shift, opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix, rotation=rotation, horizontal=horizontal, vertical=vertical, mask_size=mask_size, num_masks=num_masks, smote_sampling=smote_sampling, 

@@ -435,6 +435,15 @@ class objective_cnn(object):
             else:
                 callbacks = [EarlyStopping(monitor=self.metric, mode=mode, patience=self.patience),] #TFKerasPruningCallback(trial, monitor=self.metric),
             
+            if self.metric2 is not None:
+                mode2 = 'min' if 'loss' in self.metric2 else 'max'
+                callbacks.append(EarlyStopping(monitor=self.metric2, mode=mode2, patience=self.patience))
+                print('Setting additional early stopping criteria: {}'.format(self.metric2))
+            if self.metric3 is not None:
+                mode3 = 'min' if 'loss' in self.metric3 else 'max'
+                callbacks.append(EarlyStopping(monitor=self.metric3, mode=mode3, patience=self.patience))
+                print('Setting additional early stopping criteria: {}'.format(self.metric3))
+                
             if self.monitor1 is not None:
                 if callbacks is not None:
                     callbacks.append(Monitor_Tracker(monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, monitor2_thresh=self.monitor2_thresh))
@@ -446,16 +455,6 @@ class objective_cnn(object):
             else:
                 callbacks = None
 
-        if self.metric2 is not None:
-            mode2 = 'min' if 'loss' in self.metric2 else 'max'
-            callbacks.append(EarlyStopping(monitor=self.metric2, mode=mode2, patience=self.patience))
-            print('Setting additional early stopping criteria: {}'.format(self.metric2))
-        
-        if self.metric3 is not None:
-            mode3 = 'min' if 'loss' in self.metric3 else 'max'
-            callbacks.append(EarlyStopping(monitor=self.metric3, mode=mode3, patience=self.patience))
-            print('Setting additional early stopping criteria: {}'.format(self.metric3))
-            
         ### ### ### ### ### ### ### ### ### 
              ## Optimize CNN Model ##
         ### ### ### ### ### ### ### ### ### 

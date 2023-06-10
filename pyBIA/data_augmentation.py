@@ -84,7 +84,7 @@ def augmentation(channel1, channel2=None, channel3=None, batch=1, width_shift=0,
             Can be set to: {"constant", "nearest", "reflect", "wrap"}.
         image_size (int, bool): The length/width of the cropped image. This can be used to remove
             anomalies caused by the fill (defaults to 50). This can also be set to None in which case 
-            the image in its original size is returned.
+            the image in its original size is returned. Defaults to None.
         mask_size (int): The size of the cutout mask. Defaults to None to disable random cutouts.
         num_masks (int): Number of masks to apply to each image. Defaults to None, must be an integer
             if mask_size is used as this designates how many masks of that size to randomly place in the image.

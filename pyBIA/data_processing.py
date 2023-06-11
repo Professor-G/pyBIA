@@ -227,6 +227,8 @@ def process_class(channel, label=None, img_num_channels=1, normalize=True, min_p
     """
 
     if normalize:
+        if len(data) >= 1000:
+            print('Normalizing images...') #For when predictions are being made
         data = normalize_pixels(channel, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
     else:
         images = copy.deepcopy(channel)

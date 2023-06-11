@@ -260,6 +260,22 @@ class Classifier:
                 self.positive_class = np.squeeze(self.positive_class)
             if len(self.negative_class.shape) == 4 and self.img_num_channels == 1: #If it's just one filter convert to 3-D array
                 self.negative_class = np.squeeze(self.negative_class)
+            if self.val_positive is not None:
+                if len(self.val_positive.shape) == 4 and self.img_num_channels == 1: #If it's just one filter convert to 3-D array
+                    self.val_positive = np.squeeze(self.val_positive)
+                if len(self.val_positive.shape) == 2:
+                    if self.img_num_channels != 1:
+                        raise ValueError('Single image detected as the positive validation data, img_num_channels must be 1!')
+                    else:
+                        self.val_positive = np.reshape(self.val_positive, (1, self.val_positive.shape[0], self.val_positive.shape[1]))
+            if self.val_negative is not None:
+                if len(self.val_negative.shape) == 4 and self.img_num_channels == 1: #If it's just one filter convert to 3-D array
+                    self.val_negative = np.squeeze(self.val_negative)
+                if len(self.val_negative.shape) == 2:
+                    if self.img_num_channels != 1:
+                        raise ValueError('Single image detected as the negative validation data, img_num_channels must be 1!')
+                    else:
+                        self.val_negative = np.reshape(self.val_negative, (1, self.val_negative.shape[0], self.val_negative.shape[1]))
 
         if self.test_positive is not None or self.test_negative is not None:
             if self.post_metric is False and self.test_acc_threshold is None:
@@ -1172,7 +1188,6 @@ class Classifier:
             data[data > 1] = 1; data[data < 0] = 0
 
         model = self.model[0] if isinstance(self.model, list) else self.model 
-
         image_size = model.layers[0].input_shape[1:][0]
 
         if data.shape[1] != image_size:
@@ -2937,7 +2952,7 @@ def f1_score(y_true, y_pred):
     Returns:
         The F1 score between true and predicted labels.
     """
-
+    
     tp = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_true * y_pred, 0, 1)))
     fp = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_pred - y_true, 0, 1)))
     fn = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_true - y_pred, 0, 1)))
@@ -2945,7 +2960,9 @@ def f1_score(y_true, y_pred):
     precision = tp / (tp + fp + tf.keras.backend.epsilon())
     recall = tp / (tp + fn + tf.keras.backend.epsilon())
 
-    return 2.0 * precision * recall / (precision + recall + tf.keras.backend.epsilon())
+    f1 = 2.0 * (precision * recall) / (precision + recall + tf.keras.backend.epsilon())
+
+    return f1
 
 def focal_loss(y_true, y_pred, gamma=2.0, alpha=0.25):
     """

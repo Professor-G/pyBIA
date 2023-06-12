@@ -1671,7 +1671,7 @@ class Classifier:
         return  
 
     def plot_performance(self, metric='acc', combine=False, cv_model=0, ylabel=None, title=None,
-        xlim=None, ylim=None, xlog=False, ylog=False, savefig=False):
+        xlim=None, ylim=None, xlog=False, ylog=False, legend_loc=9, savefig=False):
         """
         Plots the training/performance histories.
     
@@ -1689,6 +1689,8 @@ class Classifier:
                 attribute is a list containing multiple models due to cross-validation.
                 Defaults to 0, the first history object in the list. Can be set to 'all', in which case
                 all histories will be used and plotted.
+            legend_loc (int, str, optional): The location of the legend, using the matplotlib.pyplot conventino.
+                Defaults to 0 aka 'upper center'.
 
         Returns:
             AxesImage
@@ -1744,17 +1746,17 @@ class Classifier:
                 for i in range(len(metric2)):
                     marker = markers[i % len(markers)]  # Wrap around the markers list
                     plt.plot(range(1, len(metric2[i])+1), metric2[i], color=color[i % len(color)], alpha=0.83, linestyle='--', label=label2+' CV '+str(i+1))
-                plt.legend(loc='upper center', frameon=False, ncol=2)
+                plt.legend(loc=legend_loc, frameon=False, ncol=2)
             else:
-                plt.legend(loc='upper center', frameon=False)
+                plt.legend(loc=legend_loc, frameon=False)
 
         else:
             plt.plot(range(1, len(metric1)+1), metric1, color='r', alpha=0.83, linestyle='-', label=label1)
             if combine:
                 plt.plot(range(1, len(metric2)+1), metric2, color='b', alpha=0.83, linestyle='--', label=label2)
-                plt.legend(loc='upper center', frameon=False, ncol=2)
+                plt.legend(loc=legend_loc, frameon=False, ncol=2)
             else:
-                plt.legend(loc='upper center', frameon=False)
+                plt.legend(loc=legend_loc, frameon=False)
 
         if ylabel is None:
             ylabel = metric
@@ -2963,6 +2965,37 @@ def f1_score(y_true, y_pred):
     f1 = 2.0 * (precision * recall) / (precision + recall + tf.keras.backend.epsilon())
 
     return f1
+
+import tensorflow as tf
+
+def calculate_tp_fp(model, sample, y_true):
+    """
+    Computes the true positives (tp) and false positives (fp) for a single sample using a given model.
+
+    Args:
+        model: The trained model.
+        sample: The input sample (image) for prediction.
+        y_true (array): The ground truth labels for the sample(s). Must be the same length as the input sample argument.
+
+    Returns:
+        tp: The number of true positives.
+        fp: The number of false positives.
+    """
+    # Make a prediction using the model
+    y_pred = model.predict(sample)
+
+    # Convert y_true and y_pred to binary values
+    y_true_binary = tf.keras.backend.round(tf.keras.backend.clip(y_true, 0, 1))
+    y_pred_binary = tf.keras.backend.round(tf.keras.backend.clip(y_pred, 0, 1))
+
+    # Calculate true positives (tp)
+    tp = tf.keras.backend.sum(y_true_binary * y_pred_binary)
+
+    # Calculate false positives (fp)
+    fp = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_pred_binary - y_true_binary, 0, 1)))
+
+    return tp, fp
+
 
 def focal_loss(y_true, y_pred, gamma=2.0, alpha=0.25):
     """

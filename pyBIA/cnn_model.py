@@ -1107,7 +1107,7 @@ class Classifier:
                 if len(self.model_val_metrics) >= 1:
                     val_metrics = ', val_training_histories'
                 else:
-                    print('Could not load training histories!')
+                    print('Could not load validation training histories!')
                     val_metrics = ''
             except:
                 print('Could not load training history!')
@@ -2965,8 +2965,6 @@ def f1_score(y_true, y_pred):
     f1 = 2.0 * (precision * recall) / (precision + recall + tf.keras.backend.epsilon())
 
     return f1
-
-import tensorflow as tf
 
 def calculate_tp_fp(model, sample, y_true):
     """

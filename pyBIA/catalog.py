@@ -870,7 +870,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
     except:
         if median_bkg is not None:
             median_bkg = [median_bkg]
-            
+        
     for i in range(len(xpix)):
         if size == data.shape[1]:
             new_data = data
@@ -971,12 +971,11 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
             ax2.tick_params(axis="both", which='minor', length=5, color='w', direction='in')
 
             if savefig is True:
-                _set_style_()
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
                 fig.savefig(path+name+'.png', dpi=dpi, bbox_inches='tight')
-                plt.clf(); plt.style.use('default')
+                plt.clf()
                 return
             plt.show()           
 
@@ -1076,7 +1075,7 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
     except:
         if median_bkg is not None:
             median_bkg = [median_bkg]
-            
+
     for i in range(len(xpix)):
         if size == data.shape[1]:
             new_data = data
@@ -1230,12 +1229,11 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             ax4.set_yticklabels(x_label_list_2, color='black', fontsize=16)
 
             if savefig is True:
-                _set_style_()
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
                 fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
-                plt.clf(); plt.style.use('default')
+                plt.clf()
                 return
             plt.show()
 
@@ -1350,7 +1348,7 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
     except:
         if median_bkg2 is not None:
             median_bkg2 = [median_bkg2]
-            
+   
     for i in range(len(xpix)):
         if size == data1.shape[1]:
             new_data1 = data1
@@ -1506,35 +1504,35 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
             ax4.set_yticklabels(x_label_list_2, color='black', fontsize=16)
 
             if savefig is True:
-                _set_style_()
                 if path is None:
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
                 fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
-                plt.clf(); plt.style.use('default')
+                plt.clf()
                 return
             plt.show()
 
-
 def _set_style_():
     """
-    Function to configure the matplotlib.pyplot style. This function is called before any images are saved.
+    Function to configure the matplotlib.pyplot style. This function is called before any images are saved,
+    after which the style is reset to the default.
     """
+
     plt.rcParams["xtick.color"] = "323034"
     plt.rcParams["ytick.color"] = "323034"
     plt.rcParams["text.color"] = "323034"
     plt.rcParams["lines.markeredgecolor"] = "black"
-    plt.rcParams["patch.facecolor"] = "bc80bd"
+    plt.rcParams["patch.facecolor"] = "#bc80bd"  # Replace with a valid color code
     plt.rcParams["patch.force_edgecolor"] = True
     plt.rcParams["patch.linewidth"] = 0.8
     plt.rcParams["scatter.edgecolors"] = "black"
-    plt.rcParams["grid.color"] = "b1afb5"
+    plt.rcParams["grid.color"] = "#b1afb5"  # Replace with a valid color code
     plt.rcParams["axes.titlesize"] = 16
     plt.rcParams["legend.title_fontsize"] = 12
     plt.rcParams["xtick.labelsize"] = 16
     plt.rcParams["ytick.labelsize"] = 16
     plt.rcParams["font.size"] = 15
-    plt.rcParams["axes.prop_cycle"] = (cycler('color', ['bc80bd' ,'fb8072', 'b3de69','fdb462','fccde5','8dd3c7','ffed6f','bebada','80b1d3', 'ccebc5', 'd9d9d9']))
+    plt.rcParams["axes.prop_cycle"] = (cycler('color', ['#bc80bd', '#fb8072', '#b3de69', '#fdb462', '#fccde5', '#8dd3c7', '#ffed6f', '#bebada', '#80b1d3', '#ccebc5', '#d9d9d9']))  # Replace with valid color codes
     plt.rcParams["mathtext.fontset"] = "stix"
     plt.rcParams["font.family"] = "STIXGeneral"
     plt.rcParams["lines.linewidth"] = 2
@@ -1565,5 +1563,3 @@ def _set_style_():
     plt.rcParams["figure.dpi"] = 300
 
     return
-
-

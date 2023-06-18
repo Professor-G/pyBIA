@@ -1634,14 +1634,12 @@ class Classifier:
 
     def save_hyper_importance(self):
         """
-        Calculates and saves binary files containing
-        dictionaries with importance information, one
+        Calculates and saves binary files containing dictionaries with importance information, one
         for the importance and one for the duration importance
 
         Note:
-            This procedure is time-consuming but must be run once before
-            plotting the importances. This function will save
-            two files in the model folder for future use. 
+            This procedure can be time-consuming but must be run once before the importances can be displayed. 
+            This function will save two files in the model folder for future use. 
 
         Returns:
             Saves two binary files, importance and duration importance.

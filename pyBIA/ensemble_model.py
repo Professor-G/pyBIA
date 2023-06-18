@@ -719,11 +719,24 @@ class Classifier:
         else:
             ncol=2
 
-        plt.plot(range(len(trials)), best_value, color='r', alpha=0.83, linestyle='-', label='Best Model')
+        plt.plot(range(len(trials)), best_value, color='r', alpha=0.83, linestyle='-', label='Optimized Model')
         plt.scatter(range(len(trials)), trial_values, c='b', marker='+', s=35, alpha=0.45, label='Trial')
         plt.xlabel('Trial #', alpha=1, color='k')
-        plt.ylabel('Accuracy', alpha=1, color='k')
-        plt.title('Hyperparameter Optimization')
+
+        if self.opt_cv > 0:
+            plt.ylabel(str(self.opt_cv)+'-Fold CV Accuracy', alpha=1, color='k')
+        else:
+            plt.ylabel('Accuracy', alpha=1, color='k')
+        
+        if self.clf == 'xgb':
+            plt.title('XGBoost Hyperparameter Optimization')
+        elif self.clf == 'rf':
+            plt.title('RF Hyperparameter Optimization')
+        elif self.clf == 'ocsvm':
+            plt.title('OneClass SVM Hyperparameter Optimization')
+        elif self.clf == 'nn':
+            plt.title('Neural Network Hyperparameter Optimization')
+
         plt.legend(loc='upper center', ncol=ncol, frameon=False)
         plt.rcParams['axes.facecolor']='white'
         plt.grid(False)
@@ -1044,9 +1057,9 @@ def evaluate_model(classifier, data_x, data_y, normalize=True, k_fold=10):
     Args:
         classifier: The machine learning classifier to optimize.
         data_x (ndarray): 2D array of size (n x m), where n is the
-            number of samples, and m the number of features.
-        data_y (ndarray, str): 1D array containing the corresponing labels.
-        normalize (bool, optional): If False the confusion matrix will display the
+            number of samples, and m is the number of features.
+        data_y (ndarray, str): 1D array containing the corresponding labels.
+        normalize (bool, optional): If False, the confusion matrix will display the
             total number of objects in the sample. Defaults to True, in which case
             the values are normalized between 0 and 1. 
         k_fold (int, optional): The number of cross-validations to perform.
@@ -1058,19 +1071,20 @@ def evaluate_model(classifier, data_x, data_y, normalize=True, k_fold=10):
         The second output is the 1D array of the predicted class labels.
     """
 
-    k_fold = KFold(k_fold, shuffle=True)#, random_state=1)
-    #k_fold = StratifiedKFold(k_fold, shuffle=False)#, random_state=8)
+    kf = KFold(n_splits=k_fold, shuffle=True, random_state=42)
+    predicted_targets = []
+    actual_targets = []
 
-    predicted_targets, actual_targets = np.array([]), np.array([])
+    for train_index, test_index in kf.split(data_x):
+        classifier.fit(data_x[train_index], data_y[train_index])
+        predicted_targets.extend(classifier.predict(data_x[test_index]))
+        actual_targets.extend(data_y[test_index])
 
-    for train_ix, test_ix in k_fold.split(data_x, data_y):
-        train_x, train_y, test_x, test_y = data_x[train_ix], data_y[train_ix], data_x[test_ix], data_y[test_ix]
-        classifier.fit(train_x, train_y)
-        predicted_labels = classifier.predict(test_x)
-        predicted_targets = np.append(predicted_targets, predicted_labels)
-        actual_targets = np.append(actual_targets, test_y)
+    predicted_targets = np.array(predicted_targets)
+    actual_targets = np.array(actual_targets)
 
     return predicted_targets, actual_targets
+
 
 def generate_matrix(predicted_labels_list, actual_targets, classes, normalize=True, 
     title='Confusion Matrix', savefig=False):
@@ -1215,6 +1229,4 @@ def _set_style_():
     plt.rcParams["figure.dpi"] = 300
 
     return
-
-    return 
 

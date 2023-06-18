@@ -2029,8 +2029,9 @@ class StopWhenTrialKeepBeingPrunedCallback:
     Class to create a custom callback that will stop
     the Optuna optimization routine if a given number of
     trials are pruned in a row. This value is controlled
-    by the threshold parameter.
+    by the threshold parameter. Not currently employed!
     """
+    
     def __init__(self, threshold: int):
         self.threshold = threshold
         self._consequtive_pruned_count = 0

@@ -6,19 +6,8 @@
 Welcome to pyBIA's documentation!
 ===============================
 
-pyBIA is an open-source program for detecting diffuse Lyman-alpha emission in the high redshift universe, using a combination of machine learning ensemble and convolutional neural network algorithms. The program tools have been coded for general application, check out this `example <https://pybia.readthedocs.io/en/latest/source/Examples.html>`_ to learn how you can use pyBIA to create your own machine learning classifier. 
+pyBIA is an open-source program for detecting diffuse Lyman-alpha emission in the high redshift universe, using a combination of machine learning tree-ensemble and convolutional neural network algorithms. Although developed as a tool for astronomers, the program has been coded for general application -- check out the `Examples <https://pybia.readthedocs.io/en/latest/source/Examples.html>`_ to learn how you can use pyBIA to create your own machine learning classifiers. 
 
-
-Check out this `page <https://pybia.readthedocs.io/en/latest/source/Engineering%20pyBIA.html>`_ to learn about the image classification architecture.
-
-.. figure:: _static/pybia_architecture.png
-    :align: center
-    :class: with-shadow with-border
-    :width: 1600px
-
-    Figure 1: Convolutional neural network architecture pyBIA uses for detecting diffuse emission; modeled after AlexNet.
-
-   
 Installation
 ==================
 
@@ -36,35 +25,15 @@ You can also clone the development version:
     cd pyBIA
     pip install .
 
-Importing pyBIA 
-==================
-
-The primary engine pyBIA employs for source detecion is a deep Convolutional Neural Network (CNN), engineered using the high-level Keras API. Our CNN model took ~3 days to train to a thousand epochs, and is included in the standard pyBIA installation. This classifier is called 'bw_model' as the DIFFUSE training sample includes diffuse objects in the blue broadband (see `Moire et al 2012 <https://arxiv.org/pdf/1111.2603.pdf>`_). More models for different bands will be added in the future.
-
-.. code-block:: python
-
-    from pyBIA import cnn_model
-
-    model = cnn_model.Classifier()
-    model.load_bw_model()
-
-With our model loaded, we can classify any 50x50 image using the predict function.
-
-.. code-block:: python
-
-    prediction = model.predict(data, normalize=True)
-
-The output will either be 'DIFFUSE' or 'OTHER'. The input data can also be a 3-dimensional array containing multiple images. 
-
 Functionality
 ==================
 The program provides three main functionalities:
 
--  Creating a catalog of astrophyscal objects
+-  Creating a catalog of astrophysical objects
 -  Training a machine learning classifier with image moments
--  Training a machine learning classifier with single or multi-band imaging (up to 6 filters!)
+-  Training a machine learning classifier with single or multi-band imaging (up to 3 filters)
 
-If you have a 2D array, but no positions, creating a catalog is quick and easy:
+If you have a 2D array, but no positions, creating a catalog is quick and easy using the `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module:
 
 .. code-block:: python
 
@@ -73,7 +42,11 @@ If you have a 2D array, but no positions, creating a catalog is quick and easy:
     cat = catalog.Catalog(data)
     cat.create(save_file=True)
 
-X and Y pixel arguments can be input if source locations are known, and optional parameters can be set to control background subtraction, source detection thresholds, and flux calculations. If error map is provided, the output catalog will contain the photometric error. The only accompanying method is `plot <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/catalog.html#Catalog.plot>`_, which will output two subplots, the source and the segmentation of the specified object. 
+The X and Y pixel arguments can be input if source locations are known, and optional parameters can be set to control background subtraction, source detection thresholds, and flux calculations. If the error map is provided, the output catalog will contain the photometric error. After the catalog has been created, the ``cat`` class attribute will contain a dataframe with the calculated features, which can then be used to train a machine learning model using the `ensemble_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html>`_ module. The only other accompanying method in the catalog class is `plot <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/catalog.html#Catalog.plot>`_, which will output two subplots, the source and the corresponding segmentation object:
+
+.. code-block:: python
+
+    cat.plot()
 
 .. figure:: _static/segm.png
     :align: center
@@ -81,7 +54,7 @@ X and Y pixel arguments can be input if source locations are known, and optional
     :width: 600px
 |
 
-To learn about pyBIA's infrastructure, check out the machine learning and the example pages.
+To learn about pyBIA's machine learning routines, refer to the Figures page which outlines how each Figure in the research paper was made, as well as the Examples page.
 
 
 Pages
@@ -89,10 +62,9 @@ Pages
 .. toctree::
    :maxdepth: 1
 
-   source/Lyman-alpha Nebulae
-   source/Engineering pyBIA
-   source/Machine Learning
+   source/Lyman-alpha Nebulae Candidates
    source/Examples
+   source/Figures 
 
 Documentation
 ==================

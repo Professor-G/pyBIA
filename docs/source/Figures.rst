@@ -326,36 +326,36 @@ Figure 5
 
 	#Leave-one-Out cross-validating the DIFFUSE class
 	for i in range(len(diffuse_training)):
-	print(i)
-	# This will be the individual DIFFUSE sample to assess
-	leave_one = np.array(diffuse_training[columns].iloc[i])
-	# Removing this validation sample from the overall DIFFUSE training bag
-	remaining = np.delete(np.array(diffuse_training[columns]), i, axis=0)
-	# Setting the new training data, flag of 1 corresponds to DIFFUSE, 0 is OTHER
-	data_x = np.r_[remaining, np.array(other_training[columns])]
-	data_y = np.r_[[1]*len(remaining), [0]*len(other_training)]
-	# Training the new base model
-	new_base_model = base_model.model.fit(data_x, data_y)
-	# Training the new optimized model, note that the optimized feats to use is invoked
-	new_optimized_model = optimized_model.model.fit(data_x[:,optimized_model.feats_to_use], data_y)
-	# Assess the left-out DIFFUSE sample using both the base and optimized models
-	proba_base = new_base_model.predict_proba(leave_one.reshape(1,-1))
-	proba_optimized = new_optimized_model.predict_proba(leave_one[optimized_model.feats_to_use].reshape(1,-1))
-	# Save only the probability prediction that the object is DIFFUSE
-	if diffuse_training.obj_name.iloc[i] == 'NDWFS_J143410.9+331730':
-		LABd05.append(float(proba_base[:,1])); LABd05.append(float(proba_optimized[:,1]))
-	elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J143512.2+351108': 
-		PRG1.append(float(proba_base[:,1])); PRG1.append(float(proba_optimized[:,1]))
-	elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J142623.0+351422':
-		PRG2.append(float(proba_base[:,1])); PRG2.append(float(proba_optimized[:,1]))
-	elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J143412.7+332939':
-		PRG3.append(float(proba_base[:,1])); PRG3.append(float(proba_optimized[:,1]))
-	elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J142653.1+343856':
-		PRG4.append(float(proba_base[:,1])); PRG4.append(float(proba_optimized[:,1]))
-	else:
-		all_diffuse_base_probas.append(float(proba_base[:,1]))
-		all_diffuse_optimized_probas.append(float(proba_optimized[:,1]))
-		names.append(diffuse_training.obj_name.iloc[i])
+		print(i)
+		# This will be the individual DIFFUSE sample to assess
+		leave_one = np.array(diffuse_training[columns].iloc[i])
+		# Removing this validation sample from the overall DIFFUSE training bag
+		remaining = np.delete(np.array(diffuse_training[columns]), i, axis=0)
+		# Setting the new training data, flag of 1 corresponds to DIFFUSE, 0 is OTHER
+		data_x = np.r_[remaining, np.array(other_training[columns])]
+		data_y = np.r_[[1]*len(remaining), [0]*len(other_training)]
+		# Training the new base model
+		new_base_model = base_model.model.fit(data_x, data_y)
+		# Training the new optimized model, note that the optimized feats to use is invoked
+		new_optimized_model = optimized_model.model.fit(data_x[:,optimized_model.feats_to_use], data_y)
+		# Assess the left-out DIFFUSE sample using both the base and optimized models
+		proba_base = new_base_model.predict_proba(leave_one.reshape(1,-1))
+		proba_optimized = new_optimized_model.predict_proba(leave_one[optimized_model.feats_to_use].reshape(1,-1))
+		# Save only the probability prediction that the object is DIFFUSE
+		if diffuse_training.obj_name.iloc[i] == 'NDWFS_J143410.9+331730':
+			LABd05.append(float(proba_base[:,1])); LABd05.append(float(proba_optimized[:,1]))
+		elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J143512.2+351108': 
+			PRG1.append(float(proba_base[:,1])); PRG1.append(float(proba_optimized[:,1]))
+		elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J142623.0+351422':
+			PRG2.append(float(proba_base[:,1])); PRG2.append(float(proba_optimized[:,1]))
+		elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J143412.7+332939':
+			PRG3.append(float(proba_base[:,1])); PRG3.append(float(proba_optimized[:,1]))
+		elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J142653.1+343856':
+			PRG4.append(float(proba_base[:,1])); PRG4.append(float(proba_optimized[:,1]))
+		else:
+			all_diffuse_base_probas.append(float(proba_base[:,1]))
+			all_diffuse_optimized_probas.append(float(proba_optimized[:,1]))
+			names.append(diffuse_training.obj_name.iloc[i])
 
 	# The first index is the base model probability predictions, the second is the optimized model's
 	five_diffuse_base_probas = np.c_[LABd05[0], PRG1[0], PRG2[0], PRG3[0], PRG4[0]][0]
@@ -378,25 +378,25 @@ Figure 5
 
 	#Leave-one-Out cross-validating the OTHER class
 	for i in range(len(other_training)):
-	print(i)
-	# This will be the individual OTHER sample to assess
-	leave_one = np.array(other_training[columns].iloc[i])
-	# Removing this validation sample from the overall OTHER training bag
-	remaining = np.delete(np.array(other_training[columns]), i, axis=0)
-	# Setting the new training data
-	data_x = np.r_[remaining, np.array(diffuse_training[columns])]
-	data_y = np.r_[[0]*len(remaining), [1]*len(diffuse_training)]
-	# Training the new base model
-	new_base_model = base_model.model.fit(data_x, data_y)
-	# Training the new optimized model
-	new_optimized_model = optimized_model.model.fit(data_x[:,optimized_model.feats_to_use], data_y)
-	# Assess the left-out OTHER sample using the base and optimized model
-	proba_base = new_base_model.predict_proba(leave_one.reshape(1,-1))
-	proba_optimized = new_optimized_model.predict_proba(leave_one[optimized_model.feats_to_use].reshape(1,-1))
-	# Save only the probability prediction that the object is DIFFUSE
-	other_base_probas.append(float(proba_base[:,1]))
-	other_optimized_probas.append(float(proba_optimized[:,1]))
-	names.append(other_training.obj_name.iloc[i])
+		print(i)
+		# This will be the individual OTHER sample to assess
+		leave_one = np.array(other_training[columns].iloc[i])
+		# Removing this validation sample from the overall OTHER training bag
+		remaining = np.delete(np.array(other_training[columns]), i, axis=0)
+		# Setting the new training data
+		data_x = np.r_[remaining, np.array(diffuse_training[columns])]
+		data_y = np.r_[[0]*len(remaining), [1]*len(diffuse_training)]
+		# Training the new base model
+		new_base_model = base_model.model.fit(data_x, data_y)
+		# Training the new optimized model
+		new_optimized_model = optimized_model.model.fit(data_x[:,optimized_model.feats_to_use], data_y)
+		# Assess the left-out OTHER sample using the base and optimized model
+		proba_base = new_base_model.predict_proba(leave_one.reshape(1,-1))
+		proba_optimized = new_optimized_model.predict_proba(leave_one[optimized_model.feats_to_use].reshape(1,-1))
+		# Save only the probability prediction that the object is DIFFUSE
+		other_base_probas.append(float(proba_base[:,1]))
+		other_optimized_probas.append(float(proba_optimized[:,1]))
+		names.append(other_training.obj_name.iloc[i])
 
 	# Save the base and optimized probabilities
 	np.savetxt('/Users/daniel/Desktop/LoO_OTHER_xgb', np.c_[names, other_base_probas, other_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')

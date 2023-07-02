@@ -14,15 +14,22 @@ The multi-band data for our five confirmed lyman-alpha nebulae can be :download:
 	import numpy as np 
 	from pyBIA import catalog
 
-	five_confirmed = np.load('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/images/final_npy/blobs_confirmed.npy')
+	five_confirmed = np.load('confirmed_diffuse.npy')
 	names = ['PRG1', 'PRG2', 'PRG3', 'PRG4', 'LABd05']
 
 	for i in range(len(five_confirmed)):
-		catalog.plot_three_segm(five_confirmed[i][:,:,0], size=100, median_bkg=0, nsig=[0.3, 0.9, 1.5], cmap='viridis', name=names[i], title='', savefig=True)
+		catalog.plot_three_segm(five_confirmed[i][:,:,0], size=100, median_bkg=0, nsig=[0.3, 0.9, 1.5], cmap='viridis', name=names[i], title='')
 
 
 Figure 2
 -----------
+
+To download the images used in this study please visit the `NoirLab <https://noirlab.edu/science/data-services/other/ndwfs>`_ website. We utilized the Bootes field data, from which there are 27 total subfields to download, in addition to the corresponding error maps. The data avaialable are in .fits format.
+
+The training set objects used in our study can be :download:`downloaded here <training_set_objects.csv>`. This dataframe contains catalog information on the 866 DIFFUSE candidates compiled by Prescott et al 2012, as well as 3200 randomly selected OTHER sources from the same dataset. 
+
+The code below demonstrates how we conducted our detection threshold analysis. Using the catalog information available in the provided training set, we extracted the morphological features using image segmentation at different thresholds between 0.1 to 1.5 rms of the noise.  
+
 
 .. code-block:: python
 
@@ -34,12 +41,11 @@ Figure 2
 
 	### Create the Data Files to Generate Figure 2 ###
 
-	data_path = '/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/Bw_FITS/'
-	data_error_path = '/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/rms_images/Bw/'
-	path_to_save = '/Users/daniel/Desktop/BW_TRAINING_SET_TEST/'
+	data_path = '/NDWFS_Tiles/Bw/fits/'
+	data_error_path = '/NDWFS_Tiles/Bw/error_fits/'
 
 	#866 DIFFUSE candidates from Prescott et al. (2012) plus 3200 randomly selected OTHER objects
-	training_set = pandas.read_csv('/Users/daniel/Desktop/Folders/pyBIA/pyBIA/data/training_set_objects.csv')
+	training_set = pandas.read_csv('training_set_objects.csv')
 
 	sigs = np.around(np.arange(0.1, 1.51, 0.01), decimals=2)
 
@@ -58,13 +64,17 @@ Figure 2
 			cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
 			# Generate the catalog and append the ``cat`` attribute to the frame list
 			cat.create(save_file=False); frame.append(cat.cat)
-		# Combine all 27 sub-catalogs into one master frame and save to the ``path_to_save``
-		frame = pandas.concat(frame, axis=0, join='inner'); frame.to_csv(path_to_save+'_Bw_training_set_nsig_'+str(sig), chunksize=1000)                                                
+		# Combine all 27 sub-catalogs into one master frame and save
+		frame = pandas.concat(frame, axis=0, join='inner'); frame.to_csv('_Bw_training_set_nsig_'+str(sig), chunksize=1000)                                                
 
+
+Each saved file is in turn its own training set, allowing us to analyze the performance when using each set of features to train both a Random Forest and XGBoost machine learning engine:
+
+.. code-block:: python
 
 	# Data for Figure 2
 
-	#These are the features to use, note that the catalog includes more than this!
+	#These are the features to use, note that the catalog includes more features than these!
 	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 
 		'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 
 		'legendre_2', 'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 
@@ -78,8 +88,7 @@ Figure 2
 
 	for sig in sigs:
 		# Load each nsig file
-		#df = pandas.read_csv('/fs1/scratch/godines/BW_NSIG/training_set_nsig_'+str(sig))
-		df = pandas.read_csv(path_to_save+'_Bw_training_set_nsig_'+str(sig))
+		df = pandas.read_csv('_Bw_training_set_nsig_'+str(sig))
 		# Omit any non-detections
 		mask = np.where((df['area'] != -999) & np.isfinite(df['mag']))[0]
 		# Balance both classes to be of same size
@@ -104,6 +113,9 @@ Figure 2
 	score_data = np.c_[sigs, rf_scores, xgb_scores]
 	non_detect_data = np.c_[sigs, blob_nondetect, other_nondetect]
 
+
+We can now generate the plots
+
 	### Generate the Plots ###
 
 	import matplotlib.pyplot as plt   
@@ -125,8 +137,7 @@ Figure 2
 	ax1.set_title('RF vs XGBoost: Baseline Performance')
 	ax1.set_xlabel(r'$\sigma$ Noise Detection Limit'); ax1.set_ylabel('10-Fold CV Acc')#, size=14)
 	ax1.set_xlim((0.1, 1.5)); ax1.set_ylim((0.875, 0.93))
-	plt.savefig('/Users/daniel/Desktop/nsigs.png', dpi=300, bbox_inches='tight')
-	#plt.show()
+	plt.show()
 
 	# Figure 2 Right Panel
 
@@ -145,13 +156,14 @@ Figure 2
 	ax2.set_xlim((0.1, 1.5));ax2.set_ylim((0, 0.16)); ax1.set_ylim(0, 0.7)
 	ax1.yaxis.set_major_formatter(FuncFormatter(y_axis_formatter))
 	ax2.yaxis.set_major_formatter(FuncFormatter(y_axis_formatter))
-	plt.savefig('/Users/daniel/Desktop/nsigs_nondetect.png', dpi=300, bbox_inches='tight')
-	#plt.show() 
+	plt.show() 
 
 
 
 Figures 3 & 4
 -----------
+
+Given the analysis from Figure 2, we now proceed with the generated training set at the optimal detection threshold. As the above analysis trained base models, at this step we invoke our optimization routine to select the optimal features to use as well as the best hyperparameters for our XGBoost engine:
 
 .. code-block:: python
 
@@ -162,8 +174,9 @@ Figures 3 & 4
 	from pyBIA import ensemble_model
 
 	#The optimal sig threshold to apply as per Figure 2
-	sig = 0.31                                                                                                                                                                                                                                
-	df = pandas.read_csv('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/nsigs/BW_NSIG/BW_training_set_nsig_'+str(sig))
+	sig = 0.31
+
+	df = pandas.read_csv('_Bw_training_set_nsig_'+str(sig))
 
 	# Omit any non-detections
 	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']))[0]
@@ -184,19 +197,22 @@ Figures 3 & 4
 	# Training data arrays
 	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
 
-
-	# Create the model object with feature and hyperparameter optimization enabled (5000 trials each)
+	# Create the model object with feature and hyperparameter optimization enabled (2500 trials each)
 
 	# Enabling 10-fold cross validation which increases the hyperparameter optimization time ten-fold
-	model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True, optimize=True, boruta_trials=5000, n_iter=5000, opt_cv=10, limit_search=False)
+	model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True, optimize=True, boruta_trials=2500, n_iter=2500, opt_cv=10, limit_search=False)
 
 	# This is how the model is created and saved afterwards
 	model.create()
-	model.save()
+	model.save('Optimal_XGB_Model')
 
-	# This is how the model can be loaded in the future
-	#model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True, opt_cv=10)
-	#model.load('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/models/ensemble_models/new_2500_2500')
+With our optimized tree-based ensemble model (which can be :download:`downloaded here <Optimal_XGB_Model.zip>`), we now generate Figure 3 using the built-in class methods:
+
+.. code-block:: python
+
+	# This is how the model can be loaded 
+	model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True, opt_cv=10)
+	model.load('Optimal_XGB_Model')
 
 	# Figure 3 Left Panel
 
@@ -242,6 +258,41 @@ Figures 3 & 4
 
 Figure 5
 -----------
+
+With the optimal model saved, we now extract the features using the catalog module for all 2 million OTHER objects in the entire catalog. We have compiled the catalog information in the following dataframe: :download:`other_cat_no_dups_final.csv <other_cat_no_dups_final.csv.zip>`.
+
+Using this file we can now construct a catalog for the entire dataset (note that this excludes the 866 DIFFUSE objects in the provided training set)
+
+.. code-block:: python
+	
+	import pandas
+	import numpy as np
+	from astropy.io import fits
+	from pyBIA import catalog
+
+	other_catalog = pandas.read_csv('other_cat_no_dups_final.csv')
+
+	sig=0.31 # The optimal noise-detection threshold to apply
+
+	data_path = '/NDWFS_Tiles/Bw/fits/'
+	data_error_path = '/NDWFS_Tiles/Bw/error_fits/'
+
+	for fieldname in np.unique(np.array(training_set['field_name'])):
+		# Load the field data
+		data, error_map = fits.open(data_path+fieldname+'_Bw_03_fix.fits'), fits.getdata(data_error_path+fieldname+'_Bw_03_rms.fits.fz')
+		# Extract the data and corresponding ZP
+		data_map, zeropoint = data[0].data, data[0].header['MAGZERO']
+		# Select only the samples from this subfield
+		subfield_index = np.where(training_set['field_name']==fieldname)[0]
+		xpix, ypix = training_set[['xpix', 'ypix']].iloc[subfield_index].values.T
+		objname, field, flag = training_set[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
+		# Create the catalog object
+		cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
+		# Generate the catalog and save it
+		cat.create(save_file=True, filename='Cat_Master_BW_'+field_name)
+
+
+
 
 .. code-block:: python
 

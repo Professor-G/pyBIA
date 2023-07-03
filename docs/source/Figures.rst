@@ -7,7 +7,9 @@ Figures
 Figure 1
 -----------
 
-The multi-band data for our five confirmed lyman-alpha nebulae can be :download:`downloaded here <confirmed_diffuse.npy>`. To visuazlie the affect the sigma detection threshold has on the image segmentation object, we used the `plot_three_segm <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_three_segm>`_ function available in the pyBIA.catalog module.
+The multi-band data for our five confirmed lyman-alpha nebulae can be :download:`downloaded here. <confirmed_diffuse.npy>`
+
+To visualize the affect the sigma detection threshold has on the image segmentation object, we used the `plot_three_segm <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_three_segm>`_ function available in the pyBIA.catalog module.
 
 .. code-block:: python
 
@@ -115,6 +117,8 @@ Each saved file is in turn its own training set, allowing us to analyze the perf
 
 
 We can now generate the plots
+
+.. code-block:: python
 
 	### Generate the Plots ###
 
@@ -277,22 +281,27 @@ Using this file we can now construct a catalog for the entire dataset (note that
 	data_path = '/NDWFS_Tiles/Bw/fits/'
 	data_error_path = '/NDWFS_Tiles/Bw/error_fits/'
 
-	for fieldname in np.unique(np.array(training_set['field_name'])):
+	frame = [] #To store all 27 subfields
+	for fieldname in np.unique(np.array(other_catalog['field_name'])):
 		# Load the field data
 		data, error_map = fits.open(data_path+fieldname+'_Bw_03_fix.fits'), fits.getdata(data_error_path+fieldname+'_Bw_03_rms.fits.fz')
 		# Extract the data and corresponding ZP
 		data_map, zeropoint = data[0].data, data[0].header['MAGZERO']
 		# Select only the samples from this subfield
-		subfield_index = np.where(training_set['field_name']==fieldname)[0]
-		xpix, ypix = training_set[['xpix', 'ypix']].iloc[subfield_index].values.T
-		objname, field, flag = training_set[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
+		subfield_index = np.where(other_catalog['field_name']==fieldname)[0]
+		xpix, ypix = other_catalog[['xpix', 'ypix']].iloc[subfield_index].values.T
+		objname, field, flag = other_catalog[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
 		# Create the catalog object
 		cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
-		# Generate the catalog and save it
-		cat.create(save_file=True, filename='Cat_Master_BW_'+field_name)
+		# Generate the catalog and save the subfield catalog, after which it is appended to the master frame 
+		cat.create(save_file=True, filename='Cat_Master_BW_'+field_name); frame.append(cat.cat)
 
+	# Combine all 27 sub-catalogs into one master frame and save
+	frame = pandas.concat(frame, axis=0, join='inner'); frame.to_csv('other_catalog_final_'+str(sig), chunksize=1000)                                                
 
+This final catalog as genereated above is available for download `here <https://drive.google.com/file/d/1ATM_UZwFNwpzhUv5dARwuZQrvKm55kQr/view?usp=drive_link>`_:
 
+Using this catalog, we can now re-load the optimal model to conduct the predictions. As per the analysis conducted for this Figure, the predictions will be made using both the base and optimal model so as to compare the distribution of probability predictions. 
 
 .. code-block:: python
 
@@ -304,8 +313,9 @@ Using this file we can now construct a catalog for the entire dataset (note that
 	# Load all 2 million catalog objects and create a sub-catalog of DIFFUSE candidates #
 
 	#The optimal sig threshold to apply as per Figure 2
-	sig = 0.31                                                                                                                                                                                                                                
-	df = pandas.read_csv('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/nsigs/BW_NSIG/BW_training_set_nsig_'+str(sig))
+	sig = 0.31
+
+	df = pandas.read_csv('_BW_training_set_nsig_'+str(sig))
 
 	# Omit any non-detections
 	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']))[0]
@@ -317,11 +327,11 @@ Using this file we can now construct a catalog for the entire dataset (note that
 
 	#These are the features to use, note that the catalog includes more than this!
 	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 
-	'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 
-	'legendre_2', 'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 
-	'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 
-	'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 
-	'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
+		'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 
+		'legendre_2', 'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 
+		'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 
+		'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 
+		'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
 
 	# Training data arrays
 	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
@@ -332,10 +342,10 @@ Using this file we can now construct a catalog for the entire dataset (note that
 
 	# This is the optimized model
 	optimized_model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True)
-	optimized_model.load('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/models/ensemble_models/new_2500_2500')
+	optimized_model.load('Optimal_XGB_Model')
 
 	# Load the catalog containing all 2 million other objects, extracted using sig=0.31
-	other_all = pandas.read_csv('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/catalogs/other_catalog_final_031_no_dups')
+	other_all = pandas.read_csv('other_catalog_final_031')
 
 	# Remove the 865 OTHER objects that are present in the training set, we will assess these individually using LoO
 	other_all = other_all[~other_all['obj_name'].isin(df_filtered['obj_name'])]
@@ -362,6 +372,10 @@ Using this file we can now construct a catalog for the entire dataset (note that
 	# Save the probability predictions as a new columns
 	candidate_catalog_base['proba'] = predictions_base_model[index_base][:,1]
 	candidate_catalog_optimized['proba'] = predictions_optimized_model[index_optimized][:,1]
+
+The base and optimized candidate catalogs generated above does not include the 866 DIFFUSE training objects as these were deliberately removed from the source catalog. The randomly selected objects that composed our OTHER class are indeed included in the catalog, however, as they were used for training purposes these were not fairly assessed as their presence as an OTHER object skews the probability prediction. For this reason, we perform a Leave-out-Out (LoO) cross-validation analysis, one assessing the DIFFUSE objects so as to extract an informed probability prediction threshold, and another assessing the OTHER objects in our training set so as to include those that would have been predicted as DIFFUSE had they not been present in the training set. These two LoO routines are executed below:
+
+.. code-block:: python
 
 	# Generate the data for the histograms in Figure 5 #
 
@@ -414,8 +428,8 @@ Using this file we can now construct a catalog for the entire dataset (note that
 	five_names = ['LABd05', 'PRG1', 'PRG2', 'PRG3', 'PRG4']
 
 	# Save the base and optimized probabilities
-	np.savetxt('/Users/daniel/Desktop/LoO_Confirmed_DIFFUSE_xgb', np.c_[five_names, five_diffuse_base_probas, five_diffuse_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')
-	np.savetxt('/Users/daniel/Desktop/LoO_DIFFUSE_xgb', np.c_[names, all_diffuse_base_probas, all_diffuse_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')
+	np.savetxt('LoO_Confirmed_DIFFUSE_xgb', np.c_[five_names, five_diffuse_base_probas, five_diffuse_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')
+	np.savetxt('LoO_DIFFUSE_xgb', np.c_[names, all_diffuse_base_probas, all_diffuse_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')
 
 	# Repeat the same LoO process but evaluate the OTHER training for fair assessment of these objects
 	# Positive detections from this LoO will be added to the candidates catalog that was created above
@@ -450,7 +464,17 @@ Using this file we can now construct a catalog for the entire dataset (note that
 		names.append(other_training.obj_name.iloc[i])
 
 	# Save the base and optimized probabilities
-	np.savetxt('/Users/daniel/Desktop/LoO_OTHER_xgb', np.c_[names, other_base_probas, other_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')
+	np.savetxt('LoO_OTHER_xgb', np.c_[names, other_base_probas, other_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')
+
+The three LoO analysis files are available here: 
+
+- :download:`LoO_Confirmed_DIFFUSE_xgb <LoO_Confirmed_DIFFUSE_xgb>`
+- :download:`LoO_DIFFUSE_xgb <LoO_DIFFUSE_xgb>`
+- :download:`LoO_OTHER_xgb <LoO_OTHER_xgb>`
+
+As stated above, analyzing the OTHER objects in our training set using LoO, we can now determine which one of these sources should be included in the candidate catalog:
+
+.. code-block:: python
 
 	# Find these OTHER objects that were classified as DIFFUSE (probas greater than or equal to 50%)
 	indices = []
@@ -478,9 +502,15 @@ Using this file we can now construct a catalog for the entire dataset (note that
 	candidate_catalog_optimized = pandas.concat([candidate_catalog_optimized, df_filtered_optimized], ignore_index=True)
 
 	# Save candidate catalogs
-	candidate_catalog_base.to_csv('/Users/daniel/Desktop/candidate_catalog_base_xgb.csv')
-	candidate_catalog_optimized.to_csv('/Users/daniel/Desktop/candidate_catalog_optimized_xgb.csv')
+	candidate_catalog_base.to_csv('candidate_catalog_base_xgb.csv')
+	candidate_catalog_optimized.to_csv('candidate_catalog_optimized_xgb.csv')
 
+These two candidate catalogs are also available for download:
+
+- `candidate_catalog_base_xgb <https://drive.google.com/file/d/1TUh9xLCTq4mOsFkmVrUyTBSzZ6LPEFxb/view?usp=drive_link>`_
+- `candidate_catalog_optimized_xgb <https://drive.google.com/file/d/15u0AEnLm5FmbkkWDkQZM_2JxDRNVjNZI/view?usp=drive_link>`_
+
+.. code-block:: python
 
 	# Figure 5 Left Panel -- Base Model #
 
@@ -582,7 +612,6 @@ Using this file we can now construct a catalog for the entire dataset (note that
 Figure 6
 -----------
 
-
 .. code-block:: python
 
 	### Training the CNN ### 
@@ -648,6 +677,8 @@ Figure 6
 	# Save the images as a 4-D array for CNN input, as well as the corresponding names
 	np.save('/Users/daniel/Desktop/saved_images/xgb_output_images.npy', np.array(images))
 	np.savetxt('/Users/daniel/Desktop/saved_images/xgb_output_images_names.txt', obj_names, fmt='%s')
+
+The images as generated above as a binary file are available `here <https://drive.google.com/file/d/1D6TFRlyTWF4lUXJKiZWAcBqOY9qUw11e/view?usp=drive_link>`_. The object names in corresponding order can be :download:`downloaded here. <xgb_output_images_names.txt>`
 
 	# Extract the DIFFUSE Images #
 

@@ -680,6 +680,8 @@ Figure 6
 
 The images as generated above as a binary file are available `here <https://drive.google.com/file/d/1D6TFRlyTWF4lUXJKiZWAcBqOY9qUw11e/view?usp=drive_link>`_. The object names in corresponding order can be :download:`downloaded here. <xgb_output_images_names.txt>`
 
+.. code-block:: python
+
 	# Extract the DIFFUSE Images #
 
 	confirmed_diffuse_images_path_bw = '/Users/daniel/Desktop/saved_images/confirmed_diffuse/Bw/'
@@ -770,6 +772,9 @@ The images as generated above as a binary file are available `here <https://driv
 	np.save('/Users/daniel/Desktop/saved_images/other_diffuse/other_diffuse.npy', np.array(images))
 	np.savetxt('/Users/daniel/Desktop/saved_images/other_diffuse/other_diffuse_names.txt', obj_names_other_diffuse, fmt='%s')
 
+The binary files containing these other diffuse images are available for download:
+
+.. code-block:: python
 
 	# Optimize the CNN Model #
 
@@ -838,6 +843,9 @@ The images as generated above as a binary file are available `here <https://driv
 	model.create()
 	model.save(dirname='Optimized_CNN_Model_CV5')
 
+With our CNN model parameters, we will now appem to ly thtrain a final model
+
+.. code-block:: python
 
 	# Load the optimization results and create the final model #
 
@@ -858,6 +866,9 @@ The images as generated above as a binary file are available `here <https://driv
 	model.create()
 	model.save()
 
+While the performance plots can be plotted via the built-in class method, plot_performance, we will generate these manually instead so that the legend can be modified to highlight which individual sample from the confirmed blobs was being used for validation
+
+.. code-block:: python
 
 	# Plot model performance #
 
@@ -974,8 +985,9 @@ Figure 7
 	np.save('OTHER_final_candidates', other_candidates[order])
 	np.savetxt('OTHER_final_candidates_names_probas', np.c_[other_candidates_names[order], other_candidate_probas[order]], fmt='%s')
 
+Now we can create the area vs color plot, byt first a final candidate catalog is created:
 
-	### Color-Color ###
+.. code-block:: python
 
 	import pandas 
 	import numpy as np
@@ -1028,6 +1040,10 @@ Figure 7
 	# Save a dataframe with only the confirmed blobs, to be used for the color-color selection below
 	confirmed_set.to_csv('_Bw_final_confirmed_catalog.csv')
 
+Now we will extract the red-band magnitudes using the catalog module:
+
+.. code-block:: python
+
 
 	# Create a new catalog in the R band for the final candidates
 	from pyBIA import catalog  
@@ -1079,7 +1095,9 @@ Figure 7
 	# Combine all 27 sub-catalogs into one master frame and save
 	frame = pandas.concat(frame, axis=0, join='inner'); frame.to_csv('_R_final_confirmed_catalog.csv')                                                
 
+Now we can create the area vs color plot:
 
+.. code-block:: python
 
 	# Plot #
 	import pandas as pd

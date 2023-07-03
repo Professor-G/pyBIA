@@ -466,7 +466,11 @@ The base and optimized candidate catalogs generated above does not include the 8
 	# Save the base and optimized probabilities
 	np.savetxt('LoO_OTHER_xgb', np.c_[names, other_base_probas, other_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')
 
-The three LoO analysis files are available for download: :download:`LoO_Confirmed_DIFFUSE_xgb <LoO_Confirmed_DIFFUSE_xgb>`, :download:`LoO_DIFFUSE_xgb <LoO_DIFFUSE_xgb>`, :download:`LoO_OTHER_xgb <LoO_OTHER_xgb>`
+The three LoO analysis files are available here: 
+
+- :download:`LoO_Confirmed_DIFFUSE_xgb <LoO_Confirmed_DIFFUSE_xgb>`
+- :download:`LoO_DIFFUSE_xgb <LoO_DIFFUSE_xgb>`
+- :download:`LoO_OTHER_xgb <LoO_OTHER_xgb>`
 
 As stated above, analyzing the OTHER objects in our training set using LoO, we can now determine which one of these sources should be included in the candidate catalog:
 

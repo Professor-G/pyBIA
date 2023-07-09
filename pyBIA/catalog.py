@@ -40,7 +40,8 @@ class Catalog:
         bkg (None, optional): If bkg=0 the data is assumed to be background-subtracted.
             The other optional is bkg=None, in which case the background will be
             automatically calculated for local regions.
-        zp (float)
+        zp (float, optional):
+        exptime (float, optional):
         error (ndarray, optional): 2D array containing the rms error map.
         morph_params (bool, optional): If True, image segmentation is performed and
             morphological parameters are computed. Defaults to True. 
@@ -75,7 +76,7 @@ class Catalog:
             need individual class instance. Defaults to None.
     """
 
-    def __init__(self, data, x=None, y=None, bkg=None, error=None, zp=None, morph_params=True, nsig=0.7, threshold=10, 
+    def __init__(self, data, x=None, y=None, bkg=None, error=None, zp=None, exptime=None, morph_params=True, nsig=0.7, threshold=10, 
         deblend=False, obj_name=None, field_name=None, flag=None, aperture=15, annulus_in=20, annulus_out=35, 
         kernel_size=21, invert=False, cat=None):
 
@@ -85,6 +86,7 @@ class Catalog:
         self.bkg = bkg 
         self.error = error 
         self.zp = zp 
+        self.exptime = exptime
         self.morph_params = morph_params
         self.kernel_size = kernel_size
         self.nsig = nsig
@@ -96,6 +98,10 @@ class Catalog:
         self.kernel_size = kernel_size
         self.invert = invert 
         self.cat = cat
+
+        if bool(self.zp) != bool(self.exptime):
+            raise ValueError('Both zp and exptime must be provided or not provided simultaneously!')
+
         if cat is not None:
             try:
                 self.obj_name = np.array(cat['obj_name'])
@@ -202,7 +208,7 @@ class Catalog:
                     data = subtract_background(self.data, length=length)
                 elif self.bkg == 0:
                     data = self.data 
-
+       
             segm, convolved_data = segm_find(data, nsig=self.nsig, kernel_size=self.kernel_size, deblend=self.deblend)
             props = segmentation.SourceCatalog(data, segm, convolved_data=convolved_data)
             try:
@@ -220,15 +226,17 @@ class Catalog:
             flux_err = None if self.error is None else aper_stats.sum_err
 
             if self.morph_params == True:
-                prop_list, moment_list = morph_parameters(data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=None, 
+                prop_list, moment_list = morph_parameters(data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=None, 
                     invert=self.invert, deblend=self.deblend)
                 tbl = make_table(prop_list, moment_list)
-                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
+                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
                     flux=aper_stats.sum, flux_err=flux_err, median_bkg=None, save=save_file, path=path, filename=filename)
+                
                 return 
 
-            self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
+            self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=aper_stats.sum, flux_err=flux_err, median_bkg=None, save=save_file, path=path, filename=filename)
+            
             return 
 
         positions = []
@@ -249,26 +257,26 @@ class Catalog:
 
         if self.error is None:
             if self.morph_params == True:
-                prop_list, moment_list = morph_parameters(self.data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
+                prop_list, moment_list = morph_parameters(self.data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
                     invert=self.invert, deblend=self.deblend, threshold=self.threshold)
                 tbl = make_table(prop_list, moment_list)
-                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
+                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
                     flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
                 return 
 
-            self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
+            self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
             return 
            
         if self.morph_params == True:
-            prop_list, moment_list = morph_parameters(self.data, self.x, self.y, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
+            prop_list, moment_list = morph_parameters(self.data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
                     invert=self.invert, deblend=self.deblend, threshold=self.threshold)
             tbl = make_table(prop_list, moment_list)
-            self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
+            self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=flux, flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
             return 
 
-        self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, flux=flux, 
+        self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, flux=flux, 
             flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
         return 
 
@@ -308,7 +316,7 @@ class Catalog:
         return
 
 def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=21, median_bkg=None, 
-    invert=False, deblend=False):
+    invert=False, deblend=False, exptime=None):
     """
     Applies image segmentation on each object to calculate morphological 
     parameters calculated from the moment-based properties. These parameters 
@@ -339,6 +347,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
         deblend (bool, optional): If True, the objects are deblended during the segmentation
             procedure, thus deblending the objects before the morphological features
             are computed. Defaults to False so as to keep blobs as one segmentation object.
+        exptime (float, optional):
 
     Note:
         This function requires x & y positions as each source 
@@ -379,6 +388,8 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
         new_data = data_processing.crop_image(data, int(x[i]), int(y[i]), size, invert=invert)
         if median_bkg is not None:
             new_data -= median_bkg[i] 
+        if exptime is not None:
+            new_data /= exptime
        
         segm, convolved_data = segm_find(new_data, nsig=nsig, kernel_size=kernel_size, deblend=deblend)
         try:
@@ -493,7 +504,7 @@ def make_table(props, moments):
 
     return np.array(table, dtype=object)
 
-def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None, median_bkg=None, 
+def make_dataframe(table=None, x=None, y=None, zp=None, exptime=None, flux=None, flux_err=None, median_bkg=None, 
     obj_name=None, field_name=None, flag=None, save=True, path=None, filename=None):
     """
     This function takes as input the catalog of morphological features
@@ -508,6 +519,8 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
         y (ndarray, optional): 1D array containing the y-pixel position.
             If input it must be an array of y positions for all objects in the table. 
             This y position will be appended to the dataframe for cataloging purposes. Defaults to None.
+        zp (float):
+        exptime (float):
         flux (ndarray, optional): 1D array containing the calculated flux
             of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
         flux_err (ndarray, optional): 1D array containing the calculated flux error
@@ -578,7 +591,7 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
             data_dict['flux'] = flux
         else:
             data_dict['flux'] = flux
-            data_dict['mag'] = -2.5*np.log10(np.array(flux))+zp 
+            data_dict['mag'] = -2.5*np.log10(np.array(flux/exptime))+zp 
     if flux_err is not None:
         if zp is None:
             data_dict['flux_err'] = flux_err
@@ -728,7 +741,9 @@ def align_error_array(data, error, data_coords, error_coords):
     This can be used in the event that the error map size does not match the data size.
     By manually identifying the coordinates of a prominent object in both arrays,
     this function can be used to perform the proper alignment and padding/cropping. 
-    This was used as the NDWFS Bootes R-band data size was inconsistent with the corresponding rms maps.
+    This was used as the NDWFS Bootes R-band data size was inconsistent with the corresponding rms maps,
+    causing the pixel locations to be inconsistent, although this can be worked around by using
+    the RA and DEC and invoking the WCS from the astropy API.
 
     Args:
         data (ndarray): The data array.

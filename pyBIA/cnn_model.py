@@ -1893,7 +1893,7 @@ class Classifier:
 
         return
 
-#Custom CNN model configured to genereate shallower CNNs than AlexNet
+#Custom CNN model configured to generate shallower CNNs than AlexNet
 
 def custom_model(positive_class, negative_class, img_num_channels=1, normalize=True, 
     min_pixel=0, max_pixel=100, val_positive=None, val_negative=None, epochs=100, batch_size=32, 

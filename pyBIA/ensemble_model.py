@@ -1110,18 +1110,17 @@ def generate_matrix(predicted_labels_list, actual_targets, classes, normalize=Tr
 
     plt.figure()
     if normalize:
-        generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title)
+        generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title, savefig=savefig)
     else:
-        generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title)
+        generate_plot(conf_matrix, classes=classes, normalize=normalize, title=title, savefig=savefig)
     
     if savefig:
-        _set_style_()
         plt.savefig('Ensemble_Confusion_Matrix.png', bbox_inches='tight', dpi=300)
-        plt.clf(); plt.style.use('default')
+        plt.clf()
     else:
         plt.show()
     
-def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix'):
+def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix', savefig=False):
     """
     Generates the confusion matrix figure object, but does not plot.
     
@@ -1136,6 +1135,8 @@ def generate_plot(conf_matrix, classes, normalize=False, title='Confusion Matrix
     Returns:
         AxesImage object. 
     """
+    
+    _set_style_() if savefig else plt.style.use('default')
 
     if normalize:
         conf_matrix = conf_matrix.astype('float') / conf_matrix.sum(axis=1)[:, np.newaxis]

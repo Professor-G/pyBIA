@@ -7,7 +7,7 @@ Figures
 Figure 1
 -----------
 
-The multi-band data for our five confirmed lyman-alpha nebulae can be :download:`downloaded here. <confirmed_diffuse.npy>`
+The multi-band data for our five confirmed lyman-alpha nebulae can be :download:`download here. <confirmed_diffuse.npy>`
 
 To visualize the affect the sigma detection threshold has on the image segmentation object, we used the `plot_three_segm <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_three_segm>`_ function available in the pyBIA.catalog module.
 
@@ -33,7 +33,7 @@ Figure 2
 
 To download the images used in this study please visit the `NoirLab <https://noirlab.edu/science/data-services/other/ndwfs>`_ website. We utilized the Bootes field data, from which there are 27 total subfields to download, in addition to the corresponding error maps. The data avaialable are in .fits format.
 
-The training set objects used in our study can be :download:`downloaded here <training_set_objects.csv>`. This dataframe contains catalog information on the 866 DIFFUSE candidates compiled by Prescott et al 2012, as well as 3200 randomly selected OTHER sources from the same dataset. 
+The training set objects used in our study can be :download:`download here <training_set_objects.csv>`. This dataframe contains catalog information on the 866 DIFFUSE candidates compiled by Prescott et al 2012, as well as 3200 randomly selected OTHER sources from the same dataset. 
 
 The code below demonstrates how we conducted our detection threshold analysis. Using the catalog information available in the provided training set, we extracted the morphological features using image segmentation at different thresholds between 0.1 to 1.5 rms of the noise.  
 
@@ -123,12 +123,12 @@ These files will be used to create base RF and XGBoost models, one per file:
 	np.savetxt('nsig_scores_Bw', score_data, header="nsigs, RF_scores, XGB_scores")
 	np.savetxt('non_detections_Bw', non_detect_data, header="nsigs, blob_non_detections, other_non_detections")
 
-These two files can be downloaded: 
+The two files generated above can be downloaded: 
 
 - :download:`nsig_scores_Bw <nsig_scores_Bw>`
 - :download:`non_detections_Bw <non_detections_Bw>`
 
-We can now generate the plots:
+We can now create the plots:
 
 .. code-block:: python
 
@@ -239,9 +239,9 @@ Given the analysis from Figure 2, we now proceed with the generated training set
     :class: with-shadow with-border
     :width: 600px
 |
-This optimized tree-based ensemble model can be :download:`downloaded here <Optimal_XGB_Model.zip>`.
+This optimized tree-based ensemble model can be :download:`download here <Optimal_XGB_Model.zip>`.
 
-We can now generate Figure 3 using the built-in class methods, for the t-SNE projection we will need the catalog names for the five confirmed blobs in our sample, available for :download:`downloaded here <obj_name_5>`.
+We can now generate Figure 3 using the built-in class methods, for the t-SNE projection we will need the catalog names for the five confirmed blobs in our sample, available for :download:`download here <obj_name_5>`.
 
 .. code-block:: python
 
@@ -358,7 +358,7 @@ Using this file we can now construct a catalog for the entire dataset so as to p
 	frame = pd.concat(frame, axis=0, join='inner')
 	frame.to_csv('Other_Catalog_Master_'+str(sig), chunksize=1000)                              
 
-This final catalog as genereated above is available for download `here <https://drive.google.com/file/d/16kJ5jyVImp7E8oEEjjUrj4l9vH2JSkCa/view?usp=sharing>`_:
+This final catalog as genereated above is available for download `here <https://drive.google.com/file/d/16kJ5jyVImp7E8oEEjjUrj4l9vH2JSkCa/view?usp=sharing>`_.
 
 Using this catalog, we can now re-load the optimal model to conduct the predictions. As per the analysis conducted for this Figure, the predictions will be made using both the base and optimal model so as to compare the distribution of probability predictions. 
 
@@ -564,10 +564,10 @@ As stated above, the OTHER objects in our training set were omitted from the can
 
 These two candidate catalogs are available for download:
 
-- `candidate_catalog_base_xgb <https://drive.google.com/file/d/13r0Qq7r4stemAtffEiEX8w-kQI_RjOKY/view?usp=sharing>`_
-- `candidate_catalog_optimized_xgb <https://drive.google.com/file/d/1IYbSql6xiTB-hGaM_bLp_ygCIKSyfOb_/view?usp=sharing>`_
+- `candidate_catalog_base_xgb <https://drive.google.com/file/d/1IYbSql6xiTB-hGaM_bLp_ygCIKSyfOb_/view?usp=sharing>`_
+- `candidate_catalog_optimized_xgb <https://drive.google.com/file/d/13r0Qq7r4stemAtffEiEX8w-kQI_RjOKY/view?usp=sharing>`_
 
-We can now perform a probability prediction analysis, first with the baseline more (all features, not hyperparameter optimization):
+We can now perform a probability prediction analysis, first with the baseline model (all features, not hyperparameter optimization):
 
 .. code-block:: python
 
@@ -591,6 +591,7 @@ We can now perform a probability prediction analysis, first with the baseline mo
 	confirmed_diffuse_probas = np.loadtxt('LoO_Confirmed_DIFFUSE_xgb', dtype=str)
 	all_diffuse_probas = np.loadtxt('LoO_DIFFUSE_xgb', dtype=str)
 
+	# The second column is the XGBoost baseline probas
 	five_diffuse_base_probas = confirmed_diffuse_probas[:,1].astype('float')
 	all_diffuse_base_probas = all_diffuse_probas[:,1].astype('float')
 
@@ -651,6 +652,8 @@ We can now perform a probability prediction analysis, first with the baseline mo
     :width: 600px
 |
 
+Now we compare with the optimized model:
+
 .. code-block:: python
 
 	# Figure 5 Right Panel Histogram -- Optimized Model #
@@ -662,6 +665,7 @@ We can now perform a probability prediction analysis, first with the baseline mo
 	candidate_catalog_optimized = pd.read_csv('candidate_catalog_optimized_xgb.csv')
 	probas_candidates = np.array(candidate_catalog_optimized.proba)
 
+	# The third column is the XGBoost optimized probas
 	five_diffuse_optimized_probas = confirmed_diffuse_probas[:,2].astype('float')
 	all_diffuse_optimized_probas = all_diffuse_probas[:,2].astype('float')
 
@@ -670,8 +674,8 @@ We can now perform a probability prediction analysis, first with the baseline mo
 
 	# Plot
 	plt.hist(probas_candidates, bins=5, weights=np.ones(len(probas_candidates)) / len(probas_candidates), color='#377eb8', label='Candidates (n='+str(len(probas_candidates))+')')
-	plt.hist(all_diffuse_base_probas, bins=12, weights=np.ones(len(all_diffuse_base_probas)) / len(all_diffuse_base_probas), color='#ff7f00', alpha=0.6, label='DIFFUSE Training (n=865)')
-	plt.scatter(five_diffuse_base_probas, [0.0458]*len(five_diffuse_base_probas), marker='*', c='k', s=800, alpha=0.72, label=r'Confirmed Ly$\alpha$ (n=5)')
+	plt.hist(all_diffuse_optimized_probas, bins=12, weights=np.ones(len(all_diffuse_base_probas)) / len(all_diffuse_base_probas), color='#ff7f00', alpha=0.6, label='DIFFUSE Training (n=865)')
+	plt.scatter(five_diffuse_optimized_probas, [0.0458]*len(five_diffuse_base_probas), marker='*', c='k', s=800, alpha=0.72, label=r'Confirmed Ly$\alpha$ (n=5)')
 
 	y=0.12 # Controls the position of the text
 
@@ -699,8 +703,7 @@ We can now perform a probability prediction analysis, first with the baseline mo
 	plt.axhline(y=0.81+y, linestyle='-', linewidth=1.2, color='k', xmin=0.81, xmax=0.99)
 	plt.text(0.931, 0.76+y, s=str(len(index_90)), weight="bold")
 
-	# Highlighting the lowest performing confirmed blob, PRG4
-	plt.text(0.7481, 0.1055, s="PRG4", weight="bold")
+	plt.text(0.6992, 0.1055, s="PRG4", weight="bold")
 
 	plt.title('XGBoost Classification Output', size=18); plt.xlabel('Probability Prediction', size=16); plt.ylabel('Normalized Counts', size=16)
 	plt.xticks(ticks=[0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.], 
@@ -708,6 +711,7 @@ We can now perform a probability prediction analysis, first with the baseline mo
 	plt.yticks(ticks=[0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0], size=14, 
 		labels=['0','','0.1','','0.2','','0.3','','0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'])
 	plt.xlim((0.5,1.0)); plt.legend(prop={'size': 14}, loc='upper left')
+	plt.savefig('/Users/daniel/Desktop/Final_Histogram_Optimized.png', bbox_inches='tight', dpi=300)
 	plt.show()
 
 .. figure:: _static/Ensemble_Confusion_Matrix_Optimized.png
@@ -745,10 +749,10 @@ Figure 6
 	r_images_path = '/Users/daniel/Desktop/saved_images/OTHER/R/'
 
 	# Load the candidate catalog according to the optimized model 
-	cat = pd.read_csv('/Users/daniel/Desktop/candidate_catalog_optimized_xgb.csv')
+	cat = pd.read_csv('candidate_catalog_optimized_xgb.csv')
 
-	# Select only the candidates with probability predictions greater than or equal to 85%
-	index = np.where(cat.proba >= 0.85)[0]
+	# Select only the candidates with probability predictions greater than or equal to 70%
+	index = np.where(cat.proba >= 0.70)[0]
 	sample = cat.iloc[index]
 
 	# Saving images as 120x120 pix
@@ -792,7 +796,7 @@ Figure 6
 	np.save('/Users/daniel/Desktop/saved_images/xgb_output_images.npy', np.array(images))
 	np.savetxt('/Users/daniel/Desktop/saved_images/xgb_output_images_names.txt', obj_names, fmt='%s')
 
-The images as generated above as a binary file are available `here <https://drive.google.com/file/d/1D6TFRlyTWF4lUXJKiZWAcBqOY9qUw11e/view?usp=drive_link>`_. The object names in corresponding order can be :download:`downloaded here. <xgb_output_images_names.txt>`
+The images as generated above as a binary file are available `here <https://drive.google.com/file/d/1D6TFRlyTWF4lUXJKiZWAcBqOY9qUw11e/view?usp=drive_link>`_. The object names in corresponding order can be :download:`download here. <xgb_output_images_names.txt>`
 
 .. code-block:: python
 
@@ -822,6 +826,12 @@ The images as generated above as a binary file are available `here <https://driv
 
 	# Will also save the five confirmed blobs
 	obj_names_5 = np.loadtxt('/Users/daniel/Desktop/Folders/pyBIA/pyBIA/data/obj_name_5', dtype=str)
+
+	# Saving images as 120x120 pix
+	image_size = 120 
+
+	# Setting the apertures for the background subtraction, approximated using the sigma-clipped median within annuli of 20 and 35 pixel radii
+	annulus_apertures = CircularAnnulus((int(image_size/2),int(image_size/2)), r_in=20, r_out=35)
 
 	for field_name in np.unique(sample['field_name']):
 		# Load the B and R broadband data

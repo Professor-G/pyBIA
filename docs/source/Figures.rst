@@ -81,12 +81,11 @@ These files will be used to create base RF and XGBoost models, one per file:
 	###  Read the Data Files ###
 
 	#These are the features to use, note that the catalog includes more than this!
-	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 
-		'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 
-		'legendre_2', 'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 
-		'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 
-		'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 
-		'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
+	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 'mu01',
+		'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 'legendre_2',
+		'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 'area', 'covar_sigx2',
+		'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity',
+		'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
 
 	rf_scores, xgb_scores = [], [] # To store the baseline accuracies as a function of sigma threshold (Left Panel of Figure 2)
 	blob_nondetect, other_nondetect = [], [] # To store the number of non-detections (Right Panel of Figure 2)
@@ -220,8 +219,11 @@ Given the analysis from Figure 2, we now proceed with the generated training set
 	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
 
 	#These are the features to use, note that the catalog includes more than this!
-	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 
-		'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 'legendre_2', 'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
+	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 'mu01',
+		'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 'legendre_2', 'legendre_3', 'legendre_4',
+		'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1',
+		'covariance_eigval2', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+		'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
 
 	# Training data arrays
 	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
@@ -269,8 +271,11 @@ We can now generate Figure 3 using the built-in class methods, for the t-SNE pro
 	# Figure 3 Right Panel
 
 	#Setting custom column names for plotting purposes 
-	columns = [r'$B_w$ Mag', r'$B_w$ MagErr', r'$M_{00}$', r'$M_{10}$', r'$M_{01}$', r'$M_{20}$', r'$M_{11}$',
-		r'$M_{02}$', r'$M_{30}$', r'$M_{21}$', r'$M_{12}$', r'$M_{03}$', r'$\mu_{10}$', r'$\mu_{01}$', r'$\mu_{20}$', r'$\mu_{11}$', r'$\mu_{02}$', r'$\mu_{30}$', r'$\mu_{21}$', r'$\mu_{12}$', r'$\mu_{03}$', r'$h_1$', r'$h_2$', r'$h_3$', r'$h_4$', r'$h_5$', r'$h_6$', r'$h_7$', r'$L_2$', r'$L_3$', r'$L_4$', r'$L_5$', r'$L_6$', r'$L_7$', r'$L_8$', r'$L_9$', 'Area', r'$\sigma^2(x)$', r'$\sigma^2(y)$', r'$\sigma^2(xy)$', r'$\lambda_1$', r'$\lambda_2$', r'$C_{xx}$', r'$C_{xy}$', r'$C_{yy}$', 'Eccentricity', 'Ellipticity', 'Elongation', 'Equiv. Radius', 'FWHM', 'Gini', 'Orientation', 'Perimeter', r'$\sigma_{\rm major}$', r'$\sigma_{\rm minor}$', 'Max Val.', 'Min Val.']
+	columns = [r'$B_w$ Mag', r'$B_w$ MagErr', r'$M_{00}$', r'$M_{10}$', r'$M_{01}$', r'$M_{20}$', r'$M_{11}$', r'$M_{02}$', r'$M_{30}$', r'$M_{21}$', r'$M_{12}$',
+		r'$M_{03}$', r'$\mu_{10}$', r'$\mu_{01}$', r'$\mu_{20}$', r'$\mu_{11}$', r'$\mu_{02}$', r'$\mu_{30}$', r'$\mu_{21}$', r'$\mu_{12}$', r'$\mu_{03}$',
+		r'$h_1$', r'$h_2$', r'$h_3$', r'$h_4$', r'$h_5$', r'$h_6$', r'$h_7$', r'$L_2$', r'$L_3$', r'$L_4$', r'$L_5$', r'$L_6$', r'$L_7$', r'$L_8$', r'$L_9$',
+		'Area', r'$\sigma^2(x)$', r'$\sigma^2(y)$', r'$\sigma^2(xy)$', r'$\lambda_1$', r'$\lambda_2$', r'$C_{xx}$', r'$C_{xy}$', r'$C_{yy}$', 'Eccentricity',
+		'Ellipticity', 'Elongation', 'Equiv. Radius', 'FWHM', 'Gini', 'Orientation', 'Perimeter', r'$\sigma_{\rm major}$', r'$\sigma_{\rm minor}$', 'Max Val.', 'Min Val.']
 
 	# Plotting only the top 20 accepted features
 	model.plot_feature_opt(feat_names=columns, top=20, include_other=True, include_shadow=True, include_rejected=False, flip_axes=True)
@@ -384,12 +389,11 @@ Using this catalog, we can now re-load the optimal model to conduct the predicti
 	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
 
 	#These are the features to use, note that the catalog includes more than this!
-	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 
-		'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 
-		'legendre_2', 'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 
-		'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 
-		'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 
-		'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
+	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 'mu01', 'mu20',
+		'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 'legendre_2', 'legendre_3',
+		'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 'area', 'covar_sigx2', 'covar_sigy2',
+		'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+		'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
 
 	# Training data arrays
 	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])

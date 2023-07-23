@@ -16,11 +16,16 @@ To visualize the affect the sigma detection threshold has on the image segmentat
 	import numpy as np 
 	from pyBIA import catalog
 
-	five_confirmed = np.load('confirmed_diffuse.npy')
-	names = ['PRG1', 'PRG2', 'PRG3', 'PRG4', 'LABd05']
+	five_confirmed = np.load('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/images/saved_images_countspersec/confirmed_diffuse/confirmed_diffuse.npy')
+	names = ['PRG4', 'LABd05', 'PRG3', 'PRG2', 'PRG1']
+
+	size = 100 # Will crop the image to be of this size 
+	median_bkg = 0 # Already background-subtracted
+	nsig = [0.3, 0.9, 1.5] # The 3 detection limits to visualize
+	cmap = 'viridis' # Colormap to use
 
 	for i in range(len(five_confirmed)):
-		catalog.plot_three_segm(five_confirmed[i][:,:,0], size=100, median_bkg=0, nsig=[0.3, 0.9, 1.5], cmap='viridis', name=names[i], title='')
+		catalog.plot_three_segm(five_confirmed[i][:,:,0], size=size, median_bkg=median_bkg, nsig=nsig, cmap=cmap, name=names[i], title='', savefig=False)
 
 
 Figure 2
@@ -32,22 +37,21 @@ The training set objects used in our study can be :download:`downloaded here <tr
 
 The code below demonstrates how we conducted our detection threshold analysis. Using the catalog information available in the provided training set, we extracted the morphological features using image segmentation at different thresholds between 0.1 to 1.5 rms of the noise.  
 
-
 .. code-block:: python
 
-	import pandas  
 	import numpy as np 
+	import pandas as pd
 	from astropy.io import fits 
 	from sklearn.model_selection import cross_validate
 	from pyBIA import catalog, ensemble_model
 
 	### Create the Data Files to Generate Figure 2 ###
 
-	data_path = '/NDWFS_Tiles/Bw/fits/'
-	data_error_path = '/NDWFS_Tiles/Bw/error_fits/'
+	data_path = 'NDWFS_Bootes/Bw/'
+	data_error_path = 'NDWFS_Bootes/Error_Maps/Bw/'
 
 	#866 DIFFUSE candidates from Prescott et al. (2012) plus 3200 randomly selected OTHER objects
-	training_set = pandas.read_csv('training_set_objects.csv')
+	training_set = pd.read_csv('training_set_objects.csv')
 
 	sigs = np.around(np.arange(0.1, 1.51, 0.01), decimals=2)
 
@@ -55,28 +59,28 @@ The code below demonstrates how we conducted our detection threshold analysis. U
 		frame = [] #To store all 27 subfields
 		for fieldname in np.unique(np.array(training_set['field_name'])):
 			# Load the field data
-			data, error_map = fits.open(data_path+fieldname+'_Bw_03_fix.fits'), fits.getdata(data_error_path+fieldname+'_Bw_03_rms.fits.fz')
+			data_hdu, error_map = fits.open(data_path+fieldname+'_Bw_03_fix.fits'), fits.getdata(data_error_path+fieldname+'_Bw_03_rms.fits.fz')
 			# Extract the data and corresponding ZP
-			data_map, zeropoint = data[0].data, data[0].header['MAGZERO']
+			data_map, zeropoint, exptime = data_hdu[0].data, data_hdu[0].header['MAGZERO'], data_hdu[0].header['EXPTIME']
 			# Select only the samples from this subfield
 			subfield_index = np.where(training_set['field_name']==fieldname)[0]
 			xpix, ypix = training_set[['xpix', 'ypix']].iloc[subfield_index].values.T
 			objname, field, flag = training_set[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
 			# Create the catalog object
-			cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
+			cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, exptime=exptime, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
 			# Generate the catalog and append the ``cat`` attribute to the frame list
 			cat.create(save_file=False); frame.append(cat.cat)
 		# Combine all 27 sub-catalogs into one master frame and save
-		frame = pandas.concat(frame, axis=0, join='inner'); frame.to_csv('_Bw_training_set_nsig_'+str(sig), chunksize=1000)                                                
+		frame = pd.concat(frame, axis=0, join='inner'); frame.to_csv('_Bw_training_set_nsig_'+str(sig), chunksize=1000)
 
-
-Each saved file is in turn its own training set, allowing us to analyze the performance when using each set of features to train both a Random Forest and XGBoost machine learning engine:
+These 141 nsig files are available for `download <https://drive.google.com/file/d/1Hdce4sA8cfN43lT_S9ilOTGfGyZvD5aj/view?usp=drive_link>`_. 
+These files will be used to create base RF and XGBoost models, one per file:
 
 .. code-block:: python
 
-	# Data for Figure 2
+	###  Read the Data Files ###
 
-	#These are the features to use, note that the catalog includes more features than these!
+	#These are the features to use, note that the catalog includes more than this!
 	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 
 		'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 
 		'legendre_2', 'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 
@@ -88,9 +92,11 @@ Each saved file is in turn its own training set, allowing us to analyze the perf
 	blob_nondetect, other_nondetect = [], [] # To store the number of non-detections (Right Panel of Figure 2)
 	impute = True; num_cv_folds = 10 # Will impute NaN values and then assess accuracy using 10-fold CV
 
+	sigs = np.around(np.arange(0.1, 1.51, 0.01), decimals=2)
+
 	for sig in sigs:
 		# Load each nsig file
-		df = pandas.read_csv('_Bw_training_set_nsig_'+str(sig))
+		df = pd.read_csv('_Bw_training_set_nsig_'+str(sig))
 		# Omit any non-detections
 		mask = np.where((df['area'] != -999) & np.isfinite(df['mag']))[0]
 		# Balance both classes to be of same size
@@ -100,7 +106,7 @@ Each saved file is in turn its own training set, allowing us to analyze the perf
 		# Training data arrays
 		data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
 		# Create RF model first
-		model = ensemble_model.Classifier(data_x, data_y, clf='rf', impute=True); model.create()
+		model = ensemble_model.Classifier(data_x, data_y, clf='rf', impute=impute); model.create()
 		cross_val = cross_validate(model.model, model.data_x, model.data_y, cv=num_cv_folds)
 		rf_scores.append(np.mean(cross_val['test_score']))
 		# Change to XGB model and re-create
@@ -114,22 +120,34 @@ Each saved file is in turn its own training set, allowing us to analyze the perf
 
 	score_data = np.c_[sigs, rf_scores, xgb_scores]
 	non_detect_data = np.c_[sigs, blob_nondetect, other_nondetect]
+	np.savetxt('nsig_scores_Bw', score_data, header="nsigs, RF_scores, XGB_scores")
+	np.savetxt('non_detections_Bw', non_detect_data, header="nsigs, blob_non_detections, other_non_detections")
 
+These two files can be downloaded: 
 
-We can now generate the plots
+- :download:`nsig_scores_Bw <nsig_scores_Bw>`
+- :download:`non_detections_Bw <non_detections_Bw>`
+
+We can now generate the plots:
 
 .. code-block:: python
 
 	### Generate the Plots ###
 
+	import numpy as np 
 	import matplotlib.pyplot as plt   
 	from matplotlib.ticker import FuncFormatter
+	from pyBIA.ensemble_model import _set_style_
 
-	ensemble_model._set_style_() #The custom matplotlib style
+	score_data = np.loadtxt('nsig_scores_Bw')
+	non_detect_data = np.loadtxt('non_detections_Bw')
+
+	_set_style_() #The custom matplotlib style
 
 	# Figure 2 Left Panel
-	max_rf_score, max_xgb_score = np.where(score_data[:,1]==np.max(score_data[:,1]))[0], np.where(score_data[:,2]==np.max(score_data[:,2]))[0] 
-	optimal_index = max_xgb_score[0] if score_data[:,2][max_xgb_score] > score_data[:,1][max_rf_score] else max_rf_score[0]
+	max_rf_score = np.where(score_data[:,1]==np.max(score_data[:,1]))[0][0]
+	max_xgb_score = np.where(score_data[:,2]==np.max(score_data[:,2]))[0][0]
+	optimal_index = max_xgb_score if score_data[:,2][max_xgb_score] > score_data[:,1][max_rf_score] else max_rf_score
 
 	# ACCURACY PLOT
 	fig, ax1 = plt.subplots()
@@ -137,11 +155,19 @@ We can now generate the plots
 	lns2, = ax1.plot(score_data[:,0], score_data[:,2], linestyle='-', color='r')
 	yscatter = score_data[:,2][optimal_index] if score_data[:,2][max_xgb_score] >= score_data[:,1][max_rf_score] else score_data[:,1][optimal_index]
 	lns3 = ax1.scatter(score_data[:,0][optimal_index], yscatter, marker='*', s=225, edgecolors='black', c='green', alpha=0.63, label='Optimal')
-	ax1.legend([lns1, lns2, lns3], ['RF', 'XGBoost', 'Optimal'], loc='upper center', ncol=3, frameon=False, handlelength=2) #r'RF $\pm$ 1$\sigma$'
+	ax1.legend([lns1, lns2, lns3], ['RF', 'XGBoost', 'Optimal'], loc='upper center', ncol=3, frameon=False, handlelength=2)
 	ax1.set_title('RF vs XGBoost: Baseline Performance')
-	ax1.set_xlabel(r'$\sigma$ Noise Detection Limit'); ax1.set_ylabel('10-Fold CV Acc')#, size=14)
+	ax1.set_xlabel(r'$\sigma$ Noise Detection Limit'); ax1.set_ylabel('10-Fold CV Acc')
 	ax1.set_xlim((0.1, 1.5)); ax1.set_ylim((0.875, 0.93))
 	plt.show()
+
+.. figure:: _static/nsigs.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. code-block:: python
 
 	# Figure 2 Right Panel
 
@@ -162,6 +188,11 @@ We can now generate the plots
 	ax2.yaxis.set_major_formatter(FuncFormatter(y_axis_formatter))
 	plt.show() 
 
+.. figure:: _static/nsigs_nondetect.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
 
 Figures 3 & 4
@@ -173,14 +204,12 @@ Given the analysis from Figure 2, we now proceed with the generated training set
 
 	### Figures 3 and 4 ###
 
-	import pandas
 	import numpy as np
+	import pandas as pd
 	from pyBIA import ensemble_model
 
-	#The optimal sig threshold to apply as per Figure 2
-	sig = 0.31
-
-	df = pandas.read_csv('_Bw_training_set_nsig_'+str(sig))
+	sig = 0.31 #The optimal sig threshold to apply as per Figure 2
+	df = pd.read_csv('_Bw_training_set_nsig_'+str(sig))     
 
 	# Omit any non-detections
 	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']))[0]
@@ -192,17 +221,12 @@ Given the analysis from Figure 2, we now proceed with the generated training set
 
 	#These are the features to use, note that the catalog includes more than this!
 	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 
-		'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 
-		'legendre_2', 'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 
-		'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 
-		'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 
-		'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
+		'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 'legendre_2', 'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
 
 	# Training data arrays
 	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
 
 	# Create the model object with feature and hyperparameter optimization enabled (2500 trials each)
-
 	# Enabling 10-fold cross validation which increases the hyperparameter optimization time ten-fold
 	model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True, optimize=True, boruta_trials=2500, n_iter=2500, opt_cv=10, limit_search=False)
 
@@ -210,7 +234,14 @@ Given the analysis from Figure 2, we now proceed with the generated training set
 	model.create()
 	model.save('Optimal_XGB_Model')
 
-With our optimized tree-based ensemble model (which can be :download:`downloaded here <Optimal_XGB_Model.zip>`), we now generate Figure 3 using the built-in class methods:
+.. figure:: _static/fig_optimization_complete.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+This optimized tree-based ensemble model can be :download:`downloaded here <Optimal_XGB_Model.zip>`.
+
+We can now generate Figure 3 using the built-in class methods, for the t-SNE projection we will need the catalog names for the five confirmed blobs in our sample, available for :download:`downloaded here <obj_name_5>`.
 
 .. code-block:: python
 
@@ -220,84 +251,114 @@ With our optimized tree-based ensemble model (which can be :download:`downloaded
 
 	# Figure 3 Left Panel
 
-	# For plotting purposes change the labels from numeric to text, although the model accepts either
+	# For plotting purposes change the labels from numeric to text
 	y_labels = []
 	for flag in data_y:
 		y_labels.append('DIFFUSE') if flag == 1 else y_labels.append('OTHER')
 
-	# For plotting purposes, re-name the five confirmed blobs to Confirmed LyAlpha
-	confirmed_names = np.loadtxt('/Users/daniel/Desktop/Folders/pyBIA/pyBIA/data/obj_name_5', dtype=str)
+	# For plotting purposes, re-name the five confirmed blobs to "Confirmed LyAlpha"
+	confirmed_names = np.loadtxt('obj_name_5', dtype=str)
 
 	for name in confirmed_names:
 		index = np.where(df_filtered.obj_name == name)[0][0]
 		y_labels[index] = r'Confirmed Ly$\alpha$'
 
 	# Plotting t-SNE projection with custom y_data labels, highlighting the scatter points for the confirmed blobs
-	model.plot_tsne(data_y=y_labels, special_class=r'Confirmed Ly$\alpha$', savefig=True)
+	model.plot_tsne(data_y=y_labels, special_class=r'Confirmed Ly$\alpha$')
 
 	# Figure 3 Right Panel
 
 	#Setting custom column names for plotting purposes 
-	columns = [r'$B_w$ Mag', r'$B_w$ MagErr', r'$M_{00}$', r'$M_{10}$', r'$M_{01}$', r'$M_{20}$', r'$M_{11}$', r'$M_{02}$', 
-		r'$M_{30}$', r'$M_{21}$', r'$M_{12}$', r'$M_{03}$', r'$\mu_{10}$', r'$\mu_{01}$', r'$\mu_{20}$', r'$\mu_{11}$', 
-		r'$\mu_{02}$', r'$\mu_{30}$', r'$\mu_{21}$', r'$\mu_{12}$', r'$\mu_{03}$', r'$h_1$', r'$h_2$', r'$h_3$', r'$h_4$', 
-		r'$h_5$', r'$h_6$', r'$h_7$', r'$L_2$', r'$L_3$', r'$L_4$', r'$L_5$', r'$L_6$', r'$L_7$', r'$L_8$', r'$L_9$',
-		'Area', r'$\sigma^2(x)$', r'$\sigma^2(y)$', r'$\sigma^2(xy)$', r'$\lambda_1$', r'$\lambda_2$', r'$C_{xx}$', r'$C_{xy}$', r'$C_{yy}$', 
-		'Eccentricity', 'Ellipticity', 'Elongation', 'Equiv. Radius', 'FWHM', 'Gini', 'Orientation', 'Perimeter', 
-		r'$\sigma_{\rm major}$', r'$\sigma_{\rm minor}$', 'Max Val.', 'Min Val.']
+	columns = [r'$B_w$ Mag', r'$B_w$ MagErr', r'$M_{00}$', r'$M_{10}$', r'$M_{01}$', r'$M_{20}$', r'$M_{11}$',
+		r'$M_{02}$', r'$M_{30}$', r'$M_{21}$', r'$M_{12}$', r'$M_{03}$', r'$\mu_{10}$', r'$\mu_{01}$', r'$\mu_{20}$', r'$\mu_{11}$', r'$\mu_{02}$', r'$\mu_{30}$', r'$\mu_{21}$', r'$\mu_{12}$', r'$\mu_{03}$', r'$h_1$', r'$h_2$', r'$h_3$', r'$h_4$', r'$h_5$', r'$h_6$', r'$h_7$', r'$L_2$', r'$L_3$', r'$L_4$', r'$L_5$', r'$L_6$', r'$L_7$', r'$L_8$', r'$L_9$', 'Area', r'$\sigma^2(x)$', r'$\sigma^2(y)$', r'$\sigma^2(xy)$', r'$\lambda_1$', r'$\lambda_2$', r'$C_{xx}$', r'$C_{xy}$', r'$C_{yy}$', 'Eccentricity', 'Ellipticity', 'Elongation', 'Equiv. Radius', 'FWHM', 'Gini', 'Orientation', 'Perimeter', r'$\sigma_{\rm major}$', r'$\sigma_{\rm minor}$', 'Max Val.', 'Min Val.']
 
-	# Plotting only the top 25 accepted features
-	model.plot_feature_opt(feat_names=columns, top=20, include_other=True, include_shadow=True, 
-		include_rejected=False, flip_axes=True, save_data=False, savefig=True)
+	# Plotting only the top 20 accepted features
+	model.plot_feature_opt(feat_names=columns, top=20, include_other=True, include_shadow=True, include_rejected=False, flip_axes=True)
+
+.. figure:: _static/tSNE_Projection.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/Feature_Importance.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. code-block:: python
 
 	# Figure 4 Left Panel
 	 
-	baseline = 0.92427745 # The maximum baseline accuracy as per Figure 2
-	model.plot_hyper_opt(baseline=baseline, xlim=(1, 2500), ylim=(0.85, 0.935), xlog=True, ylog=False, savefig=True)
+	baseline = 0.921965 # The maximum baseline accuracy as per Figure 2
+	model.plot_hyper_opt(baseline=baseline, xlim=(1, 2500), ylim=(0.85, 0.935), xlog=True, ylog=False)
 
 	# Figure 4 Right Panel 
 
-	model.plot_hyper_param_importance(plot_time=True, savefig=True)
+	model.plot_hyper_param_importance(plot_time=True)
 
+.. figure:: _static/Ensemble_Hyperparameter_Optimization.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/Ensemble_Hyperparameter_Importance.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
 Figure 5
 -----------
 
-With the optimal model saved, we now extract the features using the catalog module for all 2 million OTHER objects in the entire catalog. We have compiled the catalog information in the following dataframe: :download:`other_cat_no_dups_final.csv <other_cat_no_dups_final.csv.zip>`.
+With the optimal model saved, we now extract the features using the catalog module for all 2 million OTHER objects in the entire dataset. We have compiled the catalog information in the following dataframe: :download:`Other_Objects_Catalog.csv <Other_Objects_Catalog.csv.zip>`.
 
-Using this file we can now construct a catalog for the entire dataset (note that this excludes the 866 DIFFUSE objects in the provided training set)
+Using this file we can now construct a catalog for the entire dataset so as to perform the XGBoost classification (note that this excludes the 866 DIFFUSE objects in the provided training set).
 
 .. code-block:: python
 	
-	import pandas
+	import os
 	import numpy as np
+	import pandas as pd
 	from astropy.io import fits
 	from pyBIA import catalog
 
-	other_catalog = pandas.read_csv('other_cat_no_dups_final.csv')
+	other_catalog = pd.read_csv('Other_Objects_Catalog')
 
-	sig=0.31 # The optimal noise-detection threshold to apply
+	data_path = 'NDWFS_Bootes/Bw/'
+	data_error_path = 'NDWFS_Bootes/Error_Maps/Bw/'
 
-	data_path = '/NDWFS_Tiles/Bw/fits/'
-	data_error_path = '/NDWFS_Tiles/Bw/error_fits/'
+	sig = 0.31 # The optimal noise-detection threshold to apply
 
-	frame = [] #To store all 27 subfields
+	# Loop through all the fields and save the field catalogs to avoid memory issues
 	for fieldname in np.unique(np.array(other_catalog['field_name'])):
 		# Load the field data
-		data, error_map = fits.open(data_path+fieldname+'_Bw_03_fix.fits'), fits.getdata(data_error_path+fieldname+'_Bw_03_rms.fits.fz')
-		# Extract the data and corresponding ZP
-		data_map, zeropoint = data[0].data, data[0].header['MAGZERO']
+		data_hdu, error_map = fits.open(data_path+fieldname+'_Bw_03_fix.fits'), fits.getdata(data_error_path+fieldname+'_Bw_03_rms.fits.fz')
+		# Extract the data and corresponding ZP and exptime
+		data_map, zeropoint, exptime = data_hdu[0].data, data_hdu[0].header['MAGZERO'], data_hdu[0].header['EXPTIME']
 		# Select only the samples from this subfield
 		subfield_index = np.where(other_catalog['field_name']==fieldname)[0]
 		xpix, ypix = other_catalog[['xpix', 'ypix']].iloc[subfield_index].values.T
 		objname, field, flag = other_catalog[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
 		# Create the catalog object
-		cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
+		cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, exptime=exptime, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
 		# Generate the catalog and save the subfield catalog, after which it is appended to the master frame 
-		cat.create(save_file=True, filename='Cat_Master_BW_'+field_name); frame.append(cat.cat)
+		cat.create(save_file=True, filename='Cat_BW_Subfield_'+field_name)
+
+	# Now load each subfield individually and create one master catalog
+	fnames = [i for i in os.listdir() if 'Cat_BW_Subfield_' in i]
+
+	frame = [] #To store all 27 subfields
+	for fname in fnames:
+		cat = pd.read_csv(fname); frame.append(cat)
 
 	# Combine all 27 sub-catalogs into one master frame and save
-	frame = pandas.concat(frame, axis=0, join='inner'); frame.to_csv('other_catalog_final_'+str(sig), chunksize=1000)                                                
+	frame = pd.concat(frame, axis=0, join='inner')
+	frame.to_csv('Other_Catalog_Master_'+str(sig), chunksize=1000)    
+
+                                             
 
 This final catalog as genereated above is available for download `here <https://drive.google.com/file/d/1ATM_UZwFNwpzhUv5dARwuZQrvKm55kQr/view?usp=drive_link>`_:
 
@@ -305,17 +366,16 @@ Using this catalog, we can now re-load the optimal model to conduct the predicti
 
 .. code-block:: python
 
-	import pandas 
 	import numpy as np
+	import pandas as pd
 	import matplotlib.pyplot as plt 
 	from pyBIA import ensemble_model 
 
 	# Load all 2 million catalog objects and create a sub-catalog of DIFFUSE candidates #
 
-	#The optimal sig threshold to apply as per Figure 2
+	# Load the original training data from the optimal nsig
 	sig = 0.31
-
-	df = pandas.read_csv('_BW_training_set_nsig_'+str(sig))
+	df = pd.read_csv('_Bw_training_set_nsig_'+str(sig)) 
 
 	# Omit any non-detections
 	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']))[0]
@@ -345,7 +405,7 @@ Using this catalog, we can now re-load the optimal model to conduct the predicti
 	optimized_model.load('Optimal_XGB_Model')
 
 	# Load the catalog containing all 2 million other objects, extracted using sig=0.31
-	other_all = pandas.read_csv('other_catalog_final_031')
+	other_all = pd.read_csv('Other_Catalog_Master_0.31')
 
 	# Remove the 865 OTHER objects that are present in the training set, we will assess these individually using LoO
 	other_all = other_all[~other_all['obj_name'].isin(df_filtered['obj_name'])]

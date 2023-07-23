@@ -356,11 +356,9 @@ Using this file we can now construct a catalog for the entire dataset so as to p
 
 	# Combine all 27 sub-catalogs into one master frame and save
 	frame = pd.concat(frame, axis=0, join='inner')
-	frame.to_csv('Other_Catalog_Master_'+str(sig), chunksize=1000)    
+	frame.to_csv('Other_Catalog_Master_'+str(sig), chunksize=1000)                              
 
-                                             
-
-This final catalog as genereated above is available for download `here <https://drive.google.com/file/d/1ATM_UZwFNwpzhUv5dARwuZQrvKm55kQr/view?usp=drive_link>`_:
+This final catalog as genereated above is available for download `here <https://drive.google.com/file/d/16kJ5jyVImp7E8oEEjjUrj4l9vH2JSkCa/view?usp=sharing>`_:
 
 Using this catalog, we can now re-load the optimal model to conduct the predictions. As per the analysis conducted for this Figure, the predictions will be made using both the base and optimal model so as to compare the distribution of probability predictions. 
 
@@ -429,11 +427,11 @@ Using this catalog, we can now re-load the optimal model to conduct the predicti
 	candidate_catalog_base = other_all.iloc[index_base]
 	candidate_catalog_optimized = other_all.iloc[index_optimized]
 
-	# Save the probability predictions as a new columns
+	# Save the probability predictions as a new columns in these new catalogs
 	candidate_catalog_base['proba'] = predictions_base_model[index_base][:,1]
 	candidate_catalog_optimized['proba'] = predictions_optimized_model[index_optimized][:,1]
 
-The base and optimized candidate catalogs generated above does not include the 866 DIFFUSE training objects as these were deliberately removed from the source catalog. The randomly selected objects that composed our OTHER class are indeed included in the catalog, however, as they were used for training purposes these were not fairly assessed as their presence as an OTHER object skews the probability prediction. For this reason, we perform a Leave-out-Out (LoO) cross-validation analysis, one assessing the DIFFUSE objects so as to extract an informed probability prediction threshold, and another assessing the OTHER objects in our training set so as to include those that would have been predicted as DIFFUSE had they not been present in the training set. These two LoO routines are executed below:
+The base and optimized candidate catalogs generated above do not include the 866 DIFFUSE training objects as these were deliberately removed from the source catalog. The randomly selected objects that composed our OTHER class are indeed included in the catalog, however, as they were used for training purposes these were not fairly assessed as their presence as an OTHER object skews their probability predictions. For this reason, we perform a Leave-out-Out (LoO) cross-validation analysis, one assessing the DIFFUSE objects so as to extract an informed probability prediction threshold and select priority objects, and another assessing the OTHER objects in our training set so as to include those that would have been predicted as DIFFUSE had they not been present in the training set. These two LoO routines are executed below:
 
 .. code-block:: python
 
@@ -451,7 +449,6 @@ The base and optimized candidate catalogs generated above does not include the 8
 
 	#Leave-one-Out cross-validating the DIFFUSE class
 	for i in range(len(diffuse_training)):
-		print(i)
 		# This will be the individual DIFFUSE sample to assess
 		leave_one = np.array(diffuse_training[columns].iloc[i])
 		# Removing this validation sample from the overall DIFFUSE training bag
@@ -532,7 +529,7 @@ The three LoO analysis files are available here:
 - :download:`LoO_DIFFUSE_xgb <LoO_DIFFUSE_xgb>`
 - :download:`LoO_OTHER_xgb <LoO_OTHER_xgb>`
 
-As stated above, analyzing the OTHER objects in our training set using LoO, we can now determine which one of these sources should be included in the candidate catalog:
+As stated above, the OTHER objects in our training set were omitted from the candidate catalogs, but after analyzing these objects using LoO, we can now determine which one of these sources should be included in the candidate catalog:
 
 .. code-block:: python
 
@@ -542,7 +539,7 @@ As stated above, analyzing the OTHER objects in our training set using LoO, we c
 	# Identify these positive detections
 	index = np.where(np.array(other_base_probas) >= 0.5)[0]
 	for name in np.array(names)[index]:
-	indices.append(np.where(other_training.obj_name == name)[0][0])
+		indices.append(np.where(other_training.obj_name == name)[0][0])
 
 	# Add to the master base candidate catalog
 	df_filtered_base = other_training.iloc[indices]
@@ -554,7 +551,7 @@ As stated above, analyzing the OTHER objects in our training set using LoO, we c
 
 	index = np.where(np.array(other_optimized_probas) >= 0.5)[0]
 	for name in np.array(names)[index]:
-	indices.append(np.where(other_training.obj_name == name)[0][0])
+		indices.append(np.where(other_training.obj_name == name)[0][0])
 
 	# Add to the master optimized candidate catalog
 	df_filtered_optimized = other_training.iloc[indices]
@@ -565,10 +562,12 @@ As stated above, analyzing the OTHER objects in our training set using LoO, we c
 	candidate_catalog_base.to_csv('candidate_catalog_base_xgb.csv')
 	candidate_catalog_optimized.to_csv('candidate_catalog_optimized_xgb.csv')
 
-These two candidate catalogs are also available for download:
+These two candidate catalogs are available for download:
 
-- `candidate_catalog_base_xgb <https://drive.google.com/file/d/1TUh9xLCTq4mOsFkmVrUyTBSzZ6LPEFxb/view?usp=drive_link>`_
-- `candidate_catalog_optimized_xgb <https://drive.google.com/file/d/15u0AEnLm5FmbkkWDkQZM_2JxDRNVjNZI/view?usp=drive_link>`_
+- `candidate_catalog_base_xgb <https://drive.google.com/file/d/13r0Qq7r4stemAtffEiEX8w-kQI_RjOKY/view?usp=sharing>`_
+- `candidate_catalog_optimized_xgb <https://drive.google.com/file/d/1IYbSql6xiTB-hGaM_bLp_ygCIKSyfOb_/view?usp=sharing>`_
+
+We can now perform a probability prediction analysis, first with the baseline more (all features, not hyperparameter optimization):
 
 .. code-block:: python
 
@@ -579,94 +578,149 @@ These two candidate catalogs are also available for download:
 	# Create label_y array for plotting purposes
 	y_labels = []
 	for flag in base_model.data_y:
-	y_labels.append('DIFFUSE') if flag == 1 else y_labels.append('OTHER')
+		y_labels.append('DIFFUSE') if flag == 1 else y_labels.append('OTHER')
 
 	# Assess the accuracies using 10-fold cross-validation and normalize the accuracies
-	base_model.plot_conf_matrix(data_y=y_labels, k_fold=10, normalize=True, title='Base Model', savefig=True)
+	base_model.plot_conf_matrix(data_y=y_labels, k_fold=10, normalize=True, title='Base Model')
 
 	# Histogram Plot
-	candidate_catalog_base = pandas.read_csv('/Users/daniel/Desktop/candidate_catalog_base_xgb.csv')
-	probas_candidates = np.array(candidate_catalog_base.proba)#.iloc[xxx]) #xxx = np.where(probas_candidates.area!=-999)[0]
+	candidate_catalog_base = pd.read_csv('candidate_catalog_base_xgb.csv')
+	probas_candidates = np.array(candidate_catalog_base.proba)
 
 	# Load the saved LoO data 
-	confirmed_diffuse_probas = np.loadtxt('/Users/daniel/Desktop/LoO_Confirmed_DIFFUSE_xgb', dtype=str)
-	all_diffuse_probas = np.loadtxt('/Users/daniel/Desktop/LoO_DIFFUSE_xgb', dtype=str)
+	confirmed_diffuse_probas = np.loadtxt('LoO_Confirmed_DIFFUSE_xgb', dtype=str)
+	all_diffuse_probas = np.loadtxt('LoO_DIFFUSE_xgb', dtype=str)
 
 	five_diffuse_base_probas = confirmed_diffuse_probas[:,1].astype('float')
 	all_diffuse_base_probas = all_diffuse_probas[:,1].astype('float')
 
-	# Inspecting two thresholds, 0.8 and 0.9
-	index_90, index_80 = np.where(probas_candidates >= 0.9)[0], np.where(probas_candidates >= 0.8)[0]
+	# Inspecting three thresholds, 0.7, 0.8 and 0.9
+	index_70, index_80, index_90 = np.where(probas_candidates >= 0.7)[0], np.where(probas_candidates >= 0.8)[0], np.where(probas_candidates >= 0.9)[0]
 
 	# Plot 
 	plt.hist(probas_candidates, bins=5, weights=np.ones(len(probas_candidates)) / len(probas_candidates), color='#377eb8', label='Candidates (n='+str(len(probas_candidates))+')')
 	plt.hist(all_diffuse_base_probas, bins=12, weights=np.ones(len(all_diffuse_base_probas)) / len(all_diffuse_base_probas), color='#ff7f00', alpha=0.6, label='DIFFUSE Training (n=865)')
-	plt.scatter(five_diffuse_base_probas, [0.051]*len(five_diffuse_optimized_probas), marker='*', c='k', s=1000, alpha=0.72, label=r'Confirmed Ly$\alpha$ (n=5)')
+	plt.scatter(five_diffuse_base_probas, [0.0458]*len(five_diffuse_base_probas), marker='*', c='k', s=800, alpha=0.72, label=r'Confirmed Ly$\alpha$ (n=5)')
 
 	y=0.12 # Controls the position of the text
-	plt.axvline(x=0.9, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.551)
+
+	# 70th percentile
+	# Dashed vertical line
+	plt.axvline(x=0.7, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.105)
+	# Text showing number of objects above the threshold
+	plt.text(0.701, 0.27+y, s=r" n(P) $\geq$ 0.7", weight="bold")
+	plt.axhline(y=0.25+y, linestyle='-', linewidth=1.2, color='k', xmin=0.41, xmax=0.59)
+	plt.text(0.72, 0.2+y, s=str(len(index_70)), weight="bold")
+
+	# 80th percentile
+	# Dashed vertical line
+	plt.axvline(x=0.8, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.1415)
+	# Text showing number of objects above the threshold
+	plt.text(0.801, 0.55+y, s=r" n(P) $\geq$ 0.8", weight="bold")
+	plt.axhline(y=0.53+y, linestyle='-', linewidth=1.2, color='k', xmin=0.61, xmax=0.79)
+	plt.text(0.82, 0.48+y, s=str(len(index_80)), weight="bold")
+
+	# 90th percentile
+	# Dashed vertical line
+	plt.axvline(x=0.9, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.565)
+	# Text showing number of objects above the threshold
 	plt.text(0.903, 0.83+y, s=r" n(P) $\geq$ 0.9", weight="bold")
 	plt.axhline(y=0.81+y, linestyle='-', linewidth=1.2, color='k', xmin=0.81, xmax=0.99)
 	plt.text(0.925, 0.76+y, s=str(len(index_90)), weight="bold")
 
-	plt.axvline(x=0.8, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.146)
-	plt.text(0.803, 0.55+y, s=r" n(P) $\geq$ 0.8", weight="bold")
-	plt.axhline(y=0.53+y, linestyle='-', linewidth=1.2, color='k', xmin=0.61, xmax=0.79)
-	plt.text(0.82, 0.48+y, s=str(len(index_80)), weight="bold")
-
-	plt.text(0.89, 0.115, s="PRG4", weight="bold")
+	# Highlighting the lowest performing confirmed blob, PRG4
+	plt.text(0.7464, 0.1175, s="PRG4", weight="bold")
 
 	plt.title('XGBoost Classification Output', size=18); plt.xlabel('Probability Prediction', size=16); plt.ylabel('Normalized Counts', size=16)
 	plt.xticks(ticks=[0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.], 
-	labels=['0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'], size=14)
+		labels=['0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'], size=14)
 	plt.yticks(ticks=[0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0], size=14, 
-	labels=['0','','0.1','','0.2','','0.3','','0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'])
+		labels=['0','','0.1','','0.2','','0.3','','0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'])
 	plt.xlim((0.5,1.0)); plt.legend(prop={'size': 14}, loc='upper left')
-	plt.savefig('/Users/daniel/Desktop/Final_Histogram_Base.png', bbox_inches='tight', dpi=300)
 	plt.show()
 
+.. figure:: _static/Ensemble_Confusion_Matrix_Base.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/Final_Histogram_Base.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. code-block:: python
 
 	# Figure 5 Right Panel Histogram -- Optimized Model #
 
 	# Confusion Matrix Plot
-	optimized_model.plot_conf_matrix(data_y=y_labels, k_fold=10, normalize=True, title='Optimized Model', savefig=True)
+	optimized_model.plot_conf_matrix(data_y=y_labels, k_fold=10, normalize=True, title='Optimized Model')
 
 	# Histogram Plot
-	candidate_catalog_optimized = pandas.read_csv('/Users/daniel/Desktop/candidate_catalog_optimized_xgb.csv')
+	candidate_catalog_optimized = pd.read_csv('candidate_catalog_optimized_xgb.csv')
 	probas_candidates = np.array(candidate_catalog_optimized.proba)
 
 	five_diffuse_optimized_probas = confirmed_diffuse_probas[:,2].astype('float')
 	all_diffuse_optimized_probas = all_diffuse_probas[:,2].astype('float')
 
-	# Inspecting two thresholds, 0.8 and 0.9
-	index_90, index_80 = np.where(probas_candidates >= 0.9)[0], np.where(probas_candidates >= 0.8)[0]
+	# Inspecting three thresholds, 0.7, 0.8 and 0.9
+	index_70, index_80, index_90 = np.where(probas_candidates >= 0.7)[0], np.where(probas_candidates >= 0.8)[0], np.where(probas_candidates >= 0.9)[0]
 
 	# Plot
 	plt.hist(probas_candidates, bins=5, weights=np.ones(len(probas_candidates)) / len(probas_candidates), color='#377eb8', label='Candidates (n='+str(len(probas_candidates))+')')
-	plt.hist(all_diffuse_optimized_probas, bins=12, weights=np.ones(len(all_diffuse_optimized_probas)) / len(all_diffuse_optimized_probas), color='#ff7f00', alpha=0.6, label='DIFFUSE Training (n=865)')
-	plt.scatter(five_diffuse_optimized_probas, [0.051]*len(five_diffuse_optimized_probas), marker='*', c='k', s=1000, alpha=0.72, label=r'Confirmed Ly$\alpha$ (n=5)')
+	plt.hist(all_diffuse_base_probas, bins=12, weights=np.ones(len(all_diffuse_base_probas)) / len(all_diffuse_base_probas), color='#ff7f00', alpha=0.6, label='DIFFUSE Training (n=865)')
+	plt.scatter(five_diffuse_base_probas, [0.0458]*len(five_diffuse_base_probas), marker='*', c='k', s=800, alpha=0.72, label=r'Confirmed Ly$\alpha$ (n=5)')
 
-	y=0.02 # Controls the position of the text
-	plt.axvline(x=0.9, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.233)
+	y=0.12 # Controls the position of the text
+
+	# 70th percentile
+	# Dashed vertical line
+	plt.axvline(x=0.7, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.153)
+	# Text showing number of objects above the threshold
+	plt.text(0.701, 0.27+y, s=r" n(P) $\geq$ 0.7", weight="bold")
+	plt.axhline(y=0.25+y, linestyle='-', linewidth=1.2, color='k', xmin=0.41, xmax=0.59)
+	plt.text(0.72, 0.2+y, s=str(len(index_70)), weight="bold")
+
+	# 80th percentile
+	# Dashed vertical line
+	plt.axvline(x=0.8, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.193)
+	# Text showing number of objects above the threshold
+	plt.text(0.801, 0.55+y, s=r" n(P) $\geq$ 0.8", weight="bold")
+	plt.axhline(y=0.53+y, linestyle='-', linewidth=1.2, color='k', xmin=0.61, xmax=0.79)
+	plt.text(0.82, 0.48+y, s=str(len(index_80)), weight="bold")
+
+	# 90th percentile
+	# Dashed vertical line
+	plt.axvline(x=0.9, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.34)
+	# Text showing number of objects above the threshold
 	plt.text(0.903, 0.83+y, s=r" n(P) $\geq$ 0.9", weight="bold")
 	plt.axhline(y=0.81+y, linestyle='-', linewidth=1.2, color='k', xmin=0.81, xmax=0.99)
-	plt.text(0.825, 0.48+y, s=str(len(index_90)), weight="bold")
+	plt.text(0.931, 0.76+y, s=str(len(index_90)), weight="bold")
 
-	plt.axvline(x=0.8, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.217)
-	plt.text(0.803, 0.55+y, s=r" n(P) $\geq$ 0.8", weight="bold")
-	plt.axhline(y=0.53+y, linestyle='-', linewidth=1.2, color='k', xmin=0.61, xmax=0.79)
-	plt.text(0.93, 0.76+y, s=str(len(index_80)), weight="bold")
-
-	plt.text(0.83, 0.12, s="PRG4", weight="bold")
+	# Highlighting the lowest performing confirmed blob, PRG4
+	plt.text(0.7481, 0.1055, s="PRG4", weight="bold")
 
 	plt.title('XGBoost Classification Output', size=18); plt.xlabel('Probability Prediction', size=16); plt.ylabel('Normalized Counts', size=16)
 	plt.xticks(ticks=[0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.], 
-	labels=['0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'], size=14)
+		labels=['0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'], size=14)
 	plt.yticks(ticks=[0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0], size=14, 
-	labels=['0','','0.1','','0.2','','0.3','','0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'])
+		labels=['0','','0.1','','0.2','','0.3','','0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'])
 	plt.xlim((0.5,1.0)); plt.legend(prop={'size': 14}, loc='upper left')
-	plt.savefig('/Users/daniel/Desktop/Final_Histogram_Optimized.png', bbox_inches='tight', dpi=300)
 	plt.show()
+
+.. figure:: _static/Ensemble_Confusion_Matrix_Optimized.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/Final_Histogram_Optimized.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
 
 Figure 6

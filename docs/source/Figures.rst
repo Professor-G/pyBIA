@@ -745,14 +745,14 @@ Figure 6
 	from pyBIA.data_processing import crop_image, concat_channels 
 
 	# Where the images will be saved (as txt files)
-	bw_images_path = '/Users/daniel/Desktop/saved_images/OTHER/Bw/'
-	r_images_path = '/Users/daniel/Desktop/saved_images/OTHER/R/'
+	bw_images_path = 'saved_images/OTHER/Bw/'
+	r_images_path = 'saved_images_cps/OTHER/R/'
 
 	# Load the candidate catalog according to the optimized model 
 	cat = pd.read_csv('candidate_catalog_optimized_xgb.csv')
 
 	# Select only the candidates with probability predictions greater than or equal to 70%
-	index = np.where(cat.proba >= 0.70)[0]
+	index = np.where(cat.proba >= 0.7)[0]
 	sample = cat.iloc[index]
 
 	# Saving images as 120x120 pix
@@ -762,22 +762,28 @@ Figure 6
 	annulus_apertures = CircularAnnulus((int(image_size/2),int(image_size/2)), r_in=20, r_out=35)
 
 	for field_name in np.unique(sample['field_name']):
-		# Load the B and R broadband data
-		data_bw = getdata('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/Bw_FITS/'+field_name+'_Bw_03_fix.fits')
-		data_r = getdata('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/R_FITS/'+field_name+'_R_03_reg_fix.fits')
+		# Load the B and R broadband data 
+		hdu_bw = fits.open('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/Bw_FITS/'+field_name+'_Bw_03_fix.fits')
+		hdu_r = fits.open('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/R_FITS/'+field_name+'_R_03_reg_fix.fits')
 		# Select only the objects in this subfield
 		subfield_index = np.where(sample['field_name'] == field_name)[0] 
 		# Loop through these objects, subtract the background using aperture photometry, and save as txt file
 		for i in range(len(subfield_index)):
+			# Select the object's pixel positions
 			xpix, ypix = sample[['xpix', 'ypix']].iloc[subfield_index[i]].values.T
-			# Bw first, crop the image from the entire subfield array, and save the bkg subtracted sub-array
-			image = crop_image(data_bw, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
+			# Bw first, crop the image from the entire subfield array, and calculate the background in this region
+			image = crop_image(hdu_bw[0].data, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
 			bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
-			np.savetxt(bw_images_path+sample.obj_name.iloc[subfield_index[i]], image-bkg_stats.median)
-			# R next, crop the image from the entire subfield array, and save the bkg subtracted sub-array
-			image = crop_image(data_r, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
+			# Subtract the background and then normalize by the exposure time to get counts/sec
+			image = (image - bkg_stats.median) / hdu_bw[0].header['EXPTIME']
+			np.savetxt(bw_images_path+sample.obj_name.iloc[subfield_index[i]], image)
+			# R next, crop the image from the entire subfield array, and calculate the background in this region
+			image = crop_image(hdu_r[0].data, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
 			bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
-			np.savetxt(r_images_path+sample.obj_name.iloc[subfield_index[i]], image-bkg_stats.median)
+			# Subtract the background and then normalize by the exposure time to get counts/sec
+			image = (image - bkg_stats.median) / hdu_r[0].header['EXPTIME']
+			np.savetxt(r_images_path+sample.obj_name.iloc[subfield_index[i]], image)
+
 
 	# Load the object names that were saved
 	obj_names = [name for name in os.listdir(bw_images_path) if 'NDWFS' in name]

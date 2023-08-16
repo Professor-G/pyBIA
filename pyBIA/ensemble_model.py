@@ -392,8 +392,8 @@ class Classifier:
             
         return np.array(output)
 
-    def plot_tsne(self, data_y=None, special_class=None, norm=True, pca=False, 
-        legend_loc='upper center', title='Feature Parameter Space', savefig=False):
+    def plot_tsne(self, data_y=None, special_class=None, norm=True, pca=False, return_data=False,
+        xlim=None, ylim=None, legend_loc='upper center', title='Feature Parameter Space', savefig=False):
         """
         Plots a t-SNE projection using the sklearn.manifold.TSNE() method.
 
@@ -415,6 +415,11 @@ class Classifier:
             pca (bool): If True the data will be fit to a Principal Component
                 Analysis and all of the corresponding principal components will 
                 be used to generate the t-SNE plot. Defaults to False.
+            return_data (bool): Whether to return the t-SNE array, defaults to False. If True,
+                two outputs will be returned, the x and y coordinates of each individual scatter point,
+                sorted according to the data_y class attribute. 
+            xlim (tuple, optional): The range of the x-axis limits, defaults to None.
+            ylim (tuple, optional): The range of the y-axis limits, defaults to None.
             legend_loc (str): Location of legend, using matplotlib style.
             title (str): Title of the figure.
             savefig (bool): If True the figure will not disply but will be saved instead.
@@ -491,6 +496,8 @@ class Classifier:
                 raise ValueError('The data_y array does not contain the value input in the special_class parameter.')
             plt.scatter(x[mask], y[mask], marker='*', c='red', label=special_class, s=200, alpha=1.0)
         
+        plt.xlim((xlim)) if xlim is not None else None 
+        plt.ylim((ylim)) if ylim is not None else None 
         plt.legend(loc=legend_loc, ncol=len(np.unique(data_y)), frameon=False, handlelength=2)
         plt.title(title); plt.ylabel('t-SNE Dimension 1'); plt.xlabel('t-SNE Dimension 2')
         plt.xticks(); plt.yticks()
@@ -502,7 +509,10 @@ class Classifier:
         else:
             plt.show()
 
-        return
+        if return_data:
+            return x, y
+        else:
+            return
 
     def plot_conf_matrix(self, data_y=None, norm=False, pca=False, k_fold=10, normalize=True, 
         title='Confusion Matrix', savefig=False):

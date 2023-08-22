@@ -12,7 +12,7 @@ import tensorflow as tf
 
 import numpy as np
 import random as python_random
-np.random.seed(1909), python_random.seed(1909), tf.random.set_seed(1909) ##https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development##
+np.random.seed(190977), python_random.seed(190977), tf.random.set_seed(190977) ##https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development##
 from pandas import DataFrame
 from warnings import filterwarnings
 filterwarnings("ignore", category=FutureWarning)
@@ -1155,7 +1155,7 @@ class objective_xgb(object):
         params = {"objective": "binary:logistic", "eval_metric": self.eval_metric} 
     
         if self.opt_cv < 1:
-            train_x, valid_x, train_y, valid_y = train_test_split(self.data_x, self.data_y, test_size=self.opt_cv, random_state=1909)#np.random.randint(1, 1e9))
+            train_x, valid_x, train_y, valid_y = train_test_split(self.data_x, self.data_y, test_size=self.opt_cv, random_state=190977)#np.random.randint(1, 1e9))
             dtrain, dvalid = DMatrix(train_x, label=train_y), DMatrix(valid_x, label=valid_y)
             #print('Initializing XGBoost Pruner...')
             pruning_callback = optuna.integration.XGBoostPruningCallback(trial, "validation-" + self.eval_metric)
@@ -1179,14 +1179,14 @@ class objective_xgb(object):
                     clf = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], reg_lambda=params['reg_lambda'], 
                         reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
                         grow_policy=params['grow_policy'], sample_type=params['sample_type'], normalize_type=params['normalize_type'],
-                        rate_drop=params['rate_drop'], skip_drop=params['skip_drop'], random_state=1909)#, tree_method='hist')
+                        rate_drop=params['rate_drop'], skip_drop=params['skip_drop'], random_state=190977)#, tree_method='hist')
             
             elif params['booster'] == 'gbtree':
                 params['subsample'] = trial.suggest_loguniform('subsample', 1e-6, 1.0)
                 if self.opt_cv >= 1:
                     clf = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], reg_lambda=params['reg_lambda'], 
                         reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
-                        grow_policy=params['grow_policy'], subsample=params['subsample'], random_state=1909)#, tree_method='hist')
+                        grow_policy=params['grow_policy'], subsample=params['subsample'], random_state=190977)#, tree_method='hist')
 
             if self.opt_cv < 1:
                 bst = train(params, dtrain, evals=[(dvalid, "validation")], callbacks=[pruning_callback])
@@ -1223,12 +1223,12 @@ class objective_xgb(object):
                     reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], 
                     gamma=params['gamma'], grow_policy=params['grow_policy'], min_child_weight=params['min_child_weight'], 
                     max_delta_step=params['max_delta_step'], subsample=params['subsample'], sample_type=params['sample_type'], 
-                    normalize_type=params['normalize_type'], rate_drop=params['rate_drop'], skip_drop=params['skip_drop'], random_state=1909)#, tree_method='hist')
+                    normalize_type=params['normalize_type'], rate_drop=params['rate_drop'], skip_drop=params['skip_drop'], random_state=190977)#, tree_method='hist')
         elif params['booster'] == 'gbtree':
             if self.opt_cv >= 1:
                 clf = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'],  reg_lambda=params['reg_lambda'], 
                     reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], grow_policy=params['grow_policy'], 
-                    min_child_weight=params['min_child_weight'], max_delta_step=params['max_delta_step'], subsample=params['subsample'], random_state=1909)#, tree_method='hist')
+                    min_child_weight=params['min_child_weight'], max_delta_step=params['max_delta_step'], subsample=params['subsample'], random_state=190977)#, tree_method='hist')
             
         if self.opt_cv < 1:
             bst = train(params, dtrain, evals=[(dvalid, "validation")], callbacks=[pruning_callback])
@@ -1282,7 +1282,7 @@ class objective_nn(object):
 
         try:
             clf = MLPClassifier(hidden_layer_sizes=tuple(layers),learning_rate_init=learning_rate_init, 
-                solver=solver, activation=activation, alpha=alpha, batch_size=batch_size, max_iter=2500, random_state=1909)
+                solver=solver, activation=activation, alpha=alpha, batch_size=batch_size, max_iter=2500, random_state=190977)
         except:
             print("Invalid hyperparameter combination, skipping trial")
             return 0.0
@@ -1329,7 +1329,7 @@ class objective_rf(object):
         try:
             clf = RandomForestClassifier(n_estimators=n_estimators, criterion=criterion, max_depth=max_depth,
                 min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
-                max_features=max_features, bootstrap=bootstrap, random_state=1909)
+                max_features=max_features, bootstrap=bootstrap, random_state=190977)
         except:
             print("Invalid hyperparameter combination, skipping trial")
             return 0.0
@@ -1645,11 +1645,11 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
     """
 
     if clf == 'rf':
-        model_0 = RandomForestClassifier(random_state=1909)
+        model_0 = RandomForestClassifier(random_state=190977)
     elif clf == 'nn':
-        model_0 = MLPClassifier(random_state=1909)
+        model_0 = MLPClassifier(random_state=190977)
     elif clf == 'xgb':
-        model_0 = XGBClassifier(random_state=1909)
+        model_0 = XGBClassifier(random_state=190977)
         if all(isinstance(val, (int, str)) for val in data_y):
             print('XGBoost classifier requires numerical class labels! Converting class labels as follows:')
             print('____________________________________')
@@ -1676,7 +1676,7 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
         cv = cross_validate(model_0, data_x, data_y, cv=opt_cv)
         initial_score = np.mean(cv['test_score'])
 
-    sampler = optuna.samplers.TPESampler(seed=1909)
+    sampler = optuna.samplers.TPESampler(seed=190977)
     study = optuna.create_study(direction='maximize', sampler=sampler)#, pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=30, interval_steps=10))
     print('Starting hyperparameter optimization, this will take a while...')
 
@@ -1712,7 +1712,7 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
             model = RandomForestClassifier(n_estimators=params['n_estimators'], criterion=params['criterion'], 
                 max_depth=params['max_depth'], min_samples_split=params['min_samples_split'], 
                 min_samples_leaf=params['min_samples_leaf'], max_features=params['max_features'], 
-                bootstrap=params['bootstrap'], class_weight=sample_weight, random_state=1909)
+                bootstrap=params['bootstrap'], class_weight=sample_weight, random_state=190977)
         except:
             print('Failed to optimize with Optuna, switching over to BayesSearchCV...')
             params = {
@@ -1741,7 +1741,7 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
             layers = tuple(params[layer] for layer in layers)
             model = MLPClassifier(hidden_layer_sizes=tuple(layers), learning_rate_init=params['learning_rate_init'], 
                 activation=params['activation'], learning_rate=params['learning_rate'], alpha=params['alpha'], 
-                batch_size=params['batch_size'], solver=params['solver'], max_iter=2500, random_state=1909)
+                batch_size=params['batch_size'], solver=params['solver'], max_iter=2500, random_state=190977)
         except:
             print('Failed to optimize with Optuna, switching over to BayesSearchCV...')
             params = {
@@ -1769,23 +1769,23 @@ def hyper_opt(data_x=None, data_y=None, val_X=None, val_Y=None, img_num_channels
                 model = XGBClassifier(booster=params['booster'],  n_estimators=params['n_estimators'], reg_lambda=params['reg_lambda'], 
                     reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
                     grow_policy=params['grow_policy'], sample_type=params['sample_type'], normalize_type=params['normalize_type'],
-                    rate_drop=params['rate_drop'], skip_drop=params['skip_drop'], scale_pos_weight=sample_weight, random_state=1909)
+                    rate_drop=params['rate_drop'], skip_drop=params['skip_drop'], scale_pos_weight=sample_weight, random_state=190977)
             elif params['booster'] == 'gbtree':
                 model = XGBClassifier(booster=params['booster'],  n_estimators=params['n_estimators'], reg_lambda=params['reg_lambda'], 
                     reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
-                    grow_policy=params['grow_policy'], subsample=params['subsample'], scale_pos_weight=sample_weight, random_state=1909)
+                    grow_policy=params['grow_policy'], subsample=params['subsample'], scale_pos_weight=sample_weight, random_state=190977)
         else:
             if params['booster'] == 'dart':
                 model = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'], 
                     reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
                     grow_policy=params['grow_policy'], sample_type=params['sample_type'], normalize_type=params['normalize_type'],rate_drop=params['rate_drop'], 
                     skip_drop=params['skip_drop'], min_child_weight=params['min_child_weight'], max_delta_step=params['max_delta_step'], subsample=params['subsample'],
-                    scale_pos_weight=sample_weight, random_state=1909)
+                    scale_pos_weight=sample_weight, random_state=190977)
             elif params['booster'] == 'gbtree':
                 model = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'], 
                     reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
                     grow_policy=params['grow_policy'], subsample=params['subsample'], min_child_weight=params['min_child_weight'], max_delta_step=params['max_delta_step'],
-                    scale_pos_weight=sample_weight, random_state=1909)
+                    scale_pos_weight=sample_weight, random_state=190977)
        
     else:
         objective = objective_cnn(data_x, data_y, val_positive=val_X, val_negative=val_Y, img_num_channels=img_num_channels, clf=clf, 
@@ -1855,9 +1855,9 @@ def borutashap_opt(data_x, data_y, boruta_trials=50, model='rf', importance_type
         data_x = Strawman_imputation(data_x)
 
     if model == 'rf':
-        classifier = RandomForestClassifier(random_state=1909)
+        classifier = RandomForestClassifier(random_state=190977)
     elif model == 'xgb':
-        classifier = XGBClassifier(tree_method='exact', max_depth=20, importance_type=importance_type, random_state=1909)
+        classifier = XGBClassifier(tree_method='exact', max_depth=20, importance_type=importance_type, random_state=190977)
     else:
         raise ValueError('Model argument must either be "rf" or "xgb".')
     
@@ -1875,7 +1875,7 @@ def borutashap_opt(data_x, data_y, boruta_trials=50, model='rf', importance_type
 
         feat_selector = BorutaShap(model=classifier, importance_measure='shap', classification=True)
         print('Running feature selection...')
-        feat_selector.fit(X=X, y=y, n_trials=boruta_trials, verbose=False, random_state=1909)
+        feat_selector.fit(X=X, y=y, n_trials=boruta_trials, verbose=False, random_state=190977)
 
         index = np.array([int(feat) for feat in feat_selector.accepted])
         index.sort()
@@ -1903,9 +1903,9 @@ def boruta_opt(data_x, data_y):
         be used to index the columns in the data_x array.
     """
 
-    classifier = RandomForestClassifier(random_state=1909)
+    classifier = RandomForestClassifier(random_state=190977)
 
-    feat_selector = BorutaPy(classifier, n_estimators='auto', random_state=1909)
+    feat_selector = BorutaPy(classifier, n_estimators='auto', random_state=190977)
     print('Running feature selection...')
     feat_selector.fit(data_x, data_y)
 

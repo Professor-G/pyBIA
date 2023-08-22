@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Nov 17 28 10:10:11 2021
+Created on Thu Nov 17 10:10:11 2021
 
 @author: danielgodinez
 """
@@ -99,8 +99,8 @@ class Catalog:
         self.invert = invert 
         self.cat = cat
 
-        if bool(self.zp) != bool(self.exptime):
-            raise ValueError('Both zp and exptime must be provided or not provided simultaneously!')
+        #if bool(self.zp) != bool(self.exptime):
+        #    raise ValueError('Both zp and exptime must be provided or not provided simultaneously!')
 
         if cat is not None:
             try:
@@ -229,12 +229,12 @@ class Catalog:
                 prop_list, moment_list = morph_parameters(data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=None, 
                     invert=self.invert, deblend=self.deblend)
                 tbl = make_table(prop_list, moment_list)
-                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
+                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
                     flux=aper_stats.sum, flux_err=flux_err, median_bkg=None, save=save_file, path=path, filename=filename)
                 
                 return 
 
-            self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
+            self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=aper_stats.sum, flux_err=flux_err, median_bkg=None, save=save_file, path=path, filename=filename)
             
             return 
@@ -260,11 +260,11 @@ class Catalog:
                 prop_list, moment_list = morph_parameters(self.data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
                     invert=self.invert, deblend=self.deblend, threshold=self.threshold)
                 tbl = make_table(prop_list, moment_list)
-                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
+                self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
                     flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
                 return 
 
-            self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
+            self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=flux, median_bkg=background, save=save_file, path=path, filename=filename)
             return 
            
@@ -272,11 +272,11 @@ class Catalog:
             prop_list, moment_list = morph_parameters(self.data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
                     invert=self.invert, deblend=self.deblend, threshold=self.threshold)
             tbl = make_table(prop_list, moment_list)
-            self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
+            self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=flux, flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
             return 
 
-        self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, exptime=self.exptime, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, flux=flux, 
+        self.cat = make_dataframe(table=None, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, flux=flux, 
             flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
         return 
 
@@ -504,7 +504,7 @@ def make_table(props, moments):
 
     return np.array(table, dtype=object)
 
-def make_dataframe(table=None, x=None, y=None, zp=None, exptime=None, flux=None, flux_err=None, median_bkg=None, 
+def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None, median_bkg=None, 
     obj_name=None, field_name=None, flag=None, save=True, path=None, filename=None):
     """
     This function takes as input the catalog of morphological features
@@ -519,8 +519,8 @@ def make_dataframe(table=None, x=None, y=None, zp=None, exptime=None, flux=None,
         y (ndarray, optional): 1D array containing the y-pixel position.
             If input it must be an array of y positions for all objects in the table. 
             This y position will be appended to the dataframe for cataloging purposes. Defaults to None.
-        zp (float):
-        exptime (float):
+        zp (float): Zeropoint of the instrument.
+        exptime (float): Not currently used.
         flux (ndarray, optional): 1D array containing the calculated flux
             of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
         flux_err (ndarray, optional): 1D array containing the calculated flux error
@@ -591,7 +591,7 @@ def make_dataframe(table=None, x=None, y=None, zp=None, exptime=None, flux=None,
             data_dict['flux'] = flux
         else:
             data_dict['flux'] = flux
-            data_dict['mag'] = -2.5*np.log10(np.array(flux/exptime))+zp 
+            data_dict['mag'] = -2.5*np.log10(np.array(flux))+zp 
     if flux_err is not None:
         if zp is None:
             data_dict['flux_err'] = flux_err

@@ -86,7 +86,7 @@ class Classifier:
             below this threshold will be set to this limit. Defaults to 0.
         max_pixel (int, list, optional): The maximum pixel count, pixels with counts 
             above this threshold will be set to this limit. Defaults to 100. If img_num_channels
-            is not 1, the max_pixel should be a list containing two values, one for each band.
+            is not 1, the max_pixel should be a list containing multiple values, one for each band.
         metric (str): Assesment metric to use when both pruning and scoring the hyperparameter optimization trial.
             Defaults to 'loss'. Options include: 'loss' 'binary_accuracy', 'f1_score' 'all' or the validation equivalents (e.g. 'val_loss').
         metric2 (str, optional): Additional metric to be used solely for early-stopping purposes. If input, the trial will stop if either

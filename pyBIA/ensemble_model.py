@@ -147,11 +147,11 @@ class Classifier:
                         print('Unbalanced dataset detected, to apply weights set optimize=True.')
 
         if self.clf == 'rf':
-            model = RandomForestClassifier(random_state=1909)
+            model = RandomForestClassifier(random_state=190977)
         elif self.clf == 'nn':
-            model = MLPClassifier(random_state=1909)
+            model = MLPClassifier(random_state=190977)
         elif self.clf == 'xgb':
-            model = XGBClassifier(random_state=1909)
+            model = XGBClassifier(random_state=190977)
             if all(isinstance(val, (int, str)) for val in self.data_y):
                 print('XGBoost classifier requires numerical class labels! Converting class labels as follows:')
                 print('________________________________')

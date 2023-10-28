@@ -72,6 +72,7 @@ class Classifier:
         test_acc_threshold (float, optional): If input, models that yield test accuracies lower than the threshold will
             be rejected by the optimizer. The accuracy of both the test_positive and test_negative is asessed, if input.
             This is used to reject models that have over or under fit the training data. Defaults to None.
+        val_acc_threshold (float, optional):
         post_metric (bool): If True, the test_positive and/or test_negative inputs will be included in the final optimization score.
             This will be the averaged out metric. Defaults to True. Can be set to False to only apply the test_acc_threshold.
         optimize (bool): If True the Boruta algorithm will be run to identify the features
@@ -166,7 +167,7 @@ class Classifier:
 
     def __init__(self, positive_class=None, negative_class=None, val_positive=None, val_negative=None, img_num_channels=1, clf='alexnet', 
         normalize=False, min_pixel=0, max_pixel=100, optimize=False, n_iter=25, batch_size_min=16, batch_size_max=64, epochs=25, patience=5, metric='loss', metric2=None, metric3=None,
-        average=True, test_positive=None, test_negative=None, test_acc_threshold=None, post_metric=True, opt_model=True, train_epochs=25, opt_cv=None,
+        average=True, test_positive=None, test_negative=None, test_acc_threshold=None, val_acc_threshold=None, post_metric=True, opt_model=True, train_epochs=25, opt_cv=None,
         opt_aug=False, batch_min=2, batch_max=25, batch_other=1, balance=True, image_size_min=50, image_size_max=100, opt_max_min_pix=None, opt_max_max_pix=None, 
         shift=10, rotation=False, horizontal=False, vertical=False, mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, blending_func='mean', num_images_to_blend=2, blend_other=1, zoom_range=(0.9,1.1), skew_angle=0,
         limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, save_models=False, save_studies=False, path=None, use_gpu=False):
@@ -198,6 +199,7 @@ class Classifier:
         self.test_positive = test_positive
         self.test_negative = test_negative
         self.test_acc_threshold = test_acc_threshold
+        self.val_acc_threshold = val_acc_threshold
         self.post_metric = post_metric
         self.opt_model = opt_model
         self.train_epochs = train_epochs
@@ -334,7 +336,7 @@ class Classifier:
         if self.best_params is None:
             self.best_params, self.optimization_results = optimization.hyper_opt(self.positive_class, self.negative_class, val_X=self.val_positive, val_Y=self.val_negative, img_num_channels=self.img_num_channels, clf=self.clf,
                 normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, n_iter=self.n_iter, patience=self.patience, metric=self.metric, metric2=self.metric2, metric3=self.metric3, average=self.average,
-                test_positive=self.test_positive, test_negative=self.test_negative, test_acc_threshold=self.test_acc_threshold, post_metric=self.post_metric, opt_model=self.opt_model, batch_size_min=self.batch_size_min, batch_size_max=self.batch_size_max, 
+                test_positive=self.test_positive, test_negative=self.test_negative, test_acc_threshold=self.test_acc_threshold, val_acc_threshold=self.val_acc_threshold, post_metric=self.post_metric, opt_model=self.opt_model, batch_size_min=self.batch_size_min, batch_size_max=self.batch_size_max, 
                 train_epochs=self.train_epochs, opt_cv=self.opt_cv, opt_aug=self.opt_aug, batch_min=self.batch_min, batch_max=self.batch_max, batch_other=self.batch_other, balance=self.balance, image_size_min=self.image_size_min, image_size_max=self.image_size_max, 
                 shift=self.shift, rotation=self.rotation, horizontal=self.horizontal, vertical=self.vertical, opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, mask_size=self.mask_size, num_masks=self.num_masks, smote_sampling=self.smote_sampling, blend_max=self.blend_max, blend_other=self.blend_other, 
                 num_images_to_blend=self.num_images_to_blend, blending_func=self.blending_func, zoom_range=self.zoom_range, skew_angle=self.skew_angle, limit_search=self.limit_search, monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, 
@@ -939,6 +941,7 @@ class Classifier:
                 print('Complete!'); print('NOTE: Cross-validation was enabled, therefore the model and history class attribute are lists containing all. To save, call the save() method.') 
 
             if overwrite_training:
+                ### ADD -- if self.normalize: normalize_pixels() !!!
                 self.positive_class, self.negative_class, self.val_positive, self.val_negative = class_1, class_2, val_class_1, val_class_2
 
             return
@@ -1209,7 +1212,7 @@ class Classifier:
                     probas.append(predictions[i][1])
                 else:
                     prediction = 'OTHER'
-                    probas.append(predictions[i][0])
+                    probas.append(predictions[i][1])
                 output.append(prediction)
 
             output = np.c_[output, probas] if return_proba else np.array(output)
@@ -1228,7 +1231,7 @@ class Classifier:
                         probas.append(predictions[i][1])
                     else:
                         prediction = 'OTHER'
-                        probas.append(predictions[i][0])
+                        probas.append(predictions[i][1])
                     output.append(prediction)
 
                 model_outputs.append(output); model_probas.append(probas)
@@ -1655,11 +1658,16 @@ class Classifier:
         except:
             path = str(Path.home())
 
-        hyper_importance = get_param_importances(self.optimization_results)
+        # Need to explicitly pass the optimized parameters as by default the variable ones like the optimizer-dependent ones are not included
+        param_list = []; for key in self.optimization_results.best_params: param_list.append(key)
+
+        # The get_param_importances method defaults to the FanovaImportanceEvaluator but will call explicitly to define the number of trees and tree depth
+        hyper_importance = get_param_importances(self.optimization_results, params=param_list, evaluator=FanovaImportanceEvaluator(n_trees=100, max_depth=100))
         joblib.dump(hyper_importance, path+'Hyperparameter_Importance')
 
-        importance = FanovaImportanceEvaluator()
-        duration_importance = importance.evaluate(self.optimization_results, target=lambda t: t.duration.total_seconds())
+        # Will do another call in which the duration importance is calculated
+        importance = FanovaImportanceEvaluator(n_trees=100, max_depth=100)
+        duration_importance = importance.evaluate(self.optimization_results, params=param_list, target=lambda t: t.duration.total_seconds())
         joblib.dump(duration_importance, path+'Duration_Importance')
         
         print(f"Files saved in: {path}")
@@ -3282,6 +3290,36 @@ def format_labels(labels: list) -> list:
         label = label.replace("_", " ")
         if label == "lr":
             new_labels.append("Learning Rate")
+            continue
+        if label == "max_pixel_1":
+            new_labels.append(r"$B_W$ Max Pixel")
+            continue
+        if label == "max_pixel_2":
+            new_labels.append(r"$R$ Max Pixel")
+            continue
+        if label == "max_pixel_3":
+            new_labels.append(r"$B_W / R$ Max Pixel")
+            continue
+        if label == "num_aug":
+            new_labels.append("No. of Aug.")
+            continue
+        if label == "activation_conv":
+            new_labels.append("Conv2D Act.")
+            continue
+        if label == "activation_dense":
+            new_labels.append("FC Act.")
+            continue
+        if label == "loss":
+            new_labels.append("Loss Function")
+            continue
+        if label == "dense_init":
+            new_labels.append("FC Init.")
+            continue
+        if label == "conv_init":
+            new_labels.append("Conv2D Init.")
+            continue
+        if label == "Regularizer":
+            new_labels.append("Conv2D Init.")
             continue
         new_labels.append(label.title())
 

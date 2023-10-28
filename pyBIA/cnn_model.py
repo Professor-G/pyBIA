@@ -37,7 +37,7 @@ from tensorflow.keras.optimizers import SGD, Adam, RMSprop, Adagrad, Adadelta, A
 from tensorflow.keras.losses import categorical_crossentropy, Hinge, SquaredHinge, KLDivergence, LogCosh
 from tensorflow.keras.layers import Input, Activation, Dense, Dropout, Conv2D, MaxPool2D, Add, ZeroPadding2D, \
     AveragePooling2D, GlobalAveragePooling2D, Flatten, BatchNormalization, Lambda, concatenate
-from optuna.importance import get_param_importances, FanovaImportanceEvaluator
+from optuna.importance import get_param_importances, FanovaImportanceEvaluator, MeanDecreaseImpurityImportanceEvaluator
 from pyBIA.data_processing import process_class, create_training_set, concat_channels
 from pyBIA.data_augmentation import augmentation, resize, smote_oversampling, plot
 from pyBIA import optimization
@@ -1635,10 +1635,24 @@ class Classifier:
         else:
             plt.show()
 
-    def save_hyper_importance(self):
+    def save_hyper_importance(self, param_list=None, evaluator='fanova', n_trees=64, max_depth=64, seed=1909):
         """
         Calculates and saves binary files containing dictionaries with importance information, one
         for the importance and one for the duration importance
+    
+        Args:
+            param_list (list, optional): A list containing the names (str) of the hyperparameters to assess.
+                These must correspond to the names as configured in the optimization module and saved in
+                self.optimization_results.best_params. Defaults to None, in which case the hyperaparameters present in
+                ALL of the completed trials are assessed. IMPORTANT: If set to None, the hyperparameters that are optimizer-dependent will not
+                show as these are not present in all of the completed trials, if you wish to assess these variable parameters as well
+                set param_list='all'.
+            evaluator (str): The importance evaluator to determine what algorithm to use when computing the importances when
+                applying the random forest model. Defaults to 'fanova', other option is 'mdi' for the Mean Decrease Impurity importance evaluator.
+            n_trees (int): The number of trees in the random forest. Defaults to 64.
+            max_depth (int): The maximum depth of each tree in the random forest. Defaults to 64.
+            seed (int, optional): The seed to use when fitting the random forest, defaults to 1909.
+
 
         Note:
             This procedure can be time-consuming but must be run once before the importances can be displayed. 
@@ -1659,15 +1673,25 @@ class Classifier:
             path = str(Path.home())
 
         # Need to explicitly pass the optimized parameters as by default the variable ones like the optimizer-dependent ones are not included
-        param_list = []; for key in self.optimization_results.best_params: param_list.append(key)
+        if param_list == 'all':
+            param_list = []
+            for key in self.optimization_results.best_params: param_list.append(key)
+
+        if evaluator == 'fanova':
+            evaluator = FanovaImportanceEvaluator(n_trees=n_trees, max_depth=max_depth, seed=seed)
+        elif evaluator == 'mdi':
+            evaluator = MeanDecreaseImpurityImportanceEvaluator(n_trees=n_trees, max_depth=max_depth, seed=seed)
+        else:
+            raise ValueError('Invalid evaluator input, options are "fanova" or "mdi".')
 
         # The get_param_importances method defaults to the FanovaImportanceEvaluator but will call explicitly to define the number of trees and tree depth
-        hyper_importance = get_param_importances(self.optimization_results, params=param_list, evaluator=FanovaImportanceEvaluator(n_trees=100, max_depth=100))
+        hyper_importance = get_param_importances(self.optimization_results, params=param_list, evaluator=evaluator)
         joblib.dump(hyper_importance, path+'Hyperparameter_Importance')
 
         # Will do another call in which the duration importance is calculated
-        importance = FanovaImportanceEvaluator(n_trees=100, max_depth=100)
-        duration_importance = importance.evaluate(self.optimization_results, params=param_list, target=lambda t: t.duration.total_seconds())
+        duration_importance = get_param_importances(self.optimization_results, params=param_list, evaluator=evaluator, target=lambda t: t.duration.total_seconds())
+        #importance = FanovaImportanceEvaluator()
+        #duration_importance = importance.evaluate(self.optimization_results, params=param_list, target=lambda t: t.duration.total_seconds())
         joblib.dump(duration_importance, path+'Duration_Importance')
         
         print(f"Files saved in: {path}")
@@ -3287,7 +3311,6 @@ def format_labels(labels: list) -> list:
 
     new_labels = []
     for label in labels:
-        label = label.replace("_", " ")
         if label == "lr":
             new_labels.append("Learning Rate")
             continue
@@ -3298,16 +3321,16 @@ def format_labels(labels: list) -> list:
             new_labels.append(r"$R$ Max Pixel")
             continue
         if label == "max_pixel_3":
-            new_labels.append(r"$B_W / R$ Max Pixel")
+            new_labels.append(r"$B_W \ / \ R$ Max Pixel")
             continue
         if label == "num_aug":
-            new_labels.append("No. of Aug.")
+            new_labels.append("No. of Augmentations")
             continue
         if label == "activation_conv":
-            new_labels.append("Conv2D Act.")
+            new_labels.append("Conv2D Activation")
             continue
         if label == "activation_dense":
-            new_labels.append("FC Act.")
+            new_labels.append("FC Activation")
             continue
         if label == "loss":
             new_labels.append("Loss Function")
@@ -3318,9 +3341,21 @@ def format_labels(labels: list) -> list:
         if label == "conv_init":
             new_labels.append("Conv2D Init.")
             continue
-        if label == "Regularizer":
-            new_labels.append("Conv2D Init.")
+        if label == "beta_1":
+            new_labels.append(r"$\beta_1")
             continue
+        if label == "beta_2":
+            new_labels.append(r"$\beta_2")
+            continue
+        if label == "amsgrad":
+            new_labels.append("AMSGrad")
+        if label == "optimizer":
+            new_labels.append("Optimizer")
+            continue
+        if label == 'model_reg':
+            new_labels.append("Regularizer")
+            continue 
+        label = label.replace("_", " ")
         new_labels.append(label.title())
 
     return new_labels

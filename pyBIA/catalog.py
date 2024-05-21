@@ -226,7 +226,7 @@ class Catalog:
             flux_err = None if self.error is None else aper_stats.sum_err
 
             if self.morph_params == True:
-                prop_list, moment_list = morph_parameters(data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=None, 
+                prop_list, moment_list, self.segm_map = morph_parameters(data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=None, 
                     invert=self.invert, deblend=self.deblend)
                 tbl = make_table(prop_list, moment_list)
                 self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
@@ -257,7 +257,7 @@ class Catalog:
 
         if self.error is None:
             if self.morph_params == True:
-                prop_list, moment_list = morph_parameters(self.data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
+                prop_list, moment_list, self.segm_map = morph_parameters(self.data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
                     invert=self.invert, deblend=self.deblend, threshold=self.threshold)
                 tbl = make_table(prop_list, moment_list)
                 self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
@@ -269,7 +269,7 @@ class Catalog:
             return 
            
         if self.morph_params == True:
-            prop_list, moment_list = morph_parameters(self.data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
+            prop_list, moment_list, self.segm_map = morph_parameters(self.data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
                     invert=self.invert, deblend=self.deblend, threshold=self.threshold)
             tbl = make_table(prop_list, moment_list)
             self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
@@ -280,7 +280,7 @@ class Catalog:
             flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
         return 
 
-    def plot(self, index=None, obj_name=None, name=''):
+    def plot(self, index=None, obj_name=None, name='', pix_conversion=5, size=100):
         """
         Outputs two subplots, the image and the segmentation object.
 
@@ -302,7 +302,8 @@ class Catalog:
             
         if index is None and obj_name is None:
             plot_segm(self.data, nsig=self.nsig, kernel_size=self.kernel_size, invert=self.invert, 
-                median_bkg=self.bkg, deblend=self.deblend, name=name)
+                median_bkg=self.bkg, deblend=self.deblend, name=name, pix_conversion=pix_conversion,
+                r_in=self.annulus_in, r_out=self.annulus_out)
         else:
             if len(self.cat.shape) == 2:
                 mask = np.where(self.cat['obj_name'] == obj_name)[0] if obj_name is not None else int(index)
@@ -312,7 +313,8 @@ class Catalog:
                 xpix, ypix = float(self.cat['xpix']), float(self.cat['ypix'])
 
             plot_segm(self.data, xpix=xpix, ypix=ypix, median_bkg=self.bkg, nsig=self.nsig, 
-                kernel_size=self.kernel_size, invert=self.invert, deblend=self.deblend, name=name)
+                kernel_size=self.kernel_size, invert=self.invert, deblend=self.deblend, name=name,
+                r_in=self.annulus_in, r_out=self.annulus_out, size=100, pix_conversion=pix_conversion)
         return
 
 def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=21, median_bkg=None, 
@@ -438,7 +440,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
     if len(prop_list) != len(moment_list):
         raise ValueError('The properties list does not match the image moments list.')
         
-    return np.array(prop_list, dtype=object), moment_list
+    return np.array(prop_list, dtype=object), moment_list, segm.data
 
 def make_table(props, moments):
     """
@@ -681,9 +683,9 @@ def segm_find(data, nsig=0.6, kernel_size=21, deblend=False):
     sigma = 9.0 * gaussian_fwhm_to_sigma   # FWHM = 9. smooth the data with a 2D circular Gaussian kernel with a FWHM of 3 pixels to filter the image prior to thresholding:
     kernel = Gaussian2DKernel(sigma, x_size=kernel_size, y_size=kernel_size, mode='center')
     convolved_data = convolve(data, kernel, normalize_kernel=True, preserve_nan=True)
-    segm = detect_sources(convolved_data, threshold, npixels=9, kernel=None, connectivity=8)
+    segm = detect_sources(convolved_data, threshold, npixels=9, connectivity=8)
     if deblend is True:
-        segm = deblend_sources(convolved_data, segm, npixels=5, kernel=None)
+        segm = deblend_sources(convolved_data, segm, npixels=5)
     
     return segm, convolved_data 
 
@@ -774,7 +776,7 @@ def align_error_array(data, error, data_coords, error_coords):
     return padded_error
 
 def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, cmap='viridis', path=None, name='', savefig=False, dpi=300):
+    deblend=False, pix_conversion=5, r_in=20, r_out=35, cmap='viridis', path=None, name='', savefig=False, dpi=300):
     """
     Returns two subplots: source and corresponding segementation object. 
 
@@ -830,6 +832,8 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
             are computed. Defaults to False so as to keep blobs as one segmentation object.
         pix_conversion (int): Pixels per arcseconds conversion factor. This is used to set
             the image axes. 
+        r_in (int): Radius of first annuli used to compute the background, defaults to 20.
+        r_out (int): Radius of second annuli used to compute the background, defaults to 35.
         cmap (str): Colormap to use when generating the image.
         path (str, optional): By default the text file containing the photometry will be
             saved to the local directory, unless an absolute path to a directory is entered here.
@@ -860,13 +864,14 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
         pass
 
     if data.shape[1] < size:
-       size = data.shape[1]
-    if data.shape[1] < 70: 
-        r_out = data.shape[1]-1
-        r_in = r_out - 15 #This is a 15 pixel annulus. 
-    elif data.shape[1] >= 72:
-        r_out = 35
-        r_in = 20 #Default annulus used to calculate the median bkg
+        size = data.shape[1]
+
+    #if data.shape[1] < 70: 
+    #    r_out = data.shape[1]-1
+    #    r_in = r_out - 15 #This is a 15 pixel annulus. 
+    #elif data.shape[1] >= 72:
+    #    r_out = 35
+    #    r_in = 20 #Default annulus used to calculate the median bkg
     
     if xpix is None and ypix is None:
         xpix, ypix = data.shape[1]/2, data.shape[1]/2
@@ -971,6 +976,8 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
             length = new_data.shape[0]
             x_label_list = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
             ticks = [0,length-3*length/4,length-length/2,length-length/4,length]
+            x_label_list = [str(np.round(float(t), 1)) for t in x_label_list]
+            
             ax1.set_frame_on(True)
             ax1.set_xticks(ticks)
             ax1.set_xticklabels(x_label_list)
@@ -990,12 +997,13 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
                 fig.savefig(path+name+'.png', dpi=dpi, bbox_inches='tight')
-                plt.clf()
+                plt.close()
                 return
-            plt.show()           
+            plt.show()
+            plt.close()
 
 def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=[0.1, 0.5, 0.9], kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, cmap='viridis', path=None, name='segm_image', title='Source Detection Threshold', savefig=False):
+    r_in=20, r_out=35, deblend=False, pix_conversion=5, cmap='viridis', path=None, name='segm_image', title='Source Detection Threshold', savefig=False):
     """
     This is the function used to generate Figure 1 of the paper, used to visualize
     how the segmentation object differs when applying varying sigma thresholds.
@@ -1065,13 +1073,14 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
         pass
 
     if data.shape[1] < size:
-       size = data.shape[1]
-    if data.shape[1] < 70: 
-        r_out = data.shape[1]-1
-        r_in = r_out - 15 #This is a 15 pixel annulus. 
-    elif data.shape[1] >= 72:
-        r_out = 35
-        r_in = 20 #Default annulus used to calculate the median bkg
+        size = data.shape[1]
+
+    #if data.shape[1] < 70: 
+    #    r_out = data.shape[1]-1
+    #    r_in = r_out - 15 #This is a 15 pixel annulus. 
+    #elif data.shape[1] >= 72:
+    #    r_out = 35
+    #    r_in = 20 #Default annulus used to calculate the median bkg
     
     if xpix is None and ypix is None:
         xpix, ypix = data.shape[1]/2, data.shape[1]/2
@@ -1188,7 +1197,6 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             else:
                 ax1.title(name[i], color='black', size=18)
 
-
             ax1.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=17)
             ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
             ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=17)
@@ -1215,10 +1223,12 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             length = new_data.shape[0]
             x_label_list_1 = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
             ticks_1 = [0,length-3*length/4,length-length/2,length-length/4,length]
+            x_label_list_1 = [str(np.round(float(t), 1)) for t in x_label_list_1]
 
             x_label_list_2 = [str(length/-4./pix_conversion), 0, str(length/4./pix_conversion)]
             ticks_2 = [length-3*length/4,length-length/2,length-length/4]
-
+            x_label_list_2 = [str(np.round(float(t), 1)) for t in x_label_list_2]
+            
             ax1.set_frame_on(True)
             ax1.set_xticks(ticks_2)
             ax1.set_xticklabels(x_label_list_2, color='black', fontsize=16)
@@ -1248,12 +1258,13 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
                 fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
-                plt.clf()
+                plt.close()
                 return
             plt.show()
+            plt.close()
 
 def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0, median_bkg2=0, nsig=[0.5, 0.5], kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, cmap='viridis', path=None, filter1='Bw', filter2='Rw', name='Source Detection Threshold', savefig=False):
+    deblend=False, pix_conversion=5, r_in=20, r_out=35, cmap='viridis', path=None, filter1='Bw', filter2='Rw', name='Source Detection Threshold', savefig=False):
     """
     This is the function used to plot the same object in two different bands.
 
@@ -1333,13 +1344,14 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
         pass
 
     if data1.shape[1] < size:
-       size = data1.shape[1]
-    if data1.shape[1] < 70: 
-        r_out = data1.shape[1]-1
-        r_in = r_out - 15 #This is a 15 pixel annulus. 
-    elif data1.shape[1] >= 72:
-        r_out = 35
-        r_in = 20 #Default annulus used to calculate the median bkg
+        size = data1.shape[1]
+
+    #if data1.shape[1] < 70: 
+    #    r_out = data1.shape[1]-1
+    #    r_in = r_out - 15 #This is a 15 pixel annulus. 
+    #elif data1.shape[1] >= 72:
+    #    r_out = 35
+    #    r_in = 20 #Default annulus used to calculate the median bkg
     
     if xpix is None and ypix is None:
         xpix, ypix = data1.shape[1]/2, data1.shape[1]/2
@@ -1399,10 +1411,12 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
         plt.rcParams["axes.formatter.use_mathtext"]=True
         plt.rcParams['text.usetex']=False
 
+        #plt.style.use('/Users/daniel/Downloads/plot_style.txt')
+
         with plt.rc_context({'axes.edgecolor':'white', 'xtick.color':'white', 
             'ytick.color':'white', 'figure.facecolor':'black'}):#, 'axes.titlesize':22}):
             fig, axes = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8,8))
-            fig.suptitle(name, x=.5, y=0.98, color='black', fontsize=16)
+            fig.suptitle(name, x=.5, y=0.954, color='black', fontsize=22)
             ((ax1, ax2), (ax4, ax3)) = axes
             ax1.set_aspect('equal')
             ax2.set_aspect('equal')
@@ -1455,19 +1469,19 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
             ax4.yaxis.set_visible(True)
             
             if isinstance(filter1, str):
-                ax1.set_title(filter1, color='black', size=18)
+                ax1.set_title(filter1, color='black', size=20)
             else:
-                ax1.title(filter1[i], color='black', size=18)
+                ax1.title(filter1[i], color='black', size=20)
 
             if isinstance(filter2, str):
-                ax2.set_title(filter2, color='black', size=18)
+                ax2.set_title(filter2, color='black', size=20)
             else:
-                ax2.title(filter2[i], color='black', size=18)
+                ax2.title(filter2[i], color='black', size=20)
 
-            ax1.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=17)
-            ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
-            ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=17)
-            ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
+            ax1.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=18)
+            ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=18)
+            ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=18)
+            ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=18)
 
             ax1.xaxis.set_major_locator(plt.MaxNLocator(5))
             ax1.yaxis.set_major_locator(plt.MaxNLocator(5))
@@ -1490,9 +1504,11 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
             length = new_data1.shape[0]
             x_label_list_1 = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
             ticks_1 = [0,length-3*length/4,length-length/2,length-length/4,length]
+            x_label_list_1 = [str(np.round(float(t), 1)) for t in x_label_list_1]
 
             x_label_list_2 = [str(length/-4./pix_conversion), 0, str(length/4./pix_conversion)]
             ticks_2 = [length-3*length/4,length-length/2,length-length/4]
+            x_label_list_2 = [str(np.round(float(t), 1)) for t in x_label_list_2]
 
             ax1.set_frame_on(True)
             ax1.set_xticks(ticks_2)
@@ -1523,9 +1539,10 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
                     print("No path specified, saving catalog to local home directory.")
                     path = str(Path.home())+'/'
                 fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
-                plt.clf()
+                plt.close()
                 return
             plt.show()
+            plt.close()
 
 def _set_style_():
     """

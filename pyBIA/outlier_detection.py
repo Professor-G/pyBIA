@@ -320,6 +320,7 @@ for image_size in image_sizes:
 
 
 """
+"""
 
 from sklearn.ensemble import IsolationForest
 import numpy as np  
@@ -398,7 +399,7 @@ len(np.where(y_pred==-1)[0]) / len(y_pred)
 y_pred = model.predict(feats_non_outlier)
 len(np.where(y_pred==1)[0]) / len(y_pred)
 
-
+"""
 
 
 

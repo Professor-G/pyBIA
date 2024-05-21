@@ -1161,20 +1161,20 @@ class objective_xgb(object):
             pruning_callback = optuna.integration.XGBoostPruningCallback(trial, "validation-" + self.eval_metric)
 
         if self.limit_search:
-            params['n_estimators'] = trial.suggest_int('n_estimators', 100, 250)
+            params['n_estimators'] = trial.suggest_int('n_estimators', 100, 300)
             params['booster'] = trial.suggest_categorical('booster', ['gbtree', 'dart'])
-            params['reg_lambda'] = trial.suggest_loguniform('reg_lambda', 1e-8, 1)
-            params['reg_alpha'] = trial.suggest_loguniform('reg_alpha', 1e-8, 1)
-            params['max_depth'] = trial.suggest_int('max_depth', 2, 25)
-            params['eta'] = trial.suggest_loguniform('eta', 1e-8, 1)
-            params['gamma'] = trial.suggest_loguniform('gamma', 1e-8, 1)
+            params['reg_lambda'] = trial.suggest_float('reg_lambda', 0.0, 2.0)
+            params['reg_alpha'] = trial.suggest_float('reg_alpha', 0.0, 2.0)
+            params['max_depth'] = trial.suggest_int('max_depth', 3, 10)
+            params['eta'] = trial.suggest_float('eta', 0.01, 0.3)
+            params['gamma'] = trial.suggest_float('gamma', 0.0, 5.0)
             params['grow_policy'] = trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
 
             if params['booster'] == "dart":
                 params['sample_type'] = trial.suggest_categorical('sample_type', ['uniform', 'weighted'])
                 params['normalize_type'] = trial.suggest_categorical('normalize_type', ['tree', 'forest'])
-                params['rate_drop'] = trial.suggest_loguniform('rate_drop', 1e-8, 1)
-                params['skip_drop'] = trial.suggest_loguniform('skip_drop', 1e-8, 1)
+                params['rate_drop'] = trial.suggest_float('rate_drop', 0.1, 0.5)
+                params['skip_drop'] = trial.suggest_float('skip_drop', 0.1, 0.5)
                 if self.opt_cv >= 1:
                     clf = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], reg_lambda=params['reg_lambda'], 
                         reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], gamma=params['gamma'], 
@@ -1201,23 +1201,23 @@ class objective_xgb(object):
             return accuracy
 
         params['booster'] = trial.suggest_categorical('booster', ['gbtree', 'dart'])
-        params['n_estimators'] = trial.suggest_int('n_estimators', 100, 500)
-        params['reg_lambda'] = trial.suggest_float('reg_lambda', 0, 100)
-        params['reg_alpha'] = trial.suggest_int('reg_alpha', 0, 100)
-        params['max_depth'] = trial.suggest_int('max_depth', 2, 25)
-        params['eta'] = trial.suggest_float('eta', 1e-8, 1)
-        params['gamma'] = trial.suggest_int('gamma', 1, 100)
+        params['n_estimators'] = trial.suggest_int('n_estimators', 100, 300)
+        params['reg_lambda'] = trial.suggest_float('reg_lambda', 0.0, 2.0)
+        params['reg_alpha'] = trial.suggest_float('reg_alpha', 0.0, 2.0)
+        params['max_depth'] = trial.suggest_int('max_depth', 3, 10)
+        params['eta'] = trial.suggest_float('eta', 0.01, 0.3)
+        params['gamma'] = trial.suggest_float('gamma', 0.0, 5.0)
         params['grow_policy'] = trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
-        params['min_child_weight'] = trial.suggest_int('min_child_weight', 1, 100)
-        params['max_delta_step'] = trial.suggest_int('max_delta_step', 1, 100)
+        params['min_child_weight'] = trial.suggest_int('min_child_weight', 1, 10)
+        params['max_delta_step'] = trial.suggest_int('max_delta_step', 1, 10)
         params['subsample'] = trial.suggest_float('subsample', 0.5, 1.0)
-        params['colsample_bytree'] = trial.suggest_float('colsample_bytree', 0.5, 1)
+        params['colsample_bytree'] = trial.suggest_float('colsample_bytree', 0.5, 1.0)
 
         if params['booster'] == "dart":
             params['sample_type'] = trial.suggest_categorical('sample_type', ['uniform', 'weighted'])
             params['normalize_type'] = trial.suggest_categorical('normalize_type', ['tree', 'forest'])
-            params['rate_drop'] = trial.suggest_float('rate_drop', 1e-8, 1)
-            params['skip_drop'] = trial.suggest_float('skip_drop', 1e-8, 1)
+            params['rate_drop'] = trial.suggest_float('rate_drop', 0.1, 0.5)
+            params['skip_drop'] = trial.suggest_float('skip_drop', 0.1, 0.5)
             if self.opt_cv >= 1:
                 clf = XGBClassifier(booster=params['booster'], n_estimators=params['n_estimators'], colsample_bytree=params['colsample_bytree'], 
                     reg_lambda=params['reg_lambda'], reg_alpha=params['reg_alpha'], max_depth=params['max_depth'], eta=params['eta'], 

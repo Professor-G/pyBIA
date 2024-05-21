@@ -167,10 +167,10 @@ class Classifier:
 
     def __init__(self, positive_class=None, negative_class=None, val_positive=None, val_negative=None, img_num_channels=1, clf='alexnet', 
         normalize=False, min_pixel=0, max_pixel=100, optimize=False, n_iter=25, batch_size_min=16, batch_size_max=64, epochs=25, patience=5, metric='loss', metric2=None, metric3=None,
-        average=True, test_positive=None, test_negative=None, test_acc_threshold=None, val_acc_threshold=None, post_metric=True, opt_model=True, train_epochs=25, opt_cv=None,
+        average=True, test_positive=None, test_negative=None, test_acc_threshold=None, post_metric=True, opt_model=True, train_epochs=25, opt_cv=None,
         opt_aug=False, batch_min=2, batch_max=25, batch_other=1, balance=True, image_size_min=50, image_size_max=100, opt_max_min_pix=None, opt_max_max_pix=None, 
         shift=10, rotation=False, horizontal=False, vertical=False, mask_size=None, num_masks=None, smote_sampling=0, blend_max=0, blending_func='mean', num_images_to_blend=2, blend_other=1, zoom_range=(0.9,1.1), skew_angle=0,
-        limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, save_models=False, save_studies=False, path=None, use_gpu=False):
+        limit_search=True, monitor1=None, monitor2=None, monitor1_thresh=None, monitor2_thresh=None, verbose=0, save_models=False, save_studies=False, path=None, use_gpu=False): #val_acc_threshold=None, 
 
         self.positive_class = positive_class
         self.negative_class = negative_class
@@ -199,7 +199,7 @@ class Classifier:
         self.test_positive = test_positive
         self.test_negative = test_negative
         self.test_acc_threshold = test_acc_threshold
-        self.val_acc_threshold = val_acc_threshold
+        #self.val_acc_threshold = val_acc_threshold
         self.post_metric = post_metric
         self.opt_model = opt_model
         self.train_epochs = train_epochs
@@ -336,11 +336,11 @@ class Classifier:
         if self.best_params is None:
             self.best_params, self.optimization_results = optimization.hyper_opt(self.positive_class, self.negative_class, val_X=self.val_positive, val_Y=self.val_negative, img_num_channels=self.img_num_channels, clf=self.clf,
                 normalize=self.normalize, min_pixel=self.min_pixel, max_pixel=self.max_pixel, n_iter=self.n_iter, patience=self.patience, metric=self.metric, metric2=self.metric2, metric3=self.metric3, average=self.average,
-                test_positive=self.test_positive, test_negative=self.test_negative, test_acc_threshold=self.test_acc_threshold, val_acc_threshold=self.val_acc_threshold, post_metric=self.post_metric, opt_model=self.opt_model, batch_size_min=self.batch_size_min, batch_size_max=self.batch_size_max, 
+                test_positive=self.test_positive, test_negative=self.test_negative, test_acc_threshold=self.test_acc_threshold, post_metric=self.post_metric, opt_model=self.opt_model, batch_size_min=self.batch_size_min, batch_size_max=self.batch_size_max, 
                 train_epochs=self.train_epochs, opt_cv=self.opt_cv, opt_aug=self.opt_aug, batch_min=self.batch_min, batch_max=self.batch_max, batch_other=self.batch_other, balance=self.balance, image_size_min=self.image_size_min, image_size_max=self.image_size_max, 
                 shift=self.shift, rotation=self.rotation, horizontal=self.horizontal, vertical=self.vertical, opt_max_min_pix=self.opt_max_min_pix, opt_max_max_pix=self.opt_max_max_pix, mask_size=self.mask_size, num_masks=self.num_masks, smote_sampling=self.smote_sampling, blend_max=self.blend_max, blend_other=self.blend_other, 
                 num_images_to_blend=self.num_images_to_blend, blending_func=self.blending_func, zoom_range=self.zoom_range, skew_angle=self.skew_angle, limit_search=self.limit_search, monitor1=self.monitor1, monitor2=self.monitor2, monitor1_thresh=self.monitor1_thresh, 
-                monitor2_thresh=self.monitor2_thresh, verbose=self.verbose, save_models=self.save_models, save_studies=self.save_studies, path=self.path, return_study=True)
+                monitor2_thresh=self.monitor2_thresh, verbose=self.verbose, save_models=self.save_models, save_studies=self.save_studies, path=self.path, return_study=True) #val_acc_threshold=self.val_acc_threshold
             print("Fitting and returning final model...")
         else:
             if self.epochs != 0:

@@ -1,17 +1,17 @@
+BorutaShap==1.0.16
+astropy==5.1
+boruta==0.3
+imbalanced-learn==0.10.1
+matplotlib==3.7.1
 numpy
-tensorflow == 2.9.1
-astropy == 5.0.4
-scipy == 1.7.3
-matplotlib == 3.5.1
-photutils == 1.5.0
-pandas == 1.4.1
-scikit-optimize == 0.9.0
-scikit-learn == 1.1.1
-optuna == 3.1.0
-boruta == 0.3
-xgboost == 1.6.1
-scikit-plot == 0.3.7
-BorutaShap == 1.0.16 
-progress == 1.6
-opencv-python == 4.7.0.68
-imbalanced-learn == 0.10.1
+opencv-python==4.7.0.72
+optuna==3.1.0
+pandas==1.5.3
+photutils==1.5.0
+scikit-learn==1.1.1
+scikit-optimize==0.9.0
+scikit-plot==0.3.7
+scipy==1.10.0
+setuptools>=61
+tensorflow==2.12.0
+xgboost==1.6.2

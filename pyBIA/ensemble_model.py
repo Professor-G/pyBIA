@@ -457,6 +457,8 @@ class Classifier:
         #color = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'b', 'g', 'r', 'c']
         color = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#e41a1c', '#377eb8'] #Update the last two!
 
+        _set_style_() if savefig else plt.style.use('default')
+        
         if data_y is None:
             if self.data_y_ is None:
                 if self.csv_file is None:
@@ -503,7 +505,6 @@ class Classifier:
         plt.xticks(); plt.yticks()
 
         if savefig:
-            _set_style_()
             plt.savefig('tSNE_Projection.png', bbox_inches='tight', dpi=300)
             plt.clf(); plt.style.use('default')
         else:
@@ -677,7 +678,7 @@ class Classifier:
 
         return
 
-    def plot_hyper_opt(self, baseline=None, xlim=None, ylim=None, xlog=True, ylog=False, savefig=False):
+    def plot_hyper_opt(self, baseline=None, xlim=None, ylim=None, xlog=True, ylog=False, title=None, savefig=False):
         """
         Plots the hyperparameter optimization history.
 
@@ -738,14 +739,17 @@ class Classifier:
         else:
             plt.ylabel('Accuracy', alpha=1, color='k')
         
-        if self.clf == 'xgb':
-            plt.title('XGBoost Hyperparameter Optimization')
-        elif self.clf == 'rf':
-            plt.title('RF Hyperparameter Optimization')
-        elif self.clf == 'ocsvm':
-            plt.title('OneClass SVM Hyperparameter Optimization')
-        elif self.clf == 'nn':
-            plt.title('Neural Network Hyperparameter Optimization')
+        if title is None:
+            if self.clf == 'xgb':
+                plt.title('XGBoost Hyperparameter Optimization')
+            elif self.clf == 'rf':
+                plt.title('RF Hyperparameter Optimization')
+            elif self.clf == 'ocsvm':
+                plt.title('OneClass SVM Hyperparameter Optimization')
+            elif self.clf == 'nn':
+                plt.title('Neural Network Hyperparameter Optimization')
+        else:
+            plt.title(title)
 
         plt.legend(loc='upper center', ncol=ncol, frameon=False)
         plt.rcParams['axes.facecolor']='white'
@@ -772,7 +776,7 @@ class Classifier:
         return
 
     def plot_feature_opt(self, feat_names=None, top='all', include_other=True, include_shadow=True, 
-        include_rejected=False, flip_axes=True, save_data=False, savefig=False):
+        include_rejected=False, flip_axes=True, title='Feature Importance', save_data=False, savefig=False):
         """
         Returns whisker plot displaying the z-score distribution of each feature
         across all trials.
@@ -924,7 +928,7 @@ class Classifier:
             ax.set_ylim((np.min(y)-1, np.max(y)+1))
 
         ax.legend([(lns, lns_sigma)], [r'$\pm$ 1$\sigma$'], loc='upper right', ncol=1, frameon=False, handlelength=2)
-        ax.set_title('Feature Importance')
+        ax.set_title(title)
 
         if savefig:
             _set_style_()

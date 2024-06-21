@@ -269,8 +269,12 @@ class Catalog:
             return 
            
         if self.morph_params == True:
-            prop_list, moment_list, self.segm_map = morph_parameters(self.data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
-                    invert=self.invert, deblend=self.deblend, threshold=self.threshold)
+            try:
+                prop_list, moment_list, self.segm_map = morph_parameters(self.data, self.x, self.y, exptime=self.exptime, nsig=self.nsig, kernel_size=self.kernel_size, median_bkg=background, 
+                        invert=self.invert, deblend=self.deblend, threshold=self.threshold)
+            except AttributeError:
+                raise ValueError(f'Could not compute morphological parameters with nsig={self.nsig}, as no segmentation patch could be generated. Reduce the value of nsig and try again.')
+            
             tbl = make_table(prop_list, moment_list)
             self.cat = make_dataframe(table=tbl, x=self.x, y=self.y, zp=self.zp, obj_name=self.obj_name, field_name=self.field_name, flag=self.flag, 
                 flux=flux, flux_err=aper_stats.sum_err, median_bkg=background, save=save_file, path=path, filename=filename)
@@ -401,8 +405,8 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
             progess_bar.next()
             continue
 
-        #Mask a circular area at the center of the image, using radius=threshold
-        #Flag if there is no segmented object within the circular mask 
+        # Mask a circular area at the center of the image, using radius=threshold
+        # Flag if there is no segmented object within the circular mask 
         x_pos, y_pos = np.ogrid[:new_data.shape[0],:new_data.shape[1]]
         cx = cy = int(size/2)
         tmin, tmax = np.deg2rad((0,360))
@@ -428,7 +432,7 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
             inx = inx[0] 
 
         ##### Image Moments #####
-        new_data[segm.data!=props[inx].label] = 0
+        new_data[segm.data != props[inx].label] = 0
         moments_table = make_moments_table(new_data)
         
         prop_list.append(props[inx]), moment_list.append(moments_table)

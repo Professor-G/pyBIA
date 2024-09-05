@@ -1153,17 +1153,18 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
 
             ax2.plot(0,0,label=str(nsig[0])+r'$\sigma$', color='none')
             leg1 = ax2.legend(handlelength=0, handletextpad=0, fancybox=True, loc='upper right', prop={'size':16})
-            for item in leg1.legendHandles:
+          # import pdb; pdb.set_trace()
+            for item in leg1.get_lines():
                 item.set_visible(False)
 
             ax3.plot(0,0,label=str(nsig[1])+r'$\sigma$', color='none')
             leg2 = ax3.legend(handlelength=0, handletextpad=0, fancybox=True, loc='lower right', prop={'size':16})
-            for item in leg2.legendHandles:
+            for item in leg2.get_lines():
                 item.set_visible(False)
                 
             ax4.plot(0,0,label=str(nsig[2])+r'$\sigma$', color='none')
             leg3 = ax4.legend(handlelength=0, handletextpad=0, fancybox=True, loc='lower left', prop={'size':16})
-            for item in leg3.legendHandles:
+            for item in leg3.get_lines():
                 item.set_visible(False)  
                      
             plt.gcf().set_facecolor("white")

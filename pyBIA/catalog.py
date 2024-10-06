@@ -40,8 +40,12 @@ class Catalog:
         bkg (None, optional): If bkg=0 the data is assumed to be background-subtracted.
             The other optional is bkg=None, in which case the background will be
             automatically calculated for local regions.
-        zp (float, optional):
-        exptime (float, optional):
+        zp (float, optional): Zeropoint of the instrument, used to compute the apparent
+            magnitude from the flux. Defaults to None.
+        exptime (float, optional): Exposure time, used to set the units to counts/sec. This allows
+            for self-consistency when performing the image segmentation across different fields with 
+            varying exposure times. Defaults to None, in which case the segmentation is performed
+            on the raw input image.
         error (ndarray, optional): 2D array containing the rms error map.
         morph_params (bool, optional): If True, image segmentation is performed and
             morphological parameters are computed. Defaults to True. 
@@ -526,7 +530,6 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
             If input it must be an array of y positions for all objects in the table. 
             This y position will be appended to the dataframe for cataloging purposes. Defaults to None.
         zp (float): Zeropoint of the instrument.
-        exptime (float): Not currently used.
         flux (ndarray, optional): 1D array containing the calculated flux
             of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
         flux_err (ndarray, optional): 1D array containing the calculated flux error
@@ -1362,6 +1365,7 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
         xpix, ypix = data1.shape[1]/2, data1.shape[1]/2
         size = data1.shape[1]
 
+    
     try: 
         __ = len(xpix)
     except:
@@ -1410,7 +1414,7 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
 
         segm1, convolved_data1 = segm_find(new_data1, nsig=nsig[0], kernel_size=kernel_size, deblend=deblend)
         segm2, convolved_data2 = segm_find(new_data2, nsig=nsig[1], kernel_size=kernel_size, deblend=deblend)
-
+        return segm1.data, segm2.data
         plt.rcParams["mathtext.fontset"] = "stix"
         plt.rcParams["font.family"] = "STIXGeneral"
         plt.rcParams["axes.formatter.use_mathtext"]=True
@@ -1440,7 +1444,7 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
             
             ax4.imshow(segm1.data, origin='lower', cmap=segm2.make_cmap(seed=19))
             ax3.imshow(segm2.data, origin='lower', cmap=segm2.make_cmap(seed=19))
-        
+            #
             #'seismic', 'twilight', 'YlGnBu_r', 'bone', 'cividis' #best cmaps
             
             plt.gcf().set_facecolor("white")

@@ -413,13 +413,17 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
         # Flag if there is no segmented object within the circular mask 
         x_pos, y_pos = np.ogrid[:new_data.shape[0],:new_data.shape[1]]
         cx = cy = int(size/2)
+        #
         tmin, tmax = np.deg2rad((0,360))
         r2 = (x_pos-cx)*(x_pos-cx) + (y_pos-cy)*(y_pos-cy)
+        #
         theta = np.arctan2(x_pos-cx,y_pos-cy) - tmin
         theta %= (2*np.pi)
         circmask = r2 <= threshold*threshold
         anglemask = theta <= (tmax-tmin)
         mask = circmask*anglemask
+        #
+        # Catalog non-detection if there is no segmented object within the circular mask
         if np.count_nonzero(segm.data[mask]) == 0: 
             prop_list.append(-999), moment_list.append(-999)
             progess_bar.next()
@@ -464,15 +468,16 @@ def make_table(props, moments):
 
     """
 
+    # Our own functions, omits mu00 (first central moment) and g00 (first geometrically centered moment) as they are equivalent to m00
     moment_list = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',             
         'mu10', 'mu01', 'mu20','mu11','mu02','mu30','mu21','mu12','mu03', 'hu1','hu2',
         'hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',             
-        'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6',
-        'legendre_7','legendre_8','legendre_9','legendre_10'] #Removes mu00
+        'g10', 'g01', 'g20','g11','g02','g30','g21','g12','g03'] 
 
+    # From the photutils segm catalog generation
     prop_list = ['area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigvals', 
         'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 
-        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', #\\
+        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 
         'isscalar', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'max_value', 'maxval_xindex', 
         'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex', 'moments', 'moments_central']
     
@@ -494,7 +499,7 @@ def make_table(props, moments):
 
         QTable = props[i][0].to_table(columns=prop_list)
         for param in prop_list:
-            if param == 'moments' or param == 'moments_central': #To 3rd order photutils outputs a 4x4 matrix (obselete?)
+            if param == 'moments' or param == 'moments_central': #To 3rd order photutils outputs a 4x4 matrix
                 for moment in np.ravel(QTable[param]):
                     morph_feats.append(moment)
             elif param == 'covariance_eigvals': 
@@ -568,11 +573,10 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
     prop_list = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',             
         'mu10', 'mu01', 'mu20','mu11','mu02','mu30','mu21','mu12','mu03', 
         'hu1','hu2', 'hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',             
-        'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6',
-        'legendre_7','legendre_8','legendre_9','legendre_10', 'area', 'covar_sigx2', 
+        'g10', 'g01', 'g20','g11','g02','g30','g21','g12','g03', 'area', 'covar_sigx2', 
         'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 
         'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 
-        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', #\\
+        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 
         'isscalar', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'max_value', 'maxval_xindex', 
         'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex']
 
@@ -1108,284 +1112,6 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             median_bkg = [median_bkg]
 
     for i in range(len(xpix)):
-        if size == data.shape[1]:
-            new_data = data
-        else: 
-            new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
-
-        if median_bkg is None: #Hard coding annuli size, inner:25 -> outer:35
-            print("Subtracting background...")
-            if new_data.shape[0] > 200 and len(xpix) == 1:
-                print('Calculating background in local regions, this will take a while... if data is background subtracted set median_bkg=0.')
-                new_data = subtract_background(new_data)
-            else:
-                annulus_apertures = CircularAnnulus((new_data.shape[1]/2, new_data.shape[0]/2), r_in=r_in, r_out=r_out)
-                bkg_stats = ApertureStats(new_data, annulus_apertures, sigma_clip=SigmaClip())
-                new_data -= bkg_stats.median
-        elif median_bkg == 0:
-            new_data -= median_bkg 
-        else:
-            new_data -= median_bkg[i]
-
-        segm1, convolved_data1 = segm_find(new_data, nsig=nsig[0], kernel_size=kernel_size, deblend=deblend)
-        segm2, convolved_data2 = segm_find(new_data, nsig=nsig[1], kernel_size=kernel_size, deblend=deblend)
-        segm3, convolved_data3 = segm_find(new_data, nsig=nsig[2], kernel_size=kernel_size, deblend=deblend)
-
-        plt.rcParams["mathtext.fontset"] = "stix"
-        plt.rcParams["font.family"] = "STIXGeneral"
-        plt.rcParams["axes.formatter.use_mathtext"]=True
-        plt.rcParams['text.usetex']=False
-
-        with plt.rc_context({'axes.edgecolor':'white', 'xtick.color':'white', 
-            'ytick.color':'white', 'figure.facecolor':'black'}):#, 'axes.titlesize':22}):
-            fig, axes = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8,8))
-            fig.suptitle(title, x=.5, y=0.98, color='black', fontsize=16)
-            ((ax1, ax2), (ax4, ax3)) = axes
-            ax1.set_aspect('equal')
-            ax2.set_aspect('equal')
-            ax3.set_aspect('equal')
-            ax4.set_aspect('equal')
-
-            index = np.where(np.isfinite(new_data))
-            std = np.median(np.abs(new_data[index] - np.median(new_data[index])))
-            vmin, vmax = np.median(new_data[index]) - 3*std, np.median(new_data[index]) + 10*std
-            ax1.imshow(new_data, vmin=vmin, vmax=vmax, cmap=cmap)
-            ax2.imshow(segm1.data, origin='lower', cmap=segm1.make_cmap(seed=19))
-            ax3.imshow(segm2.data, origin='lower', cmap=segm2.make_cmap(seed=19))
-            ax4.imshow(segm3.data, origin='lower', cmap=segm3.make_cmap(seed=19))
-
-            ax2.plot(0,0,label=str(nsig[0])+r'$\sigma$', color='none')
-            leg1 = ax2.legend(handlelength=0, handletextpad=0, fancybox=True, loc='upper right', prop={'size':16})
-          # import pdb; pdb.set_trace()
-            for item in leg1.get_lines():
-                item.set_visible(False)
-
-            ax3.plot(0,0,label=str(nsig[1])+r'$\sigma$', color='none')
-            leg2 = ax3.legend(handlelength=0, handletextpad=0, fancybox=True, loc='lower right', prop={'size':16})
-            for item in leg2.get_lines():
-                item.set_visible(False)
-                
-            ax4.plot(0,0,label=str(nsig[2])+r'$\sigma$', color='none')
-            leg3 = ax4.legend(handlelength=0, handletextpad=0, fancybox=True, loc='lower left', prop={'size':16})
-            for item in leg3.get_lines():
-                item.set_visible(False)  
-                     
-            plt.gcf().set_facecolor("white")
-            fig.subplots_adjust(wspace=0, hspace=0)
-            ax1.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
-            ax2.grid(True, alpha=0.35, linestyle='--')
-            ax3.grid(True, alpha=0.35, linestyle='--')
-            ax4.grid(True, alpha=0.35, linestyle='--')
-
-            for axis in ['right', 'left', 'bottom', 'top']:
-                ax1.spines[axis].set_color("silver")
-                ax1.spines[axis].set_linewidth(0.95)
-                ax1.spines[axis].set_visible(True)
-                ax2.spines[axis].set_color("silver")
-                ax2.spines[axis].set_linewidth(0.95)
-                ax2.spines[axis].set_visible(True)
-                ax3.spines[axis].set_color("silver")
-                ax3.spines[axis].set_linewidth(0.95)
-                ax3.spines[axis].set_visible(True)
-                ax4.spines[axis].set_color("silver")
-                ax4.spines[axis].set_linewidth(0.95)
-                ax4.spines[axis].set_visible(True)
-            
-            ax1.xaxis.set_visible(True)
-            ax1.yaxis.set_visible(True)
-            ax2.xaxis.set_visible(True)
-            ax2.yaxis.set_visible(True)
-            ax3.xaxis.set_visible(True)
-            ax3.yaxis.set_visible(True)
-            ax4.xaxis.set_visible(True)
-            ax4.yaxis.set_visible(True)
-            
-            if isinstance(name, str):
-                ax1.set_title(name, color='black', size=18)
-            else:
-                ax1.title(name[i], color='black', size=18)
-
-            ax1.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=17)
-            ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
-            ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=17)
-            ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=17)
-
-            ax1.xaxis.set_major_locator(plt.MaxNLocator(5))
-            ax1.yaxis.set_major_locator(plt.MaxNLocator(5))
-            ax2.yaxis.set_major_locator(plt.MaxNLocator(5))
-            ax2.xaxis.set_major_locator(plt.MaxNLocator(5))
-            ax3.xaxis.set_major_locator(plt.MaxNLocator(5))
-            ax3.yaxis.set_major_locator(plt.MaxNLocator(5))
-            ax4.yaxis.set_major_locator(plt.MaxNLocator(5))
-            ax4.xaxis.set_major_locator(plt.MaxNLocator(5))
-
-            ax1.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
-            ax1.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
-            ax2.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
-            ax2.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
-            ax3.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
-            ax3.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
-            ax4.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
-            ax4.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
-
-            length = new_data.shape[0]
-            x_label_list_1 = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
-            ticks_1 = [0,length-3*length/4,length-length/2,length-length/4,length]
-            x_label_list_1 = [str(np.round(float(t), 1)) for t in x_label_list_1]
-
-            x_label_list_2 = [str(length/-4./pix_conversion), 0, str(length/4./pix_conversion)]
-            ticks_2 = [length-3*length/4,length-length/2,length-length/4]
-            x_label_list_2 = [str(np.round(float(t), 1)) for t in x_label_list_2]
-            
-            ax1.set_frame_on(True)
-            ax1.set_xticks(ticks_2)
-            ax1.set_xticklabels(x_label_list_2, color='black', fontsize=16)
-            ax1.set_yticks(ticks_2)
-            ax1.set_yticklabels(x_label_list_2, color='black', fontsize=16)
-
-            ax2.set_frame_on(True)
-            ax2.set_xticks(ticks_2)
-            ax2.set_xticklabels(x_label_list_2, color='black', fontsize=16)
-            ax2.set_yticks(ticks_2)
-            ax2.set_yticklabels(x_label_list_2, color='black', fontsize=16)
-
-            ax3.set_frame_on(True)
-            ax3.set_xticks(ticks_2)
-            ax3.set_xticklabels(x_label_list_2, color='black', fontsize=16)
-            ax3.set_yticks(ticks_2)
-            ax3.set_yticklabels(x_label_list_2, color='black', fontsize=16)
-
-            ax4.set_frame_on(True)
-            ax4.set_xticks(ticks_2)
-            ax4.set_xticklabels(x_label_list_2, color='black', fontsize=16)
-            ax4.set_yticks(ticks_2)
-            ax4.set_yticklabels(x_label_list_2, color='black', fontsize=16)
-
-            if savefig is True:
-                if path is None:
-                    print("No path specified, saving catalog to local home directory.")
-                    path = str(Path.home())+'/'
-                fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
-                plt.close()
-                return
-            plt.show()
-            plt.close()
-
-def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0, median_bkg2=0, nsig=[0.5, 0.5], kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, r_in=20, r_out=35, cmap='viridis', path=None, filter1='Bw', filter2='Rw', name='Source Detection Threshold', savefig=False):
-    """
-    This is the function used to plot the same object in two different bands.
-
-    If no x & y positions are input, the whole image will be used. If there are
-    position areguments then a subimage of area size x size will be cropped out 
-    first, centered around a given (x, y). By default size=100, although this should
-    be a window size that comfortably encapsulates all objects. If this is too large
-    the automatic background measurements will be less robust.
-
-    Note:
-        If median_bkg1 is None both images will be assumed to not be background subtracted!
-
-    Args:
-        data (ndarray): 2D array of a single image.
-        xpix (ndarray, optional): 1D array or list containing the x-pixel position.
-            Can contain one position or multiple samples. Defaults to None, in which case
-            the whole image is plotted.
-        ypix (ndarray, optional): 1D array or list containing the y-pixel position.
-            Can contain one position or multiple samples. Defaults to None, in which case
-            the whole image is plotted.
-        size (int): length/width of the output image. Defaults to
-            100 pixels or data.shape[0] if image is small.
-        median_bkg (ndarray, optional): If None then the median background will be
-            subtracted using the median value within an annuli around the source. 
-            If data is already background subtracted set median_bkg = 0. If this is
-            an array, it must contain the local medium background around each source as
-            this scalar will be subtracted locally.        
-        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
-            deviations from the background will be detected during segmentation. Defaults to 0.7.
-        kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
-            the data. This length must be odd. Defaults to 21.
-        invert (bool): If True the x & y coordinates will be switched
-            when cropping out the object, see Note below. Defaults to False. 
-        deblend (bool, optional): If True, the objects are deblended during the segmentation
-            procedure, thus deblending the objects before the morphological features
-            are computed. Defaults to False so as to keep blobs as one segmentation object.
-        pix_conversion (int): Pixels per arcseconds conversion factor. This is used to set
-            the image axes. 
-        cmap (str): Colormap to use when generating the image.
-        path (str, optional): By default the text file containing the photometry will be
-            saved to the local directory, unless an absolute path to a directory is entered here.
-        filter1 (str, ndarray, optional): The title of the image. This can be an array containing
-            multiple names, in which case it must contain a name for each object.
-        savefig (bool, optional): If True the plot will be saved to the specified
-        dpi (int, optional): Dots per inch (resolution) when savefig=True. 
-            Set dpi='figure' to use the image's dpi. Defaults to 300.
-       
-    Returns:
-        AxesImage.
-
-    """
-
-    if data1.max() == 0 and data1.min() == 0:
-        raise ValueError('The input data1 array contains only zeroes!')
-
-    if data2.max() == 0 and data2.min() == 0:
-        raise ValueError('The input data2 array contains only zeroes!')
-
-    if isinstance(nsig, np.ndarray) is False:
-        nsig = np.array(nsig)
-
-    if median_bkg1 != 0 and median_bkg1 is not None:
-        if isinstance(median_bkg1, np.ndarray) is False:
-            median_bkg1 = np.array(median_bkg1)
-    if median_bkg2 != 0 and median_bkg2 is not None:
-        if isinstance(median_bkg2, np.ndarray) is False:
-            median_bkg2 = np.array(median_bkg2)
-
-    if len(data1.shape) != 2:
-        raise ValueError('Data must be 2 dimensional, 3d images not currently supported.')
-    try:
-        if len(median_bkg1) != len(xpix):
-            raise ValueError('If more than one median_bkg1 is input, the size of the array must be the number of sources (xpix, ypix) input.')
-        if len(median_bkg2) != len(xpix):
-            raise ValueError('If more than one median_bkg2 is input, the size of the array must be the number of sources (xpix, ypix) input.')
-    except:
-        pass
-
-    if data1.shape[1] < size:
-        size = data1.shape[1]
-
-    #if data1.shape[1] < 70: 
-    #    r_out = data1.shape[1]-1
-    #    r_in = r_out - 15 #This is a 15 pixel annulus. 
-    #elif data1.shape[1] >= 72:
-    #    r_out = 35
-    #    r_in = 20 #Default annulus used to calculate the median bkg
-    
-    if xpix is None and ypix is None:
-        xpix, ypix = data1.shape[1]/2, data1.shape[1]/2
-        size = data1.shape[1]
-
-    
-    try: 
-        __ = len(xpix)
-    except:
-        xpix = [xpix]
-    try:
-        __ = len(ypix)
-    except:
-        ypix = [ypix]
-    try:
-        __ = len(median_bkg1)
-    except:
-        if median_bkg1 is not None:
-            median_bkg1 = [median_bkg1]
-    try:
-        __ = len(median_bkg2)
-    except:
-        if median_bkg2 is not None:
-            median_bkg2 = [median_bkg2]
-   
-    for i in range(len(xpix)):
         if size == data1.shape[1]:
             new_data1 = data1
             new_data2 = data2
@@ -1553,54 +1279,228 @@ def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0
             plt.show()
             plt.close()
 
-def _set_style_():
+def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0, median_bkg2=0, nsig=[0.5, 0.5], kernel_size=21, invert=False,
+    deblend=False, pix_conversion=5, r_in=20, r_out=35, cmap='viridis', path=None, filter1='Bw', filter2='Rw', name='Source Detection Threshold', 
+    savefig=False):
     """
-    Function to configure the matplotlib.pyplot style. This function is called before any images are saved,
-    after which the style is reset to the default.
+    This is the function used to plot the same object in two different bands.
+
+    If no x & y positions are input, the whole image will be used. If there are
+    position areguments then a subimage of area size x size will be cropped out 
+    first, centered around a given (x, y). By default size=100, although this should
+    be a window size that comfortably encapsulates all objects. If this is too large
+    the automatic background measurements will be less robust.
+
+    Note:
+        If median_bkg1 is None both images will be assumed to not be background subtracted!
+
+    Args:
+        data (ndarray): 2D array of a single image.
+        xpix (ndarray, optional): 1D array or list containing the x-pixel position(s).
+            Can contain one position or multiple samples. Defaults to None, in which case
+            the whole image is plotted.
+        ypix (ndarray, optional): 1D array or list containing the y-pixel position.
+            Can contain one position or multiple samples. Defaults to None, in which case
+            the whole image is plotted.
+        size (int): length/width of the output image. Defaults to 100 pixels or data.shape[0] 
+            if image is lenght is less than 100.
+        median_bkg (ndarray, optional): If None then the median background will be
+            subtracted using the median value within an annuli around the source. 
+            If data is already background subtracted set median_bkg = 0. If this is
+            an array, it must contain the local medium background around each source as
+            this scalar will be subtracted locally.        
+        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
+            deviations from the background will be detected during segmentation. Defaults to 0.7.
+        kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
+            the data. This length must be odd. Defaults to 21.
+        invert (bool): If True the x & y coordinates will be switched
+            when cropping out the object, see Note below. Defaults to False. 
+        deblend (bool, optional): If True, the objects are deblended during the segmentation
+            procedure, thus deblending the objects before the morphological features
+            are computed. Defaults to False so as to keep blobs as one segmentation object.
+        pix_conversion (int): Pixels per arcseconds conversion factor. This is used to set
+            the image axes. 
+        cmap (str): Colormap to use when generating the image.
+        path (str, optional): By default the text file containing the photometry will be
+            saved to the local directory, unless an absolute path to a directory is entered here.
+        filter1 (str, ndarray, optional): The title of the image. This can be an array containing
+            multiple names, in which case it must contain a name for each object.
+        savefig (bool, optional): If True the plot will be saved to the specified
+       
+    Returns:
+        AxesImage.
+
     """
 
-    plt.rcParams["xtick.color"] = "323034"
-    plt.rcParams["ytick.color"] = "323034"
-    plt.rcParams["text.color"] = "323034"
-    plt.rcParams["lines.markeredgecolor"] = "black"
-    plt.rcParams["patch.facecolor"] = "#bc80bd"  # Replace with a valid color code
-    plt.rcParams["patch.force_edgecolor"] = True
-    plt.rcParams["patch.linewidth"] = 0.8
-    plt.rcParams["scatter.edgecolors"] = "black"
-    plt.rcParams["grid.color"] = "#b1afb5"  # Replace with a valid color code
-    plt.rcParams["axes.titlesize"] = 16
-    plt.rcParams["legend.title_fontsize"] = 12
-    plt.rcParams["xtick.labelsize"] = 16
-    plt.rcParams["ytick.labelsize"] = 16
-    plt.rcParams["font.size"] = 15
-    plt.rcParams["axes.prop_cycle"] = (cycler('color', ['#bc80bd', '#fb8072', '#b3de69', '#fdb462', '#fccde5', '#8dd3c7', '#ffed6f', '#bebada', '#80b1d3', '#ccebc5', '#d9d9d9']))  # Replace with valid color codes
-    plt.rcParams["mathtext.fontset"] = "stix"
-    plt.rcParams["font.family"] = "STIXGeneral"
-    plt.rcParams["lines.linewidth"] = 2
-    plt.rcParams["lines.markersize"] = 6
-    plt.rcParams["legend.frameon"] = True
-    plt.rcParams["legend.framealpha"] = 0.8
-    plt.rcParams["legend.fontsize"] = 13
-    plt.rcParams["legend.edgecolor"] = "black"
-    plt.rcParams["legend.borderpad"] = 0.2
-    plt.rcParams["legend.columnspacing"] = 1.5
-    plt.rcParams["legend.labelspacing"] = 0.4
-    plt.rcParams["text.usetex"] = False
-    plt.rcParams["axes.labelsize"] = 17
-    plt.rcParams["axes.titlelocation"] = "center"
-    plt.rcParams["axes.formatter.use_mathtext"] = True
-    plt.rcParams["axes.autolimit_mode"] = "round_numbers"
-    plt.rcParams["axes.labelpad"] = 3
-    plt.rcParams["axes.formatter.limits"] = (-4, 4)
-    plt.rcParams["axes.labelcolor"] = "black"
-    plt.rcParams["axes.edgecolor"] = "black"
-    plt.rcParams["axes.linewidth"] = 1
-    plt.rcParams["axes.grid"] = False
-    plt.rcParams["axes.spines.right"] = True
-    plt.rcParams["axes.spines.left"] = True
-    plt.rcParams["axes.spines.top"] = True
-    plt.rcParams["figure.titlesize"] = 18
-    plt.rcParams["figure.autolayout"] = True
-    plt.rcParams["figure.dpi"] = 300
+    if data1.max() == 0 and data1.min() == 0: raise ValueError('The input data1 array contains only zeroes!')
+    if data2.max() == 0 and data2.min() == 0: raise ValueError('The input data2 array contains only zeroes!')
+    if len(data1.shape) != 2: raise ValueError('Data must be 2 dimensional.')
 
-    return
+    if isinstance(nsig, np.ndarray) is False: nsig = np.array(nsig)
+
+    if median_bkg1 != 0 and median_bkg1 is not None:
+        if isinstance(median_bkg1, np.ndarray) is False: median_bkg1 = np.array(median_bkg1)
+    if median_bkg2 != 0 and median_bkg2 is not None:
+        if isinstance(median_bkg2, np.ndarray) is False: median_bkg2 = np.array(median_bkg2)
+
+    try:
+        if len(median_bkg1) != len(xpix):
+            raise ValueError('If more than one median_bkg1 is input, the size of the array must be the number of sources (xpix, ypix) input.')
+        if len(median_bkg2) != len(xpix):
+            raise ValueError('If more than one median_bkg2 is input, the size of the array must be the number of sources (xpix, ypix) input.')
+    except:
+        pass
+
+    if data1.shape[1] < size: size = data1.shape[1]
+
+    #if data1.shape[1] < 70: 
+    #    r_out = data1.shape[1]-1
+    #    r_in = r_out - 15 #This is a 15 pixel annulus. 
+    #elif data1.shape[1] >= 72:
+    #    r_out = 35
+    #    r_in = 20 #Default annulus used to calculate the median bkg
+    
+    if xpix is None and ypix is None:
+        xpix, ypix = data1.shape[1]/2, data1.shape[1]/2
+        size = data1.shape[1]
+
+    xpix = xpix if isinstance(xpix, list) else [xpix]
+    ypix = ypix if isinstance(ypix, list) else [ypix]
+
+    if median_bkg1 is not None: median_bkg1 = median_bkg1 if isinstance(median_bkg1, list) else [median_bkg1]
+    if median_bkg2 is not None: median_bkg2 = median_bkg2 if isinstance(median_bkg2, list) else [median_bkg2]
+
+    for i in range(len(xpix)):
+        if size == data1.shape[1]:
+            new_data1, new_data2 = data1, data2
+        else: 
+            new_data1 = data_processing.crop_image(data1, int(xpix[i]), int(ypix[i]), size, invert=invert)
+            new_data2 = data_processing.crop_image(data2, int(xpix[i]), int(ypix[i]), size, invert=invert)
+
+        if median_bkg1 is None: #Hard coding annuli size, inner:25 -> outer:35
+            print("Subtracting background...")
+            if new_data1.shape[0] > 200 and len(xpix) == 1:
+                print('Calculating background in local regions, this will take a while... if data is background subtracted set median_bkg=0.')
+                new_data1, new_data2 = subtract_background(new_data1), subtract_background(new_data2)
+            else:
+                annulus_apertures = CircularAnnulus((new_data1.shape[1]/2, new_data1.shape[0]/2), r_in=r_in, r_out=r_out)
+                bkg_stats = ApertureStats(new_data1, annulus_apertures, sigma_clip=SigmaClip())
+                new_data1 -= bkg_stats.median
+                bkg_stats = ApertureStats(new_data2, annulus_apertures, sigma_clip=SigmaClip())
+                new_data2 -= bkg_stats.median
+        elif median_bkg1 == 0:
+            new_data1 -= median_bkg1
+            new_data2 -= median_bkg2 
+        else:
+            new_data1 -= median_bkg1[i]
+            new_data2 -= median_bkg2[i]
+
+        segm1, convolved_data1 = segm_find(new_data1, nsig=nsig[0], kernel_size=kernel_size, deblend=deblend)
+        segm2, convolved_data2 = segm_find(new_data2, nsig=nsig[1], kernel_size=kernel_size, deblend=deblend)
+
+        segm1_, segm2_ = segm1.data, segm2.data
+
+       
+      #  return segm1.data, segm2.data
+
+        fig, axes = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8,8))
+        fig.suptitle(name, x=.5, y=0.954, color='black', fontsize=22)
+        ((ax1, ax2), (ax4, ax3)) = axes
+
+        index = np.where(np.isfinite(new_data1))
+        std = np.median(np.abs(new_data1[index] - np.median(new_data1[index])))
+        vmin, vmax = np.median(new_data1[index]) - 3*std, np.median(new_data1[index]) + 10*std
+        ax1.imshow(new_data1, vmin=vmin, vmax=vmax, cmap=cmap)
+
+        index = np.where(np.isfinite(new_data2))
+        std = np.median(np.abs(new_data2[index] - np.median(new_data2[index])))
+        vmin, vmax = np.median(new_data2[index]) - 3*std, np.median(new_data2[index]) + 10*std
+        ax2.imshow(new_data2, vmin=vmin, vmax=vmax, cmap=cmap)
+        
+        ax4.imshow(segm1.data, origin='lower', cmap=segm2.make_cmap(seed=19))
+        ax3.imshow(segm2.data, origin='lower', cmap=segm2.make_cmap(seed=19))
+        #
+        #'seismic', 'twilight', 'YlGnBu_r', 'bone', 'cividis' #best cmaps
+        
+        plt.gcf().set_facecolor("white")
+        fig.subplots_adjust(wspace=0, hspace=0)
+        ax1.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
+        ax2.grid(True, alpha=0.35, linestyle='--')
+        ax3.grid(True, alpha=0.35, linestyle='--')
+        ax4.grid(True, alpha=0.35, linestyle='--')
+        
+        if isinstance(filter1, str):
+            ax1.set_title(filter1, color='black', size=20)
+        else:
+            ax1.title(filter1[i], color='black', size=20)
+
+        if isinstance(filter2, str):
+            ax2.set_title(filter2, color='black', size=20)
+        else:
+            ax2.title(filter2[i], color='black', size=20)
+
+        ax1.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=18)
+        ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=18)
+        ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=18)
+        ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=18)
+
+        ax1.xaxis.set_major_locator(plt.MaxNLocator(5))
+        ax1.yaxis.set_major_locator(plt.MaxNLocator(5))
+        ax2.yaxis.set_major_locator(plt.MaxNLocator(5))
+        ax2.xaxis.set_major_locator(plt.MaxNLocator(5))
+        ax3.xaxis.set_major_locator(plt.MaxNLocator(5))
+        ax3.yaxis.set_major_locator(plt.MaxNLocator(5))
+        ax4.yaxis.set_major_locator(plt.MaxNLocator(5))
+        ax4.xaxis.set_major_locator(plt.MaxNLocator(5))
+
+        ax1.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
+        ax1.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
+        ax2.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
+        ax2.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
+        ax3.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
+        ax3.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
+        ax4.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
+        ax4.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
+
+        length = new_data1.shape[0]
+        x_label_list_1 = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
+        ticks_1 = [0,length-3*length/4,length-length/2,length-length/4,length]
+        x_label_list_1 = [str(np.round(float(t), 1)) for t in x_label_list_1]
+
+        x_label_list_2 = [str(length/-4./pix_conversion), 0, str(length/4./pix_conversion)]
+        ticks_2 = [length-3*length/4,length-length/2,length-length/4]
+        x_label_list_2 = [str(np.round(float(t), 1)) for t in x_label_list_2]
+
+        ax1.set_frame_on(True)
+        ax1.set_xticks(ticks_2)
+        ax1.set_xticklabels(x_label_list_2, color='black', fontsize=16)
+        ax1.set_yticks(ticks_2)
+        ax1.set_yticklabels(x_label_list_2, color='black', fontsize=16)
+
+        ax2.set_frame_on(True)
+        ax2.set_xticks(ticks_2)
+        ax2.set_xticklabels(x_label_list_2, color='black', fontsize=16)
+        ax2.set_yticks(ticks_2)
+        ax2.set_yticklabels(x_label_list_2, color='black', fontsize=16)
+
+        ax3.set_frame_on(True)
+        ax3.set_xticks(ticks_2)
+        ax3.set_xticklabels(x_label_list_2, color='black', fontsize=16)
+        ax3.set_yticks(ticks_2)
+        ax3.set_yticklabels(x_label_list_2, color='black', fontsize=16)
+
+        ax4.set_frame_on(True)
+        ax4.set_xticks(ticks_2)
+        ax4.set_xticklabels(x_label_list_2, color='black', fontsize=16)
+        ax4.set_yticks(ticks_2)
+        ax4.set_yticklabels(x_label_list_2, color='black', fontsize=16)
+
+        if savefig is True:
+            if path is None:
+                print("No path specified, saving catalog to local home directory.")
+                path = str(Path.home())+'/'
+            fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
+            plt.close()
+            return
+        plt.show()
+        plt.close()

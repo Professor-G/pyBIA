@@ -6,9 +6,10 @@ def make_moments_table(image):
 	"""
 	This function takes a 2D image array as input and 
 	calculates the image moments, central moments, Hu moments, 
-	and legendre moments to third order. The fourier descriptors
-	are also computed but only the first ten are kept.
-	These 47 features are concatenated and then saved in an astropy Table.
+	and geometrically centered moments to third order. The fourier descriptors
+	are also computed but only the first three are kept by default.
+	These features are concatenated and then saved in an astropy Table.
+	This is the main function the is used to generating the catalog (see pyBIA.catalog.morph_parameters)
 
 	Args:
 		image (ndarray): A 2D array representing an image.
@@ -21,14 +22,16 @@ def make_moments_table(image):
 		raise ValueError("Input image must be 2D.")
   
 	moments, central_moments, hu_moments = calculate_moments(image), calculate_central_moments(image), calculate_hu_moments(image)
-	legendre_moments, fourier_descriptors = calculate_legendre_moments(image), calculate_fourier_descriptors(image, k=3)
+	geometrically_centered_moments, fourier_descriptors = calculate_geometrically_centered_moments(image), calculate_fourier_descriptors(image, k=3)
 	
-	features = moments + central_moments + hu_moments + fourier_descriptors + legendre_moments
+	features = moments + central_moments + hu_moments + fourier_descriptors + geometrically_centered_moments
+
+	# The catalog mu00 and g00 because these are equivalent to m00! BUT these are kept here because these col_names must 
+	# match what the functions output
 	col_names = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',
-		'mu00','mu10','mu01','mu20','mu11','mu02','mu30','mu21','mu12','mu03',
+		'mu00', 'mu10','mu01','mu20','mu11','mu02','mu30','mu21','mu12','mu03',
 		'hu1','hu2','hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',
-		'legendre_1','legendre_2','legendre_3','legendre_4','legendre_5','legendre_6',
-		'legendre_7','legendre_8','legendre_9','legendre_10']
+		'g00', 'g10', 'g01', 'g20','g11','g02','g30','g21','g12','g03']
 
 	features, col_names = np.array(features), np.array(col_names)
 	dtype = ('f8',) * len(col_names)
@@ -39,7 +42,7 @@ def make_moments_table(image):
 def calculate_moments(image):
 	"""
 	This function takes a 2D image array as input 
-	and calculates the image moments to third order.
+	and calculates the raw image moments to third order.
 
 	Args:
 		image (ndarray): A 2D array representing an image.
@@ -139,42 +142,64 @@ def calculate_hu_moments(image):
 
 	return [hu1, hu2, hu3, hu4, hu5, hu6, hu7]
 
-def calculate_legendre_moments(image, order=3):
-	"""
-	This function takes a 2D image array and calculates the Legendre moments of the input image.
+def calculate_geometrically_centered_moments(image, order=3):
+    """
+    Calculates geometrically centered polynomial moments of a 2D image.
 
-	The order of the moments can be specified as an optional input parameter. The default is set to 3.
-	Each moment is represented by a monomial of x and y, where x and y are the spatial coordinates of the image.
-	The returned list of moments will be in the format of [1, x, y, x^2, xy, y^2, x^3, x^2y, xy^2, y^3] for order 3.
-	
-	Note:
-		The first Legendre moment is the sum of the pixels, and therefore
-		is equivalent to the zeroth central moment.
-		
-	Args:
-	    image (ndarray): A 2D array representing an image.
-	    order (int, optional): The order of the Legendre moments to calculate. Must be a non-negative integer.
+    The moments are computed using spatial coordinates that have been shifted
+    by the geometric center (i.e. the mean of the coordinate grid) of the image.
+    Each moment is defined as:
+    
+        M(p, q) = sum_{x,y} [ (x_centered)^p * (y_centered)^q * image(x, y) ]
+    
+    where the summation is performed over all pixels in the image, and
+    (x_centered, y_centered) = (x - mean(x), y - mean(y)).
 
-	Returns:
-	    A list of Legendre moments.
-	"""
+    The maximum total order of the moments is specified by the parameter `order`.
+    
+    Note:
+        For order = 3, the function returns 10 moments in the following order:
+            M(0,0) = sum(image)
+            M(1,0) = sum(x_centered * image)
+            M(0,1) = sum(y_centered * image)
+            M(2,0) = sum(x_centered^2 * image)
+            M(1,1) = sum(x_centered * y_centered * image)
+            M(0,2) = sum(y_centered^2 * image)
+            M(3,0) = sum(x_centered^3 * image)
+            M(2,1 = sum(x_centered^2 * y_centered * image)
+            M(1,2) = sum(x_centered * y_centered^2 * image)
+            M(0,3) = sum(y_centered^3 * image)
 
-	if len(image.shape) != 2:
-		raise ValueError("Input image must be 2D.")
-	if not isinstance(order, int) or order < 0:
-		raise ValueError("Order must be a non-negative integer.")
+    Args:
+        image (ndarray): A 2D array representing an image.
+        order (int, optional): The maximum order of the polynomial moments to calculate.
+                               Must be a non-negative integer (default is 3).
 
-	x, y = np.meshgrid(np.arange(image.shape[1]), np.arange(image.shape[0]))
-	x = x - np.mean(x)
-	y = y - np.mean(y)
-	moments = []
-	for i in range(order+1):
-		for j in range(i+1):
-			moment = np.sum(np.power(x, i-j) * np.power(y, j) * image)
-			moments.append(moment)
+    Returns:
+        list: A list of computed polynomial moments in the order specified above.
+    """
+    if image.ndim != 2:
+        raise ValueError("Input image must be a 2D array.")
+    if not isinstance(order, int) or order < 0:
+        raise ValueError("Order must be a non-negative integer.")
 
-	return moments
+    rows, cols = image.shape
+    x, y = np.meshgrid(np.arange(cols), np.arange(rows))
+    
+    # Shift the coordinates by subtracting the geometric (grid) mean.
+    x_centered = x - np.mean(x)
+    y_centered = y - np.mean(y)
 
+    moments = []
+
+    for total_order in range(order + 1):
+        # Loop over all exponent combinations 
+        for j in range(total_order + 1):
+            i = total_order - j  # i is the exponent for x_centered, j for y_centered.
+            moment = np.sum((x_centered ** i) * (y_centered ** j) * image)
+            moments.append(moment)
+
+    return moments
 
 def calculate_fourier_descriptors(image, k=3):
 	"""
@@ -235,6 +260,13 @@ def calculate_fourier_descriptors(image, k=3):
 			fourier_descriptors = fourier_descriptors + [0]
 
 	return fourier_descriptors
+
+
+
+########
+######## Functions that were NOT used!!!
+########
+
 
 def zernike_moments(image, r_max=3):
 	"""
@@ -370,5 +402,38 @@ def comb(n, k):
 
 	return np.math.factorial(n) // (np.math.factorial(k) * np.math.factorial(n - k))
 
-
-
+def calculate_normalized_hu_moments(image):
+    """
+    Calculate the 7 Hu moments for a 2D image, but normalized! : ηpq = μpq / μ00^γ, with γ = (p+q)/2+1.
+    """
+    if len(image.shape) != 2:
+        raise ValueError("Input image must be 2D.")
+    
+    mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03 = calculate_central_moments(image)
+    
+    if mu00 == 0:
+        raise ValueError("ERROR: Zero area encountered; cannot normalize moments.")
+    
+    def eta(p, q, mu):
+        gamma = (p+q)/2 + 1
+        return mu / (mu00 ** gamma)
+    
+    eta20 = eta(2, 0, mu20)
+    eta02 = eta(0, 2, mu02)
+    eta11 = eta(1, 1, mu11)
+    eta30 = eta(3, 0, mu30)
+    eta12 = eta(1, 2, mu12)
+    eta21 = eta(2, 1, mu21)
+    eta03 = eta(0, 3, mu03)
+    
+    hu1 = eta20 + eta02
+    hu2 = (eta20 - eta02)**2 + 4*(eta11**2)
+    hu3 = (eta30 - 3*eta12)**2 + (3*eta21 - eta03)**2
+    hu4 = (eta30 + eta12)**2 + (eta21 + eta03)**2
+    hu5 = (eta30 - 3*eta12)*(eta30 + eta12)*((eta30 + eta12)**2 - 3*(eta21 + eta03)**2) \
+          + (3*eta21 - eta03)*(eta21 + eta03)*(3*(eta30 + eta12)**2 - (eta21 + eta03)**2)
+    hu6 = (eta20 - eta02)*((eta30 + eta12)**2 - (eta21 + eta03)**2) + 4*eta11*(eta30 + eta12)*(eta21 + eta03)
+    hu7 = (3*eta21 - eta03)*(eta30 + eta12)*((eta30 + eta12)**2 - 3*(eta21 + eta03)**2) \
+          - (eta30 - 3*eta12)*(eta21 + eta03)*(3*(eta30 + eta12)**2 - (eta21 + eta03)**2)
+    
+    return [hu1, hu2, hu3, hu4, hu5, hu6, hu7]

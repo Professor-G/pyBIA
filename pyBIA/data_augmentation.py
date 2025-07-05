@@ -9,7 +9,6 @@ from pyBIA.data_processing import crop_image, concat_channels
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.utils import to_categorical
 from scipy.ndimage.interpolation import zoom
-from imblearn.over_sampling import SMOTE
 from scipy.ndimage import rotate
 import matplotlib.pyplot as plt
 from warnings import warn
@@ -454,84 +453,6 @@ def image_blending(images, num_augmentations=1, blend_ratio=0.5, blending_func='
 
     return output_images
 
-def smote_oversampling(X_train, Y_train, smote_sampling=1, binary=True, seed=None):
-    """
-    Apply SMOTE (Synthetic Minority Over-sampling Technique) oversampling to the training data to address class imbalance.
-
-    SMOTE generates synthetic samples by interpolating between neighboring minority class samples. It does this by choosing 
-    two samples from the minority class at random, then choosing a random point between them and adding it as a new sample. 
-    By doing this, SMOTE creates new synthetic samples that are similar to existing samples in the minority class, while 
-    introducing some degree of randomness to ensure that the synthetic samples are not exact duplicates.
-    
-    If binary=True, the function assumes binary classification only therefore only expects two classes. 
-
-    Note:
-        The smote_sampling options are defined as follows:
-        
-        0-1: 0 means no sampling applied, if 0.5, then the minority class will be oversampled using the SMOTE 
-        algorithm until it is 50% the size of the majority class, whereas if it's set to 0.75 it will be oversampled
-        until the minority class is 75% the size of the majority, etc. Maximum value is 1.
-
-        If using the following string options the number of samples in both classes will always be equalized.
-
-        "minority": This is the default option, and it generates synthetic samples only for the minority class.
-
-        "not minority": This option generates synthetic samples for all classes except the majority class.
-
-        "not majority": This option generates synthetic samples for all classes except the minority class.
-
-        "all": This option generates synthetic samples for all classes.
-
-    Args:
-        X_train (numpy array): A 4D array of shape (num_images, height, width, num_channels) containing the training data.
-        Y_train (numpy array): A 1D array of shape (num_images,) containing the training labels.
-        smote_sampling (str or float): Determines the target ratio of samples in the minority class after resampling. 
-            Valid options are 'minority', 'not minority', 'not majority', 'all', or a float in the range (0, 1) that 
-            specifies the desired ratio of minority class samples. Defaults to 1.
-        binary (bool): Set to True if there are only two classes, used to one-hot-encode the labels array. Defaults to True.
-        seed (int): Seed for the random number generator. Defaults to None.
-
-    Returns:
-        tuple: A tuple containing the oversampled X_train and Y_train arrays.
-
-    Raises:
-        ValueError: If X_train and Y_train have incompatible shapes or if smote_sampling is not a valid option.
-    """
-
-    if smote_sampling == 0:
-        return X_train, Y_train
-
-    if X_train.shape[0] != Y_train.shape[0]:
-        raise ValueError("X_train and Y_train must have the same number of samples")
-    
-    #Check smote_sampling parameter
-    valid_sampling_options = ['minority', 'not minority', 'not majority', 'all']
-    if isinstance(smote_sampling, str) and smote_sampling not in valid_sampling_options:
-        raise ValueError(f"Invalid smote_sampling option '{smote_sampling}'. Valid options are {valid_sampling_options}, or a float in the range (0, 1)")
-    elif isinstance(smote_sampling, float) and (smote_sampling < 0 or smote_sampling > 1):
-        raise ValueError("smote_sampling must be a float in the range (0, 1)")
-    
-    #Reshape X_train to 2D array
-    if len(X_train.shape) == 4:
-        num_images, height, width, num_channels = X_train.shape
-    else:
-        num_images, height, width = X_train.shape
-        num_channels = 1
-
-    X_2d = np.reshape(X_train, (num_images, -1))
-    
-    #Apply SMOTE oversampling
-    smote = SMOTE(sampling_strategy=smote_sampling, random_state=seed)
-    X_resampled, Y_resampled = smote.fit_resample(X_2d, Y_train)
-    
-    #Reshape X_resampled to 4D array
-    num_resampled = X_resampled.shape[0]
-    X_train_resampled = np.reshape(X_resampled, (num_resampled, height, width, num_channels))
-    if binary:
-        Y_resampled = to_categorical(Y_resampled, num_classes=2)
-
-    return X_train_resampled, Y_resampled
-
 def resize(data, size=50):
     """
     Resizes the data by cropping out the outer boundaries outside the size x size limit.
@@ -700,3 +621,5 @@ def plot(data, cmap='gray', title=''):
     plt.show()
 
 
+
+    

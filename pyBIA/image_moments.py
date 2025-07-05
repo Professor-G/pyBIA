@@ -142,6 +142,41 @@ def calculate_hu_moments(image):
 
 	return [hu1, hu2, hu3, hu4, hu5, hu6, hu7]
 
+def calculate_normalized_hu_moments(image):
+    """
+    Calculate the 7 Hu moments for a 2D image, but normalized as per the original paper!
+    """
+
+    if len(image.shape) != 2:
+        raise ValueError("Input image must be 2D.")
+    
+    mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03 = calculate_central_moments(image)
+    
+    if mu00 == 0:
+        raise ValueError("ERROR: Zero area encountered; cannot normalize moments.")
+    
+    def eta(p, q, mu):
+        gamma = (p+q)/2 + 1
+        return mu / (mu00 ** gamma)
+    
+    eta20 = eta(2, 0, mu20)
+    eta02 = eta(0, 2, mu02)
+    eta11 = eta(1, 1, mu11)
+    eta30 = eta(3, 0, mu30)
+    eta12 = eta(1, 2, mu12)
+    eta21 = eta(2, 1, mu21)
+    eta03 = eta(0, 3, mu03)
+    
+    hu1 = eta20 + eta02
+    hu2 = (eta20 - eta02)**2 + 4*(eta11**2)
+    hu3 = (eta30 - 3*eta12)**2 + (3*eta21 - eta03)**2
+    hu4 = (eta30 + eta12)**2 + (eta21 + eta03)**2
+    hu5 = (eta30 - 3*eta12)*(eta30 + eta12)*((eta30 + eta12)**2 - 3*(eta21 + eta03)**2) + (3*eta21 - eta03)*(eta21 + eta03)*(3*(eta30 + eta12)**2 - (eta21 + eta03)**2)
+    hu6 = (eta20 - eta02)*((eta30 + eta12)**2 - (eta21 + eta03)**2) + 4*eta11*(eta30 + eta12)*(eta21 + eta03)
+    hu7 = (3*eta21 - eta03)*(eta30 + eta12)*((eta30 + eta12)**2 - 3*(eta21 + eta03)**2) - (eta30 - 3*eta12)*(eta21 + eta03)*(3*(eta30 + eta12)**2 - (eta21 + eta03)**2)
+    
+    return [hu1, hu2, hu3, hu4, hu5, hu6, hu7]
+
 def calculate_geometrically_centered_moments(image, order=3):
     """
     Calculates geometrically centered polynomial moments of a 2D image.
@@ -261,179 +296,4 @@ def calculate_fourier_descriptors(image, k=3):
 
 	return fourier_descriptors
 
-
-
-########
-######## Functions that were NOT used!!!
-########
-
-
-def zernike_moments(image, r_max=3):
-	"""
-	This function takes a 2D image array and 
-	an integer "r_max" as input and calculates 
-	the Zernike moments up to the order of "r_max".
-
-	If r_max=3, there are 13 Zernike moments. Each Zernike moment 
-	is indexed by two integers n and m, where n is the radial order 
-	and m is the azimuthal order. The radial order must be non-negative 
-	and the azimuthal order must be in the range -n <= m <= n. The total 
-	number of Zernike moments is given by the formula (n+1)^2. Therefore, 
-	if r_max is 3, the highest radial order is 3, and the total number of 
-	Zernike moments is (3+1)^2 = 4^2 = 16. However, since the Zernike moment 
-	Z_{n, m} is equivalent to Z_{n, -m}, only half of them are unique. 
-	Therefore, the number of unique Zernike moments is 16/2 = 8.
-
-	Args:
-		image (ndarray): A 2D array representing an image.
-		r_max (int): The maximum order of the Zernike moments to calculate.
-
-	Returns:
-		A tuple of (r_max+1)*(r_max+1) values representing the calculated Zernike moments.
-	"""
-
-	if len(image.shape) != 2:
-		raise ValueError("Input image must be 2D.")
-	if not isinstance(r_max, int) or r_max < 0:
-		raise ValueError("r_max must be a non-negative integer.")
-
-	rows, cols = image.shape
-	# Create a grid of x and y coordinates
-	x, y = np.meshgrid(np.arange(cols), np.arange(rows))
-	x = x - np.mean(x)
-	y = y - np.mean(y)
-
-	# Convert x and y coordinates to polar coordinates
-	rho = np.sqrt(x**2 + y**2)
-	theta = np.arctan2(y, x)
-
-	moments = []
-	# Define the range of n and m values
-	n_range = range(r_max + 1)
-	m_range = range(-r_max, r_max + 1, 2)
-	# Calculate the Zernike moments
-	for n in n_range:
-		for m in m_range:
-			if n < m:
-				continue
-			Rnm = zernike_radial(n, m, rho)
-			Znm = Rnm * np.exp(1j * m * theta)
-			moment = np.sum(image * Znm)
-			moments.append(moment)
-
-	return moments
-
-def harris_corner_descriptors(image, block_size=2, ksize=3):
-	"""
-	Harris Corner Descriptors are calculated by applying 
-	the Harris corner detection algorithm on the grayscale image. 
-	The Harris corner detection algorithm uses the second derivatives 
-	of the image intensity to detect corners in an image. It's sensitive 
-	to both the intensity and the location of the corner.
-
-	The Harris Corner Descriptors are returned as a 2D array, 
-	where each element represents the corner response at that particular pixel. 
-	The higher the value of a pixel, the more likely it is to be a corner.
 	
-	Note:
-		Only available in paid version of cv2?
-
-	Args:
-		image (ndarray): A 2D array representing an image.
-		block_size (int): The block_size parameter is used to set the size of 
-			the neighborhood used in the calculation of the Harris corner response. 
-			A larger block size will result in averaging over a larger neighborhood 
-			and may be less sensitive to noise. Defaults to 2.
-		ksize (int): This parameter is used to set the sensitivity of the Harris corner 
-			detector. A larger value of ksize will result in a higher threshold for detecting corners.
-			Defaults to 3.
-
-	Returns:
-		The Harris corner descriptors.
-	"""
-
-	# Convert image to grayscale
-	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	# Apply Harris corner detection
-	corners = cv2.cornerHarris(gray, block_size, ksize, 0.04)
-	# Normalize corner responses
-	corners = cv2.normalize(corners, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-	
-	return corners
-
-def zernike_radial(n, m, rho):
-	"""
-	This function takes integers n and m 
-	and a float rho as input and returns 
-	the radial polynomial Zernike moment of order (n, m)
-
-	Args:
-		n (int): The n order of Zernike polynomial.
-		m (int): The m order of Zernike polynomial.
-		rho (float): A value between 0 and 1 representing the distance from the center of the image.
-
-	Returns:
-		The radial polynomial Zernike moment of order (n, m)
-	"""
-
-	if (n - m) % 2 != 0:
-	    return 0
-	k = (n - m) // 2
-	pre_factor = (-1) ** k * comb(n, k)
-	Rnm = pre_factor * rho ** m
-	for i in range(1, k + 1):
-		pre_factor = -pre_factor * (n - i) / (i * (2 * i + m))
-		Rnm = Rnm * (rho ** 2 - i)
-	return Rnm
-
-def comb(n, k):
-	"""
-	This function takes integers n and k as 
-	input and returns the value of the binomial 
-	coefficient of n and k.
-
-	Args:
-		n (int): The number of elements in the set
-		k (int): The number of elements to choose
-
-	Returns:
-		The binomial coefficient of n and k
-	"""
-
-	return np.math.factorial(n) // (np.math.factorial(k) * np.math.factorial(n - k))
-
-def calculate_normalized_hu_moments(image):
-    """
-    Calculate the 7 Hu moments for a 2D image, but normalized! : ηpq = μpq / μ00^γ, with γ = (p+q)/2+1.
-    """
-    if len(image.shape) != 2:
-        raise ValueError("Input image must be 2D.")
-    
-    mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03 = calculate_central_moments(image)
-    
-    if mu00 == 0:
-        raise ValueError("ERROR: Zero area encountered; cannot normalize moments.")
-    
-    def eta(p, q, mu):
-        gamma = (p+q)/2 + 1
-        return mu / (mu00 ** gamma)
-    
-    eta20 = eta(2, 0, mu20)
-    eta02 = eta(0, 2, mu02)
-    eta11 = eta(1, 1, mu11)
-    eta30 = eta(3, 0, mu30)
-    eta12 = eta(1, 2, mu12)
-    eta21 = eta(2, 1, mu21)
-    eta03 = eta(0, 3, mu03)
-    
-    hu1 = eta20 + eta02
-    hu2 = (eta20 - eta02)**2 + 4*(eta11**2)
-    hu3 = (eta30 - 3*eta12)**2 + (3*eta21 - eta03)**2
-    hu4 = (eta30 + eta12)**2 + (eta21 + eta03)**2
-    hu5 = (eta30 - 3*eta12)*(eta30 + eta12)*((eta30 + eta12)**2 - 3*(eta21 + eta03)**2) \
-          + (3*eta21 - eta03)*(eta21 + eta03)*(3*(eta30 + eta12)**2 - (eta21 + eta03)**2)
-    hu6 = (eta20 - eta02)*((eta30 + eta12)**2 - (eta21 + eta03)**2) + 4*eta11*(eta30 + eta12)*(eta21 + eta03)
-    hu7 = (3*eta21 - eta03)*(eta30 + eta12)*((eta30 + eta12)**2 - 3*(eta21 + eta03)**2) \
-          - (eta30 - 3*eta12)*(eta21 + eta03)*(3*(eta30 + eta12)**2 - (eta21 + eta03)**2)
-    
-    return [hu1, hu2, hu3, hu4, hu5, hu6, hu7]

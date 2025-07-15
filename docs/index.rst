@@ -62,9 +62,9 @@ Pages
 .. toctree::
    :maxdepth: 1
 
-   source/Lyman-alpha Nebulae
+   source/Lyman-alpha Blobs
    source/Examples
-   source/Figures 
+   source/Godines et al 2025
 
 Documentation
 ==================

@@ -9,7 +9,7 @@ Figure 1
 
 The multi-band data for our five confirmed lyman-alpha nebulae can be :download:`download here. <confirmed_diffuse.npy>`
 
-To visualize the affect the sigma detection threshold has on the image segmentation object, we used the `plot_three_segm <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_three_segm>`_ function available in the pyBIA.catalog module.
+To visualize the affect the sigma detection threshold has on the image segmentation object, we used the `plot_objects_segmentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_objects_segmentation>`_ function available in the pyBIA.catalog module.
 
 .. code-block:: python
 

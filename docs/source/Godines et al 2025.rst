@@ -7,7 +7,10 @@ Figures
 Figure 1
 -----------
 
-The multi-band data for our five confirmed lyman-alpha nebulae can be :download:`download here. <confirmed_diffuse.npy>`
+The multi-band data (Bw and R) for the five broadband-selected Lyman-alpha blobs (LABs) from `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_ can be :download:`downloaded here. <confirmed_LAB.npy>`
+
+The corresponding names for these five objects (as cataloged in the NDWFS Bootes Survey) can be :download:`downloaded here. <confirmed_LAB_names.txt>`
+
 
 To visualize the affect the sigma detection threshold has on the image segmentation object, we used the `plot_objects_segmentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_objects_segmentation>`_ function available in the pyBIA.catalog module.
 
@@ -15,17 +18,56 @@ To visualize the affect the sigma detection threshold has on the image segmentat
 
 	import numpy as np 
 	from pyBIA import catalog
+	    
+	# Load the five broadband-selected LABs from Prescott+12
+	five_confirmed = np.load('confirmed_LABs.npy')
 
-	five_confirmed = np.load('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/images/saved_images_countspersec/confirmed_diffuse/confirmed_diffuse.npy')
-	names = ['PRG4', 'LABd05', 'PRG3', 'PRG2', 'PRG1']
+	# These are the Bw images, second axis contains the R-band data
+	five_confirmed_bw = five_confirmed[:,:,:,0]
 
-	size = 100 # Will crop the image to be of this size 
-	median_bkg = 0 # Already background-subtracted
-	nsig = [0.3, 0.9, 1.5] # The 3 detection limits to visualize
-	cmap = 'viridis' # Colormap to use
+	# The corresponding cataloged names
+	names = np.loadtxt('confirmed_diffuse_names.txt', dtype=str)
 
-	for i in range(len(five_confirmed)):
-		catalog.plot_three_segm(five_confirmed[i][:,:,0], size=size, median_bkg=median_bkg, nsig=nsig, cmap=cmap, name=names[i], title='', savefig=False)
+	# To associate each LAB with its cataloged name 
+	index1 = np.where(names == 'NDWFS_J143512.2+351108')[0] # PRG1
+	index2 = np.where(names == 'NDWFS_J142623.0+351422')[0] # PRG2
+	index3 = np.where(names == 'NDWFS_J143412.7+332939')[0] # PRG3
+	index4 = np.where(names == 'NDWFS_J142653.1+343856')[0] # PRG4
+	index5 = np.where(names == 'NDWFS_J143410.9+331730')[0] # LABd05
+
+	# Index the images
+	PRG1 = five_confirmed_bw[index1][0]
+	PRG2 = five_confirmed_bw[index2][0]
+	PRG3 = five_confirmed_bw[index3][0]
+	PRG4 = five_confirmed_bw[index4][0]
+	LABd05 = five_confirmed_bw[index5][0]
+
+	# Plotting parameters
+	median_bkg = 0 # Whether to subtract the background (set to None if background subtraction required)
+	pix_conversion = 3.8961 # NDWFS survey pixel-per-arcsecond (for setting the axes)
+	crop_size = 100 # Will crop the image to be of this size, otherwise set to None 
+	xpix = ypix = 125 # Cropped image will be centered about these coords, if not cropping set to None
+
+	# Figure parameters
+	fig_title = r'Image Segmentation Example ($B_W$ Imaging)' # Figure suptitle
+	sup_titles = ['PRG1','PRG2','PRG3','PRG4','LABd05'] # Title(s) above each individual panel
+	cmap = 'viridis' # Colormap to use when displaying input image, the segmentation patches always use binary
+
+	# Segm detection parameters
+	sigma_vals = [0.1, 0.3, 0.7, 1.3] # The detection threshold(s) to apply
+	deblend = False # Whether to deblend detected sources 
+	kernel_size = 21 # Gaussian filter kernel size used to convolve the data prior to segmentation
+	npixels = 9 # Required number of pixels above the sigma threshold required to detect a source
+	connectivity = 8 # Scheme to determine how pixels are grouped into a detected source, either 4 (touch along edges) or 8 (edges and corners)
+
+	# This function takes in up to 5 images, and plots the detection thresholds (up to 4 thresholds allowed)
+	catalog.plot_objects_segmentation(PRG1, PRG2, PRG3, PRG4, LABd05, 
+	    pix_conversion=pix_conversion, sigma_values=sigma_vals, deblend=deblend, 
+	    kernel_size=kernel_size, npixels=npixels, connectivity=connectivity,
+	    titles=sup_titles, suptitle=fig_title, cmap=cmap,
+	    xpix=xpix, ypix=ypix, size=crop_size, savefig=True)
+
+
 
 
 Figure 2

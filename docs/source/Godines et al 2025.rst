@@ -1,6 +1,6 @@
 .. _figures:
 
-Figures
+Godines et al 2025
 ========
 
 
@@ -60,7 +60,10 @@ To visualize the affect the sigma detection threshold has on the image segmentat
 	    titles=sup_titles, suptitle=fig_title, cmap=cmap,
 	    xpix=xpix, ypix=ypix, size=crop_size, savefig=True)
 
-
+.. figure:: _static/segm_multi.png
+    :align: center
+|
+|
 
 
 Figure 2

@@ -1422,7 +1422,7 @@ def plot_objects_segmentation(
         ypix=None,
         size=None,
         median_bkg=0, kernel_size=21, deblend=False, r_in=20, r_out=35, npixels=9, connectivity=8, cmap='viridis',
-        savepath='/Users/daniel/Desktop/segm_multi.png'):
+        savepath='/Users/daniel/Desktop/segm_multi.png', savefig=True):
     """
     Plot up to five objects (default behaviour still works for one or two).
 
@@ -1529,8 +1529,11 @@ def plot_objects_segmentation(
                bbox_to_anchor=(0.5, 1.063), ncol=len(sigma_values),
                frameon=True, fancybox=True)
 
-    plt.savefig(savepath, dpi=300, bbox_inches='tight')
-    return fig
+    if savefig:
+        plt.savefig(savepath, dpi=300, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()
 
 
 

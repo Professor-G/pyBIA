@@ -14,6 +14,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as tck
+from matplotlib.patches import Patch
+import matplotlib.colors
+from matplotlib import gridspec
+#import matplotlib
+
+from pyBIA.data_processing import crop_image
+
+
 from cycler import cycler 
 
 from photutils.detection import DAOStarFinder
@@ -27,10 +35,17 @@ from pyBIA.image_moments import make_moments_table
 from pathlib import Path
 from progress import bar
 
+try:
+    import scienceplots
+    plt.style.use('science')
+    plt.rcParams.update({'font.size':21,})
+except:
+    print('scienceplots not detected! Saved images will not be formatted correctly! Try: pip install scienceplots')
+
 class Catalog:
     """
     Creates catalog object.
-
+ 
     Args:
         data (ndarray): 2D array.
         x (ndarray, optional): 1D array or list containing the x-pixel position.
@@ -40,12 +55,8 @@ class Catalog:
         bkg (None, optional): If bkg=0 the data is assumed to be background-subtracted.
             The other optional is bkg=None, in which case the background will be
             automatically calculated for local regions.
-        zp (float, optional): Zeropoint of the instrument, used to compute the apparent
-            magnitude from the flux. Defaults to None.
-        exptime (float, optional): Exposure time, used to set the units to counts/sec. This allows
-            for self-consistency when performing the image segmentation across different fields with 
-            varying exposure times. Defaults to None, in which case the segmentation is performed
-            on the raw input image.
+        zp (float, optional):
+        exptime (float, optional):
         error (ndarray, optional): 2D array containing the rms error map.
         morph_params (bool, optional): If True, image segmentation is performed and
             morphological parameters are computed. Defaults to True. 
@@ -413,17 +424,13 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
         # Flag if there is no segmented object within the circular mask 
         x_pos, y_pos = np.ogrid[:new_data.shape[0],:new_data.shape[1]]
         cx = cy = int(size/2)
-        #
         tmin, tmax = np.deg2rad((0,360))
         r2 = (x_pos-cx)*(x_pos-cx) + (y_pos-cy)*(y_pos-cy)
-        #
         theta = np.arctan2(x_pos-cx,y_pos-cy) - tmin
         theta %= (2*np.pi)
         circmask = r2 <= threshold*threshold
         anglemask = theta <= (tmax-tmin)
         mask = circmask*anglemask
-        #
-        # Catalog non-detection if there is no segmented object within the circular mask
         if np.count_nonzero(segm.data[mask]) == 0: 
             prop_list.append(-999), moment_list.append(-999)
             progess_bar.next()
@@ -447,12 +454,14 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
         progess_bar.next()
     progess_bar.finish()
 
-    #if -999 in prop_list:
-    #    print('NOTE: At least one object could not be detected in segmentation, perhaps the object is too faint. The morphological features have been set to -999.')
     if len(prop_list) != len(moment_list):
         raise ValueError('The properties list does not match the image moments list.')
-        
-    return np.array(prop_list, dtype=object), moment_list, segm.data
+    
+    if -999 in prop_list:
+        print('NOTE: At least one object could not be detected in segmentation, perhaps the object is too faint. The morphological features have been set to -999.')
+        return np.array(prop_list, dtype=object), moment_list, np.zeros(new_data.shape)
+    else:
+        return np.array(prop_list, dtype=object), moment_list, segm.data
 
 def make_table(props, moments):
     """
@@ -468,16 +477,14 @@ def make_table(props, moments):
 
     """
 
-    # Our own functions, omits mu00 (first central moment) and g00 (first geometrically centered moment) as they are equivalent to m00
     moment_list = ['m00','m10','m01','m20','m11','m02','m30','m21','m12','m03',             
         'mu10', 'mu01', 'mu20','mu11','mu02','mu30','mu21','mu12','mu03', 'hu1','hu2',
         'hu3','hu4','hu5','hu6','hu7', 'fourier_1','fourier_2','fourier_3',             
-        'g10', 'g01', 'g20','g11','g02','g30','g21','g12','g03'] 
+        'g10', 'g01', 'g20','g11','g02','g30','g21','g12','g03'] #Removes mu00
 
-    # From the photutils segm catalog generation
     prop_list = ['area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigvals', 
         'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 
-        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 
+        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', #\\
         'isscalar', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'max_value', 'maxval_xindex', 
         'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex', 'moments', 'moments_central']
     
@@ -499,7 +506,7 @@ def make_table(props, moments):
 
         QTable = props[i][0].to_table(columns=prop_list)
         for param in prop_list:
-            if param == 'moments' or param == 'moments_central': #To 3rd order photutils outputs a 4x4 matrix
+            if param == 'moments' or param == 'moments_central': #To 3rd order photutils outputs a 4x4 matrix (obselete?)
                 for moment in np.ravel(QTable[param]):
                     morph_feats.append(moment)
             elif param == 'covariance_eigvals': 
@@ -535,6 +542,7 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
             If input it must be an array of y positions for all objects in the table. 
             This y position will be appended to the dataframe for cataloging purposes. Defaults to None.
         zp (float): Zeropoint of the instrument.
+        exptime (float): Not currently used.
         flux (ndarray, optional): 1D array containing the calculated flux
             of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
         flux_err (ndarray, optional): 1D array containing the calculated flux error
@@ -576,7 +584,7 @@ def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None
         'g10', 'g01', 'g20','g11','g02','g30','g21','g12','g03', 'area', 'covar_sigx2', 
         'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 
         'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 
-        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 
+        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', #\\
         'isscalar', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'max_value', 'maxval_xindex', 
         'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex']
 
@@ -667,7 +675,7 @@ def DAO_find(data, fwhm):
     
     return x, y
 
-def segm_find(data, nsig=0.6, kernel_size=21, deblend=False):
+def segm_find(data, nsig=0.6, kernel_size=21, deblend=False, npixels=9, connectivity=8):
     """
     Finds objects using the segmentation detection threshold. 
     
@@ -683,7 +691,8 @@ def segm_find(data, nsig=0.6, kernel_size=21, deblend=False):
         deblend (bool, optional): If True, the objects are deblended during the segmentation
             procedure, thus deblending the objects before the morphological features
             are computed. Defaults to False so as to keep blobs as one segmentation object.
-
+        npxiels (int): From photutils: Detected sources must have npixels connected pixels that are each greater than the threshold value in the input data
+        connectivity (int): From photutils: The type of pixel connectivity used in determining how pixels are grouped into a detected source. The options are 4 or 8 (default). 4-connected pixels touch along their edges. 8-connected pixels touch along their edges or corners.
     Returns:
         First output is the segmentation image object, the second output is the convolved data
         that was used when cataloging the segmentation objects.
@@ -694,9 +703,9 @@ def segm_find(data, nsig=0.6, kernel_size=21, deblend=False):
     sigma = 9.0 * gaussian_fwhm_to_sigma   # FWHM = 9. smooth the data with a 2D circular Gaussian kernel with a FWHM of 3 pixels to filter the image prior to thresholding:
     kernel = Gaussian2DKernel(sigma, x_size=kernel_size, y_size=kernel_size, mode='center')
     convolved_data = convolve(data, kernel, normalize_kernel=True, preserve_nan=True)
-    segm = detect_sources(convolved_data, threshold, npixels=9, connectivity=8)
+    segm = detect_sources(convolved_data, threshold, npixels=npixels, connectivity=connectivity)
     if deblend is True:
-        segm = deblend_sources(convolved_data, segm, npixels=5)
+        segm = deblend_sources(convolved_data, segm, npixels=npixels)
     
     return segm, convolved_data 
 
@@ -787,7 +796,7 @@ def align_error_array(data, error, data_coords, error_coords):
     return padded_error
 
 def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, r_in=20, r_out=35, cmap='viridis', path=None, name='', savefig=False, dpi=300):
+    deblend=False, pix_conversion=5, r_in=20, r_out=35, cmap='viridis', path=None, name='', savefig=False, dpi=300, return_segm_only=False, npixels=9, connectivity=8):
     """
     Returns two subplots: source and corresponding segementation object. 
 
@@ -853,6 +862,7 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
         savefig (bool, optional): If True the plot will be saved to the specified
         dpi (int, optional): Dots per inch (resolution) when savefig=True. 
             Set dpi='figure' to use the image's dpi. Defaults to 300.
+        return_segm_only (bool, optional): If True will not plot but instead return the segmentation map.
        
     Returns:
         AxesImage.
@@ -922,7 +932,17 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
         else:
             new_data -= median_bkg[i]
 
-        segm, convolved_data = segm_find(new_data, nsig=nsig, kernel_size=kernel_size, deblend=deblend)
+        segm, convolved_data = segm_find(new_data, nsig=nsig, kernel_size=kernel_size, deblend=deblend, npixels=npixels, connectivity=connectivity)
+
+        if return_segm_only:
+            try:
+                _ = segm.data
+                return segm.data
+            except AttributeError:
+                print(f"WARNING: No segmentation patches could be generated anywhere on the image for sigma={nsig}, kernel size={kernel_size}, npixels={npixels}, and connectivity={connectivity}. Adjust the detection settings and try again! Returning zero-like array...")
+                return np.zeros((size, size))
+
+
         props = segmentation.SourceCatalog(new_data, segm, convolved_data=convolved_data)
         #return segm.data
         with plt.rc_context({'axes.edgecolor':'silver', 'axes.linewidth':5, 'xtick.color':'black', 
@@ -1009,21 +1029,23 @@ def plot_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=0.7, k
                     path = str(Path.home())+'/'
                 fig.savefig(path+name+'.png', dpi=dpi, bbox_inches='tight')
                 plt.close()
-                return
-            plt.show()
-            plt.close()
+            else:
+                plt.show()
+                
 
-def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=[0.1, 0.5, 0.9], kernel_size=21, invert=False,
-    r_in=20, r_out=35, deblend=False, pix_conversion=5, cmap='viridis', path=None, name='segm_image', title='Source Detection Threshold', savefig=False):
+def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0, median_bkg2=0, nsig=[0.5, 0.5], kernel_size=21, invert=False,
+    deblend=False, pix_conversion=5, r_in=20, r_out=35, cmap='viridis', path=None, filter1='Bw', filter2='Rw', name='Source Detection Threshold', savefig=False):
     """
-    This is the function used to generate Figure 1 of the paper, used to visualize
-    how the segmentation object differs when applying varying sigma thresholds.
+    This is the function used to plot the same object in two different bands.
 
     If no x & y positions are input, the whole image will be used. If there are
     position areguments then a subimage of area size x size will be cropped out 
     first, centered around a given (x, y). By default size=100, although this should
     be a window size that comfortably encapsulates all objects. If this is too large
     the automatic background measurements will be less robust.
+
+    Note:
+        If median_bkg1 is None both images will be assumed to not be background subtracted!
 
     Args:
         data (ndarray): 2D array of a single image.
@@ -1054,7 +1076,7 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
         cmap (str): Colormap to use when generating the image.
         path (str, optional): By default the text file containing the photometry will be
             saved to the local directory, unless an absolute path to a directory is entered here.
-        name (str, ndarray, optional): The title of the image. This can be an array containing
+        filter1 (str, ndarray, optional): The title of the image. This can be an array containing
             multiple names, in which case it must contain a name for each object.
         savefig (bool, optional): If True the plot will be saved to the specified
         dpi (int, optional): Dots per inch (resolution) when savefig=True. 
@@ -1065,37 +1087,45 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
 
     """
 
-    if data.max() == 0 and data.min() == 0:
-        raise ValueError('The input data array contains only zeroes!')
+    if data1.max() == 0 and data1.min() == 0:
+        raise ValueError('The input data1 array contains only zeroes!')
+
+    if data2.max() == 0 and data2.min() == 0:
+        raise ValueError('The input data2 array contains only zeroes!')
 
     if isinstance(nsig, np.ndarray) is False:
         nsig = np.array(nsig)
 
-    if median_bkg != 0 and median_bkg is not None:
-        if isinstance(median_bkg, np.ndarray) is False:
-            median_bkg = np.array(median_bkg)
+    if median_bkg1 != 0 and median_bkg1 is not None:
+        if isinstance(median_bkg1, np.ndarray) is False:
+            median_bkg1 = np.array(median_bkg1)
+    if median_bkg2 != 0 and median_bkg2 is not None:
+        if isinstance(median_bkg2, np.ndarray) is False:
+            median_bkg2 = np.array(median_bkg2)
 
-    if len(data.shape) != 2:
+    if len(data1.shape) != 2:
         raise ValueError('Data must be 2 dimensional, 3d images not currently supported.')
     try:
-        if len(median_bkg) != len(xpix):
-            raise ValueError('If more than one median_bkg is input, the size of the array must be the number of sources (xpix, ypix) input.')
+        if len(median_bkg1) != len(xpix):
+            raise ValueError('If more than one median_bkg1 is input, the size of the array must be the number of sources (xpix, ypix) input.')
+        if len(median_bkg2) != len(xpix):
+            raise ValueError('If more than one median_bkg2 is input, the size of the array must be the number of sources (xpix, ypix) input.')
     except:
         pass
 
-    if data.shape[1] < size:
-        size = data.shape[1]
+    if data1.shape[1] < size:
+        size = data1.shape[1]
 
-    #if data.shape[1] < 70: 
-    #    r_out = data.shape[1]-1
+    #if data1.shape[1] < 70: 
+    #    r_out = data1.shape[1]-1
     #    r_in = r_out - 15 #This is a 15 pixel annulus. 
-    #elif data.shape[1] >= 72:
+    #elif data1.shape[1] >= 72:
     #    r_out = 35
     #    r_in = 20 #Default annulus used to calculate the median bkg
     
     if xpix is None and ypix is None:
-        xpix, ypix = data.shape[1]/2, data.shape[1]/2
-        size = data.shape[1]
+        xpix, ypix = data1.shape[1]/2, data1.shape[1]/2
+        size = data1.shape[1]
 
     try: 
         __ = len(xpix)
@@ -1106,11 +1136,16 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
     except:
         ypix = [ypix]
     try:
-        __ = len(median_bkg)
+        __ = len(median_bkg1)
     except:
-        if median_bkg is not None:
-            median_bkg = [median_bkg]
-
+        if median_bkg1 is not None:
+            median_bkg1 = [median_bkg1]
+    try:
+        __ = len(median_bkg2)
+    except:
+        if median_bkg2 is not None:
+            median_bkg2 = [median_bkg2]
+   
     for i in range(len(xpix)):
         if size == data1.shape[1]:
             new_data1 = data1
@@ -1140,7 +1175,9 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
 
         segm1, convolved_data1 = segm_find(new_data1, nsig=nsig[0], kernel_size=kernel_size, deblend=deblend)
         segm2, convolved_data2 = segm_find(new_data2, nsig=nsig[1], kernel_size=kernel_size, deblend=deblend)
+
         return segm1.data, segm2.data
+
         plt.rcParams["mathtext.fontset"] = "stix"
         plt.rcParams["font.family"] = "STIXGeneral"
         plt.rcParams["axes.formatter.use_mathtext"]=True
@@ -1279,228 +1316,224 @@ def plot_three_segm(data, xpix=None, ypix=None, size=100, median_bkg=None, nsig=
             plt.show()
             plt.close()
 
-def plot_two_filters(data1, data2, xpix=None, ypix=None, size=100, median_bkg1=0, median_bkg2=0, nsig=[0.5, 0.5], kernel_size=21, invert=False,
-    deblend=False, pix_conversion=5, r_in=20, r_out=35, cmap='viridis', path=None, filter1='Bw', filter2='Rw', name='Source Detection Threshold', 
-    savefig=False):
+
+
+
+# FOR FIG1
+
+
+def get_segmentation(data, nsig_val, pix_conversion, xpix=100, ypix=100, size=100, median_bkg=0, kernel_size=21, deblend=False, r_in=20, r_out=35, npixels=9, connectivity=8):
     """
-    This is the function used to plot the same object in two different bands.
-
-    If no x & y positions are input, the whole image will be used. If there are
-    position areguments then a subimage of area size x size will be cropped out 
-    first, centered around a given (x, y). By default size=100, although this should
-    be a window size that comfortably encapsulates all objects. If this is too large
-    the automatic background measurements will be less robust.
-
-    Note:
-        If median_bkg1 is None both images will be assumed to not be background subtracted!
-
-    Args:
-        data (ndarray): 2D array of a single image.
-        xpix (ndarray, optional): 1D array or list containing the x-pixel position(s).
-            Can contain one position or multiple samples. Defaults to None, in which case
-            the whole image is plotted.
-        ypix (ndarray, optional): 1D array or list containing the y-pixel position.
-            Can contain one position or multiple samples. Defaults to None, in which case
-            the whole image is plotted.
-        size (int): length/width of the output image. Defaults to 100 pixels or data.shape[0] 
-            if image is lenght is less than 100.
-        median_bkg (ndarray, optional): If None then the median background will be
-            subtracted using the median value within an annuli around the source. 
-            If data is already background subtracted set median_bkg = 0. If this is
-            an array, it must contain the local medium background around each source as
-            this scalar will be subtracted locally.        
-        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
-            deviations from the background will be detected during segmentation. Defaults to 0.7.
-        kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
-            the data. This length must be odd. Defaults to 21.
-        invert (bool): If True the x & y coordinates will be switched
-            when cropping out the object, see Note below. Defaults to False. 
-        deblend (bool, optional): If True, the objects are deblended during the segmentation
-            procedure, thus deblending the objects before the morphological features
-            are computed. Defaults to False so as to keep blobs as one segmentation object.
-        pix_conversion (int): Pixels per arcseconds conversion factor. This is used to set
-            the image axes. 
-        cmap (str): Colormap to use when generating the image.
-        path (str, optional): By default the text file containing the photometry will be
-            saved to the local directory, unless an absolute path to a directory is entered here.
-        filter1 (str, ndarray, optional): The title of the image. This can be an array containing
-            multiple names, in which case it must contain a name for each object.
-        savefig (bool, optional): If True the plot will be saved to the specified
-       
-    Returns:
-        AxesImage.
-
-    """
-
-    if data1.max() == 0 and data1.min() == 0: raise ValueError('The input data1 array contains only zeroes!')
-    if data2.max() == 0 and data2.min() == 0: raise ValueError('The input data2 array contains only zeroes!')
-    if len(data1.shape) != 2: raise ValueError('Data must be 2 dimensional.')
-
-    if isinstance(nsig, np.ndarray) is False: nsig = np.array(nsig)
-
-    if median_bkg1 != 0 and median_bkg1 is not None:
-        if isinstance(median_bkg1, np.ndarray) is False: median_bkg1 = np.array(median_bkg1)
-    if median_bkg2 != 0 and median_bkg2 is not None:
-        if isinstance(median_bkg2, np.ndarray) is False: median_bkg2 = np.array(median_bkg2)
-
-    try:
-        if len(median_bkg1) != len(xpix):
-            raise ValueError('If more than one median_bkg1 is input, the size of the array must be the number of sources (xpix, ypix) input.')
-        if len(median_bkg2) != len(xpix):
-            raise ValueError('If more than one median_bkg2 is input, the size of the array must be the number of sources (xpix, ypix) input.')
-    except:
-        pass
-
-    if data1.shape[1] < size: size = data1.shape[1]
-
-    #if data1.shape[1] < 70: 
-    #    r_out = data1.shape[1]-1
-    #    r_in = r_out - 15 #This is a 15 pixel annulus. 
-    #elif data1.shape[1] >= 72:
-    #    r_out = 35
-    #    r_in = 20 #Default annulus used to calculate the median bkg
+    Calls the catalog module’s plot_segm to produce segmentation arrays.
     
-    if xpix is None and ypix is None:
-        xpix, ypix = data1.shape[1]/2, data1.shape[1]/2
-        size = data1.shape[1]
+    The function returns (segm1, segm2) where segm1 corresponds to data1.
+    (In our usage, if only one image is available we pass the same image twice.)
+    """
 
-    xpix = xpix if isinstance(xpix, list) else [xpix]
-    ypix = ypix if isinstance(ypix, list) else [ypix]
+    segm1 = plot_segm(data, xpix=xpix, ypix=ypix, size=size, 
+        median_bkg=median_bkg, nsig=nsig_val, kernel_size=kernel_size,
+        deblend=deblend, pix_conversion=5, r_in=r_in, r_out=r_out, 
+        return_segm_only=True, npixels=npixels, connectivity=connectivity)
 
-    if median_bkg1 is not None: median_bkg1 = median_bkg1 if isinstance(median_bkg1, list) else [median_bkg1]
-    if median_bkg2 is not None: median_bkg2 = median_bkg2 if isinstance(median_bkg2, list) else [median_bkg2]
 
-    for i in range(len(xpix)):
-        if size == data1.shape[1]:
-            new_data1, new_data2 = data1, data2
-        else: 
-            new_data1 = data_processing.crop_image(data1, int(xpix[i]), int(ypix[i]), size, invert=invert)
-            new_data2 = data_processing.crop_image(data2, int(xpix[i]), int(ypix[i]), size, invert=invert)
+    return segm1
 
-        if median_bkg1 is None: #Hard coding annuli size, inner:25 -> outer:35
-            print("Subtracting background...")
-            if new_data1.shape[0] > 200 and len(xpix) == 1:
-                print('Calculating background in local regions, this will take a while... if data is background subtracted set median_bkg=0.')
-                new_data1, new_data2 = subtract_background(new_data1), subtract_background(new_data2)
-            else:
-                annulus_apertures = CircularAnnulus((new_data1.shape[1]/2, new_data1.shape[0]/2), r_in=r_in, r_out=r_out)
-                bkg_stats = ApertureStats(new_data1, annulus_apertures, sigma_clip=SigmaClip())
-                new_data1 -= bkg_stats.median
-                bkg_stats = ApertureStats(new_data2, annulus_apertures, sigma_clip=SigmaClip())
-                new_data2 -= bkg_stats.median
-        elif median_bkg1 == 0:
-            new_data1 -= median_bkg1
-            new_data2 -= median_bkg2 
+def normalize_label(segm, center_val=50):
+    """
+    Normalize the segmentation array so that the connected component at the center
+    (at index [center_val, center_val]) is set to 1000 and everything else to 0.
+    """
+    src_val = segm[center_val, center_val]
+    if src_val == 0:
+        return np.zeros(segm.shape) 
+
+    segm[segm == src_val] = 1000
+    segm[segm != 1000] = 0
+    return segm
+
+def compute_layered_segmentation(image, sigma_values, pix_conversion, xpix, ypix, size, median_bkg=0, kernel_size=21, deblend=False, r_in=20, r_out=35, npixels=9, connectivity=8):
+    """
+    For each sigma threshold in sigma_values, compute a segmentation mask (by calling
+    get_segmentation with data1 and data2 – here if only one image is available we pass
+    the same image twice). Each mask is then normalized and stored.
+    
+    Finally, a layered segmentation image is built by overlaying the masks.
+    (The first threshold’s mask is assigned intensity 1.0, the second 0.7, then 0.4 and 0.1.)
+    """
+    segm_list = []
+    # Use the default intensities for up to four sigma values:
+    default_intensities = [1.0, 0.7, 0.4, 0.1]
+    #default_intensities = np.linspace(0.1, 1, 4) ** 0.5  # sqrt for better perceptual contrast
+    #default_intensities = default_intensities[::-1]
+    intensities = default_intensities[:len(sigma_values)]
+    
+    for sval in sigma_values:
+        # For segmentation we call plot_segm.
+        # If we have only one image, we pass it twice.
+        segm = get_segmentation(data=image, nsig_val=sval, pix_conversion=pix_conversion, xpix=xpix, ypix=ypix, size=size, median_bkg=median_bkg, kernel_size=kernel_size, deblend=deblend, r_in=r_in, r_out=r_out, npixels=npixels, connectivity=connectivity)
+        segm = normalize_label(segm)
+        segm_list.append(segm)
+    
+    # Build the layered segmentation image
+    layered = np.zeros_like(segm_list[0], dtype=float)
+    for segm, inten in zip(segm_list, intensities):
+        layered[segm == 1000] = inten
+    return layered
+
+def get_extent(img, pix_conversion):
+    """
+    Returns an extent for imshow in arcsec assuming the image is centered.
+    """
+    height, width = img.shape
+    center_x = width // 2
+    center_y = height // 2
+    x = np.arange(width) - center_x
+    y = np.arange(height) - center_y
+    x_arcsec = x / pix_conversion
+    y_arcsec = y / pix_conversion
+    return [x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()]
+
+def get_display_limits(img):
+    """
+    Compute robust display limits based on the median and robust std (using median absolute deviation).
+    """
+    finite = np.isfinite(img)
+    med = np.median(img[finite])
+    std = np.median(np.abs(img[finite] - med))
+    return med - 3*std, med + 10*std
+
+
+
+
+#
+
+#
+
+
+
+#
+def plot_objects_segmentation(
+        *images,
+        pix_conversion=1.0,
+        sigma_values=[0.1, 0.25, 0.55, 0.95],
+        titles=None,
+        suptitle='',
+        xpix=None,
+        ypix=None,
+        size=None,
+        median_bkg=0, kernel_size=21, deblend=False, r_in=20, r_out=35, npixels=9, connectivity=8, cmap='viridis',
+        savepath='/Users/daniel/Desktop/segm_multi.png'):
+    """
+    Plot up to five objects (default behaviour still works for one or two).
+
+    Parameters
+    ----------
+    *images : 2-D numpy arrays
+        One to five postage-stamp images.  The first row shows the data,
+        the second the layered segmentation masks.
+    pix_conversion : float
+        Pixels-to-arcsec conversion factor.
+    sigma_values : list
+        Detection‐σ thresholds (≤ 4 values), highest σ plotted brightest.
+    titles : list/tuple of str or None
+        Per-panel titles for the imaging row; supply len(titles) == len(images).
+    suptitle : str
+        Global figure title.
+    xpix, ypix, size : int or None
+        If all three are given each image is cropped with
+        ``crop_image(img, xpix, ypix, size)`` before processing.
+    savepath : str
+        Path to ``plt.savefig`` output.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    """
+    # ------------------------------------------------------------------
+    if not 1 <= len(images) <= 5:
+        raise ValueError('Supply between 1 and 5 images.')
+
+    ncols = len(images)
+    if titles is None:
+        titles = [''] * ncols
+    elif len(titles) != ncols:
+        raise ValueError('len(titles) must equal number of images.')
+
+    proc_imgs, extents, vmins, vmaxs, layereds = [], [], [], [], []
+
+    # ------------------------------------------------------------------
+    for img in images:
+        # optional crop
+        if (xpix is not None) and (ypix is not None) and (size is not None):
+            img = crop_image(img, xpix, ypix, size)
+
+        extent = get_extent(img, pix_conversion)
+        vmin, vmax = get_display_limits(img)
+        layered = compute_layered_segmentation(
+            img, sigma_values, pix_conversion,
+            xpix if xpix is not None else 100,
+            ypix if ypix is not None else 100,
+            size if size is not None else 100,
+            median_bkg=median_bkg, kernel_size=kernel_size, deblend=deblend, r_in=r_in, r_out=r_out, npixels=npixels, connectivity=connectivity
+            )
+
+        proc_imgs.append(img)
+        extents.append(extent)
+        vmins.append(vmin)
+        vmaxs.append(vmax)
+        layereds.append(layered)
+
+    # ------------------------------------------------------------------
+    fig_w = 4 * ncols          # keep aspect similar to original (8×8 for 2 cols)
+    fig = plt.figure(figsize=(fig_w, 8))
+    spec = gridspec.GridSpec(2, ncols, wspace=0, hspace=0)
+
+    binary_cmap = plt.get_cmap('binary')
+
+    for idx in range(ncols):
+        # --- imaging row ---
+        ax_img = fig.add_subplot(spec[0, idx])
+        ax_img.imshow(np.flip(proc_imgs[idx], axis=0),
+                      vmin=vmins[idx], vmax=vmaxs[idx],
+                      cmap=cmap, extent=extents[idx], origin='lower')
+        ax_img.set_title(f'{titles[idx]}')
+        if idx != 0:
+            ax_img.set_yticklabels([])
         else:
-            new_data1 -= median_bkg1[i]
-            new_data2 -= median_bkg2[i]
+            ax_img.set_ylabel(r'$\Delta \delta$ (arcsec)')
+        ax_img.set_xticklabels([])
 
-        segm1, convolved_data1 = segm_find(new_data1, nsig=nsig[0], kernel_size=kernel_size, deblend=deblend)
-        segm2, convolved_data2 = segm_find(new_data2, nsig=nsig[1], kernel_size=kernel_size, deblend=deblend)
-
-        segm1_, segm2_ = segm1.data, segm2.data
-
-       
-      #  return segm1.data, segm2.data
-
-        fig, axes = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8,8))
-        fig.suptitle(name, x=.5, y=0.954, color='black', fontsize=22)
-        ((ax1, ax2), (ax4, ax3)) = axes
-
-        index = np.where(np.isfinite(new_data1))
-        std = np.median(np.abs(new_data1[index] - np.median(new_data1[index])))
-        vmin, vmax = np.median(new_data1[index]) - 3*std, np.median(new_data1[index]) + 10*std
-        ax1.imshow(new_data1, vmin=vmin, vmax=vmax, cmap=cmap)
-
-        index = np.where(np.isfinite(new_data2))
-        std = np.median(np.abs(new_data2[index] - np.median(new_data2[index])))
-        vmin, vmax = np.median(new_data2[index]) - 3*std, np.median(new_data2[index]) + 10*std
-        ax2.imshow(new_data2, vmin=vmin, vmax=vmax, cmap=cmap)
-        
-        ax4.imshow(segm1.data, origin='lower', cmap=segm2.make_cmap(seed=19))
-        ax3.imshow(segm2.data, origin='lower', cmap=segm2.make_cmap(seed=19))
-        #
-        #'seismic', 'twilight', 'YlGnBu_r', 'bone', 'cividis' #best cmaps
-        
-        plt.gcf().set_facecolor("white")
-        fig.subplots_adjust(wspace=0, hspace=0)
-        ax1.grid(True, color='k', alpha=0.35, linewidth=1.5, linestyle='--')
-        ax2.grid(True, alpha=0.35, linestyle='--')
-        ax3.grid(True, alpha=0.35, linestyle='--')
-        ax4.grid(True, alpha=0.35, linestyle='--')
-        
-        if isinstance(filter1, str):
-            ax1.set_title(filter1, color='black', size=20)
+        # --- segmentation row ---
+        ax_seg = fig.add_subplot(spec[1, idx])
+        ax_seg.imshow(np.flip(layereds[idx], axis=0),
+                      cmap='binary', vmin=0, vmax=1,
+                      extent=extents[idx], origin='lower', interpolation='nearest')
+        if idx == 0:
+            ax_seg.set_ylabel(r'$\Delta \delta$ (arcsec)')
         else:
-            ax1.title(filter1[i], color='black', size=20)
+            ax_seg.set_yticklabels([])
+        ax_seg.set_xlabel(r'$\Delta \alpha$ (arcsec)')
 
-        if isinstance(filter2, str):
-            ax2.set_title(filter2, color='black', size=20)
-        else:
-            ax2.title(filter2[i], color='black', size=20)
+    # ------------------------------------------------------------------
+    fig.suptitle(suptitle, y=1.09)
 
-        ax1.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=18)
-        ax4.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=18)
-        ax4.set_ylabel(r'$\Delta\delta \ \rm [arcsec]$', color='black', size=18)
-        ax3.set_xlabel(r'$\Delta\alpha \ \rm [arcsec]$', color='black', size=18)
+    default_intensities = [1.0, 0.7, 0.4, 0.1]
+    intensities_used = default_intensities[:len(sigma_values)]
+    legend_handles = [
+        Patch(color=matplotlib.colors.to_hex(binary_cmap(inten)),
+              label=f'{sigma}') for sigma, inten in zip(sigma_values, intensities_used)
+    ]
+    fig.legend(legend_handles, [h.get_label() for h in legend_handles],
+               loc='upper center', handlelength=1.,
+               title=r'$\sigma_{\rm det}$',
+               bbox_to_anchor=(0.5, 1.063), ncol=len(sigma_values),
+               frameon=True, fancybox=True)
 
-        ax1.xaxis.set_major_locator(plt.MaxNLocator(5))
-        ax1.yaxis.set_major_locator(plt.MaxNLocator(5))
-        ax2.yaxis.set_major_locator(plt.MaxNLocator(5))
-        ax2.xaxis.set_major_locator(plt.MaxNLocator(5))
-        ax3.xaxis.set_major_locator(plt.MaxNLocator(5))
-        ax3.yaxis.set_major_locator(plt.MaxNLocator(5))
-        ax4.yaxis.set_major_locator(plt.MaxNLocator(5))
-        ax4.xaxis.set_major_locator(plt.MaxNLocator(5))
+    plt.savefig(savepath, dpi=300, bbox_inches='tight')
+    return fig
 
-        ax1.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
-        ax1.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
-        ax2.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
-        ax2.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
-        ax3.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
-        ax3.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
-        ax4.xaxis.set_minor_locator(tck.AutoMinorLocator(2))
-        ax4.yaxis.set_minor_locator(tck.AutoMinorLocator(2))
 
-        length = new_data1.shape[0]
-        x_label_list_1 = [str(length/-2./pix_conversion), str(length/-4./pix_conversion), 0, str(length/4./pix_conversion), str(length/2./pix_conversion)]
-        ticks_1 = [0,length-3*length/4,length-length/2,length-length/4,length]
-        x_label_list_1 = [str(np.round(float(t), 1)) for t in x_label_list_1]
 
-        x_label_list_2 = [str(length/-4./pix_conversion), 0, str(length/4./pix_conversion)]
-        ticks_2 = [length-3*length/4,length-length/2,length-length/4]
-        x_label_list_2 = [str(np.round(float(t), 1)) for t in x_label_list_2]
 
-        ax1.set_frame_on(True)
-        ax1.set_xticks(ticks_2)
-        ax1.set_xticklabels(x_label_list_2, color='black', fontsize=16)
-        ax1.set_yticks(ticks_2)
-        ax1.set_yticklabels(x_label_list_2, color='black', fontsize=16)
 
-        ax2.set_frame_on(True)
-        ax2.set_xticks(ticks_2)
-        ax2.set_xticklabels(x_label_list_2, color='black', fontsize=16)
-        ax2.set_yticks(ticks_2)
-        ax2.set_yticklabels(x_label_list_2, color='black', fontsize=16)
 
-        ax3.set_frame_on(True)
-        ax3.set_xticks(ticks_2)
-        ax3.set_xticklabels(x_label_list_2, color='black', fontsize=16)
-        ax3.set_yticks(ticks_2)
-        ax3.set_yticklabels(x_label_list_2, color='black', fontsize=16)
-
-        ax4.set_frame_on(True)
-        ax4.set_xticks(ticks_2)
-        ax4.set_xticklabels(x_label_list_2, color='black', fontsize=16)
-        ax4.set_yticks(ticks_2)
-        ax4.set_yticklabels(x_label_list_2, color='black', fontsize=16)
-
-        if savefig is True:
-            if path is None:
-                print("No path specified, saving catalog to local home directory.")
-                path = str(Path.home())+'/'
-            fig.savefig(path+name+'.png', dpi=300, bbox_inches='tight')
-            plt.close()
-            return
-        plt.show()
-        plt.close()

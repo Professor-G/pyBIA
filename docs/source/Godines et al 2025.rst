@@ -28,19 +28,12 @@ To visualize the affect the sigma detection threshold has on the image segmentat
 	# The corresponding cataloged names
 	names = np.loadtxt('confirmed_diffuse_names.txt', dtype=str)
 
-	# To associate each LAB with its cataloged name 
-	index1 = np.where(names == 'NDWFS_J143512.2+351108')[0] # PRG1
-	index2 = np.where(names == 'NDWFS_J142623.0+351422')[0] # PRG2
-	index3 = np.where(names == 'NDWFS_J143412.7+332939')[0] # PRG3
-	index4 = np.where(names == 'NDWFS_J142653.1+343856')[0] # PRG4
-	index5 = np.where(names == 'NDWFS_J143410.9+331730')[0] # LABd05
-
-	# Index the images
-	PRG1 = five_confirmed_bw[index1][0]
-	PRG2 = five_confirmed_bw[index2][0]
-	PRG3 = five_confirmed_bw[index3][0]
-	PRG4 = five_confirmed_bw[index4][0]
-	LABd05 = five_confirmed_bw[index5][0]
+	# Index the images of each LAB according to its cataloged name
+	PRG1 = five_confirmed_bw[(names == 'NDWFS_J143512.2+351108')][0]
+	PRG2 = five_confirmed_bw[(names == 'NDWFS_J142623.0+351422')][0]
+	PRG3 = five_confirmed_bw[(names == 'NDWFS_J143412.7+332939')][0]
+	PRG4 = five_confirmed_bw[(names == 'NDWFS_J142653.1+343856')][0]
+	LABd05 = five_confirmed_bw[(names == 'NDWFS_J143410.9+331730')][0]
 
 	# Plotting parameters
 	median_bkg = 0 # Whether to subtract the background (set to None if background subtraction required)

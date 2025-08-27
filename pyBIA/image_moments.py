@@ -105,8 +105,8 @@ def calculate_central_moments(image: np.ndarray) -> list:
     y_bar = np.sum(y * image) / m00
 
     mu00 = m00
-    mu10 = np.sum((x - x_bar) * image)
-    mu01 = np.sum((y - y_bar) * image)
+    mu10 = np.sum((x - x_bar) * image) #Should be 0 but usually get ~1e-15 - 1e-16
+    mu01 = np.sum((y - y_bar) * image) #Should be 0 but usually get ~1e-15 - 1e-16
     mu20 = np.sum((x - x_bar)**2 * image)
     mu11 = np.sum((x - x_bar) * (y - y_bar) * image)
     mu02 = np.sum((y - y_bar)**2 * image)
@@ -182,7 +182,9 @@ def calculate_hu_moments(image: np.ndarray, central_moments=None) -> list:
     	mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03 = central_moments
 
     if mu00 == 0:
-        raise ValueError("ERROR: Zero area encountered; cannot normalize moments.")
+        #raise ValueError("ERROR: Zero area encountered; cannot normalize moments.")
+        print("ERROR: Zero area encountered; cannot normalize moments. Returning NaN...")
+        return [np.nan] * 7
     
     def eta(p, q, mu):
         gamma = (p+q)/2 + 1

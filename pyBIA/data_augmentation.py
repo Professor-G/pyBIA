@@ -14,98 +14,91 @@ import matplotlib.pyplot as plt
 from warnings import warn
 import numpy as np
 import random
-import cv2
+from typing import Optional
+from scipy.ndimage import affine_transform
 
-def augmentation(channel1, channel2=None, channel3=None, batch=1, width_shift=0, height_shift=0, horizontal=False, vertical=False, 
-    rotation=False, fill='nearest', image_size=None, zoom_range=None, mask_size=None, num_masks=None, blend_multiplier=0, blending_func='mean', 
-    num_images_to_blend=2, skew_angle=0, return_stacked=False):
+def augmentation(
+    channel1, 
+    channel2=None, 
+    channel3=None, 
+    batch=1, 
+    width_shift=0, 
+    height_shift=0, 
+    horizontal=False, 
+    vertical=False, 
+    rotation=False, 
+    fill='nearest', 
+    image_size=None, 
+    zoom_range=None, 
+    mask_size=None, 
+    num_masks=None, 
+    blend_multiplier=0, 
+    blending_func='mean', 
+    num_images_to_blend=2, 
+    skew_angle=0, 
+    return_stacked=False
+    ):
     """
-    This function takes in a set of images, up to three filters. The ``channel1`` to ``channel3`` arguments
-    are 3D arrays containing individual 2D images, all from the same band. 
-    NOte that even though the filters must be input individually each time, the output
-    can designated to a 4-D array if ``return_stacked``=``True``. The default is ``False``, which
-    will make it so the function returns the same number of outputs as channel inputs. The number 
-    of augmentations to perform PER INDIVIDUAL SAMPLE is determined by the ``batch`` argument. 
+    Offline image augmentation for up to three aligned channels (bands), with optional stacking.
 
-    Rotating (``rotation``), skewing (``skew_angle``), and flipping images (``horizontal`` & ``vertical``) can 
-    make the training model more robust to variations in the orientation and perspective of the input images. 
-    Likewise, shifting up (``widtht_shift``) and down (``height_shift``) will help make the model translation 
-    invariant and thus robust to the position of the object of interest within the image.
+    Parameters
+    ----------
+    channel1 : ndarray
+        First channel as a single image (H×W) or a stack (N×H×W). Always required.
+    channel2 : ndarray or None, optional
+        Second channel aligned to `channel1`, shape (H×W) or (N×H×W). Default is None.
+    channel3 : ndarray or None, optional
+        Third channel aligned to `channel1`, shape (H×W) or (N×H×W). Default is None.
+    batch : int, optional
+        Number of augmented samples to generate per input image. Default is 1.
+    width_shift : int, optional
+        Maximum horizontal pixel shift (both directions). Default is 0.
+    height_shift : int, optional
+        Maximum vertical pixel shift (both directions). Default is 0.
+    horizontal : bool, optional
+        Random left–right flips if enabled. Default is False.
+    vertical : bool, optional
+        Random up–down flips if enabled. Default is False.
+    rotation : bool, optional
+        Random rotation by an angle uniformly sampled in [0°, 360°] if enabled. Default is False.
+    fill : {'constant','nearest','reflect','wrap'}, optional
+        Fill mode used for pixels introduced by shifts/rotations. Default is 'nearest'.
+    image_size : int or None, optional
+        Output side length for cropping/resizing after transforms (returns H=W=image_size); if None, keep original size. Default is None.
+    zoom_range : tuple[float, float] or None, optional
+        (min_zoom, max_zoom) factor applied uniformly at random (e.g., (0.9, 1.1)); if None, no zoom is applied. Default is None.
+    mask_size : int or None, optional
+        Diameter of circular cutout mask applied at random locations; if None, cutouts are disabled. Default is None.
+    num_masks : int or None, optional
+        Number of cutouts per image when `mask_size` is set; requires `mask_size`. Default is None.
+    blend_multiplier : float, optional
+        Ratio controlling the number of synthetic blended images (≥1 replaces/expands the set, <1 disables blending); 0 disables entirely. Default is 0.
+    blending_func : {'mean','max','min','random'}, optional
+        Reduction used when blending multiple images into one. Default is 'mean'.
+    num_images_to_blend : int, optional
+        Number of images randomly selected to compose each blend when blending is enabled. Default is 2.
+    skew_angle : float, optional
+        Maximum absolute skew angle in degrees (sampled uniformly from [-skew_angle, +skew_angle]); 0 disables skew. Default is 0.
+    return_stacked : bool, optional
+        If True, return channels concatenated along a last dimension (N×H×W×C); otherwise return one array per input channel. Default is False.
 
-    Image blending (``blend_multiplier``) can help to generate new samples through the combination of different images 
-    using a variety of blending criteria (``blend_func``). Note that by default two random images (``num_images_to_blend``)
-    will be blended together to create one synthetic sample, and since this procedure is applied post-batch creation,
-    the same unique sample may be randomly blended, which could be a problem if the configured augmentation parameters
-    do not generate sufficient training feature variety.
+    Returns
+    -------
+    aug1 : ndarray
+        Augmented images for `channel1`, shape (M×H×W) when not stacked, where M = N×batch possibly modified by zoom/blend steps.
+    aug2 : ndarray, optional
+        Augmented images for `channel2` when provided and `return_stacked` is False, same length and shape as `aug1`.
+    aug3 : ndarray, optional
+        Augmented images for `channel3` when provided and `return_stacked` is False, same length and shape as `aug1`.
+    stacked : ndarray
+        If `return_stacked` is True, a single array of shape (M×H×W×C) with C equal to the number of provided channels (2 or 3).
 
-    Random cutouts (``mask_size``) can help increase the diversity of the training set and reduce overfitting, as applying
-    this technique prevents the training model from relying too heavily on specific features of the image, thus 
-    encouraging the model to learn more general image attributes.
-    
-    These techniques, when enabled, are applied in the following order:
-        - Random shift + flip + rotation: Generates ``batch`` number of images.
-        - Random zoom in or out.
-        - If ``image_size`` is set, the image is resized so as to crop the distorted boundary.
-        - Random image skewness is applied, with the ``skew_angle`` controlling the maximum angle,
-            in degrees, to distort the image from its original position.
-        - The batch size is now increased by a factor of ``blend_multiplier``, where each unique sample is generated
-            by randomly merging ``num_images_to_blend`` together according to the blending function ``blend_func``. 
-            As per the random nature, an original sample may be blended together at this stage,
-            but with enough variation this may not be a problem.
-        - Circular cutouts of size ``mask_size`` are randomly placed in the image, whereby
-            the cutouts replace the pixel values with zeroes. Note that as per the random nature
-            of the routine, if ``num_masks`` is greater than 1, overlap between each cutout may occur,
-            depending on the corresponding image size to ``mask_size`` ratio.
-    Note:
-        This function is used for offline data augmentation! In practice, online augmentation may be preferred 
-        as that exposes the training model to significantly more samples. If multiple channels are input,
-        this method will save the seeds from the augmentation of the first filter, after which the seeds 
-        will be applied to the remaining filters, thus ensuring the same augmentation procedure is applied across all channels.
-
-    Args:
-        channel1 (ndarray): 2D array of containing a single image, or a 3D array containing
-            multiple images. 
-        channel2 (ndarray, optional): 2D array of containing a single image, or a 3D array containing
-            multiple images. Must correspond with channel1. Default is None.
-        channel3 (ndarray, optional): 2D array of containing a single image, or a 3D array containing
-            multiple images. Must correspond with channel2. Default is None.
-        batch (int): How many augmented images to create and save, per individual smaple in the input data.
-        width_shift (int): The max pixel shift allowed in either horizontal direction.
-            If set to zero no horizontal shifts will be performed. Defaults to 0 pixels.
-        height_shift (int): The max pixel shift allowed in either vertical direction.
-            If set to zero no vertical shifts will be performed. Defaults to 0 pixels.
-        horizontal (bool): If False no horizontal flips are allowed. Defaults to False.
-        vertical (bool): If False no vertical reflections are allowed. Defaults to False.
-        rotation (int): If True full 360 rotation is allowed, if False no rotation is performed.
-            Defaults to False.
-        fill (str): This is the treatment for data outside the boundaries after roration
-            and shifts. Default is set to 'nearest' which repeats the closest pixel values.
-            Can be set to: {"constant", "nearest", "reflect", "wrap"}.
-        image_size (int, bool): The length/width of the cropped image. This can be used to remove
-            anomalies caused by the fill (defaults to 50). This can also be set to None in which case 
-            the image in its original size is returned. Defaults to None.
-        mask_size (int): The size of the cutout mask. Defaults to None to disable random cutouts.
-        num_masks (int): Number of masks to apply to each image. Defaults to None, must be an integer
-            if mask_size is used as this designates how many masks of that size to randomly place in the image.
-        blend_multiplier (float): Sets the amount of synthetic images to make via image blending.
-            Must be a ratio greater than or equal to 1. If set to 1, the data will be replaced with
-            randomly blended images, if set to 1.5, it will increase the training set by 50% with blended images,
-            and so forth. Deafults to 0 which disables this feature.
-        blending_func (str): The blending function to use. Options are 'mean', 'max', 'min', and 'random'. 
-            Only used when blend_multiplier >= 1. Defaults to 'mean'.
-        num_images_to_blend (int): The number of images to randomly select for blending. Only used when 
-            blend_multiplier >= 1. Defaults to 2.
-        zoom_range (tuple): Tuple of floats (min_zoom, max_zoom) specifying the range of zoom in/out values.
-            If set to (0.9, 1.1), for example, the zoom will be randomly chosen between 90% to 110% the original 
-            image size, note that the image size thus increases if the randomly selected zoom is greater than 1,
-            therefore it is recommended to also input an appropriate image_size. Defaults to None, which disables this procedure.
-        skew_angle (float): The maximum absolute value of the skew angle, in degrees. This is the maximum because 
-            the actual angle to skew by will be chosen from a uniform distribution between the negative and positive 
-            skew_angle values. Defaults to 0, which disables this feature.
-
-    Returns:
-        Array containing the augmented images. When input, channel2 and channel3 yield 
-        additionl outputs, respectively.
+    Notes
+    -----
+    - Identical random seeds are reused across channels so that all spatial transforms (shift/flip/rotate/zoom/skew, blending, cutouts) are aligned.
+    - If `mask_size` is provided, `num_masks` must also be provided (and vice-versa).
+    - `width_shift` and `height_shift` must be integers specifying pixel ranges.
+    - Setting `blend_multiplier >= 1` generates blended samples; e.g., 1.0 replaces with blends, 1.5 increases the set by 50% using blends.
     """
 
     if batch == 0: #Setting this in case the negative class is not set to be augmented during the CNN optimization routine.
@@ -136,8 +129,7 @@ def augmentation(channel1, channel2=None, channel3=None, batch=1, width_shift=0,
         Function for the image data genereation which hardcodes the rotation parameter of the parent function.
         The order parameter to 0 to ensure that the rotation is performed using nearest-neighbor interpolation, 
         which minimizes the amount of distortion introduced into the image. Additionally, the reshape parameter is False, 
-        which will ensure that the rotated image has the same shape as the original image. The prefilter parameter is also 
-        set to False to prevent any additional processing from being performed on the image prior to rotation.
+        which will ensure that the rotated image has the same shape as the original image. 
         """
         return rotate(data, np.random.choice(range(rotation+1), 1)[0], reshape=False, order=0, prefilter=True) #Prefilter is useful but slows things down slightly
         
@@ -168,8 +160,9 @@ def augmentation(channel1, channel2=None, channel3=None, batch=1, width_shift=0,
         for j in range(batch):
             seed = int(random.sample(range(int(1e9)), 1)[0])
             seeds.append(seed)
+           # import pdb; pdb.set_trace()
             augment = datagen.flow(original_data, batch_size=1, seed=seed) #returns 3D (width, height, num)
-            augmented_data_batch = augment.next()[0]
+            augmented_data_batch = augment.__next__()[0]
             width, height = augmented_data_batch.shape[:2]
             augmented_data_reshaped = np.reshape(augmented_data_batch, (width, height))
             if zoom_range is not None:
@@ -218,7 +211,7 @@ def augmentation(channel1, channel2=None, channel3=None, batch=1, width_shift=0,
             original_data = data[i].reshape((1,) + data[-i].shape)
             for j in range(batch):
                 augment = datagen.flow(original_data, batch_size=1, seed=seeds[k])
-                augmented_data_batch = augment.next()[0]
+                augmented_data_batch = augment.__next__()[0]
                 width, height = augmented_data_batch.shape[:2]
                 augmented_data_reshaped = np.reshape(augmented_data_batch, (width, height))
                 if zoom_range is not None:
@@ -265,7 +258,7 @@ def augmentation(channel1, channel2=None, channel3=None, batch=1, width_shift=0,
             original_data = data[i].reshape((1,) + data[-i].shape)
             for j in range(batch):
                 augment = datagen.flow(original_data, batch_size=1, seed=seeds[k])
-                augmented_data_batch = augment.next()[0]
+                augmented_data_batch = augment.__next__()[0]
                 width, height = augmented_data_batch.shape[:2]
                 augmented_data_reshaped = np.reshape(augmented_data_batch, (width, height))
                 if zoom_range is not None:
@@ -300,21 +293,33 @@ def augmentation(channel1, channel2=None, channel3=None, batch=1, width_shift=0,
     else:
         return augmented_data, augmented_data2, augmented_data3
 
-def random_cutout(images, mask_size=16, num_masks=1, seed=None, mask_type='circle'):
+def random_cutout(
+    images, 
+    mask_size=16, 
+    num_masks=1, 
+    seed=None, 
+    mask_type='circle'
+    ):
     """
-    Applies the cutout data augmentation technique to a sample of 2D images.
-    This method applies `num_masks` random positioned (mask_size x mask_size) black squares or
-    circles to each image.
+    Cutout augmentation: randomly applies square or circular zeroed masks to each image.
 
-    Args:
-        images (numpy array): A 3D array of shape (num_images, height, width).
-        mask_size (int): The size of the cutout mask. Defaults to 16.
-        num_masks (int): Number of masks to apply to each image. Defaults to 1.
-        seed (int): Seed for the random number generator. Defaults to None.
-        mask_type (str): Type of mask to create. Can be 'square' or 'circle'. Defaults to 'square'.
+    Parameters
+    ----------
+    images : ndarray
+        Input as a single image (H×W) or a stack (N×H×W); values are preserved except where masked. Default is required.
+    mask_size : int, optional
+        Mask scale: radius for 'circle'; half-side for 'square' (final square = 2×mask_size by 2×mask_size). Default is 16.
+    num_masks : int, optional
+        Number of masks to place per image; masks may overlap. Default is 1.
+    seed : int or None, optional
+        Random seed for reproducible mask placement; if None, use current RNG state. Default is None.
+    mask_type : {'square','circle'}, optional
+        Shape of each mask region applied to the image(s). Default is 'circle'.
 
-    Returns:
-        A new 3D array of the same shape as data, with cutout applied.
+    Returns
+    -------
+    ndarray
+        Array with cutouts applied; same shape as input (H×W for a single image, N×H×W for a stack).
     """
 
     if seed is not None:
@@ -361,42 +366,39 @@ def random_cutout(images, mask_size=16, num_masks=1, seed=None, mask_type='circl
     else:
         return new_images
 
-def image_blending(images, num_augmentations=1, blend_ratio=0.5, blending_func='mean', normalize_blend=True,
-    num_images_to_blend=5, seed=None):
+def image_blending(
+    images, 
+    num_augmentations=1, 
+    blend_ratio=0.5, 
+    blending_func='mean', 
+    normalize_blend=True,
+    num_images_to_blend=5, 
+    seed=None
+    ):
     """
-    Perform image blending augmentation on a set of single-band images, combining up to num_images_to_blend images to generate each augmentation.
-    
-    After all the blended images are generated, the code normalizes each image by dividing each pixel value by 
-    the number of images that were blended to create that image. By dividing the sum of pixel values by the 
-    number of images blended, the resulting pixel values will be the average of the corresponding pixel values 
-    in the original images. This ensures that the overall intensity of the resulting image is similar to the 
-    original images and does not become too bright or too dark due to the blending process.
-    
-    Note:
-        The blend_ratio is a parameter that determines the proportion of the two images that are blended together.
+    Blend multiple single-band images to create augmented samples.
 
-        For example, suppose we have two images A and B that we want to blend. If blend_ratio is set to 0.5, then the 
-        resulting blended image will be a 50-50 mix of A and B. Specifically, each pixel in the blended image will be computed as:
+    Parameters
+    ----------
+    images : ndarray
+        Input as a stack (N×H×W) or a single image (H×W); values are linearly or elementwise combined to form new images. Default is required.
+    num_augmentations : int, optional
+        Number of blended images to generate; must be a positive integer. Default is 1.
+    blend_ratio : float, optional
+        Mixing weight for 'mean' blending where output = (1−blend_ratio)·A + blend_ratio·B; constrained to [0, 1]. Default is 0.5.
+    blending_func : {'mean','max','min','random'}, optional
+        Rule used to combine images where 'random' picks one of the other modes per blend. Default is 'mean'.
+    normalize_blend : bool, optional
+        If True, divide each blended image by the number of images combined to keep overall intensity comparable. Default is True.
+    num_images_to_blend : int, optional
+        Maximum number of distinct images sampled (uniformly without replacement) to combine per augmentation; must be ≤ N. Default is 5.
+    seed : int or None, optional
+        Random seed for reproducible sampling and mode selection when applicable. Default is None.
 
-        blended_pixel = 0.5 * pixel_A + 0.5 * pixel_B
-
-        If blend_ratio is set to 0.7, then the resulting blended image will contain 70% of A and 30% of B. Specifically, 
-        each pixel in the blended image will be computed as:
-
-        blended_pixel = 0.7 * pixel_A + 0.3 * pixel_B
-
-        Thus the blend_ratio determines the weighting of each image in the blend, with values between 0 and 1 indicating the proportion of each image.
-
-    Args:
-        images (numpy array): A 3D array of shape (num_images, height, width).
-        num_augmentations (int): The number of augmented images to generate.
-        blend_ratio (float): The proportion of the two images to blend together. Must be between 0 and 1.
-        blending_func (str): The blending function to use. Options are 'mean', 'max', 'min', and 'random'.
-        num_images_to_blend (int): The number of images to randomly select for blending. Defaults to 2.
-        seed (int): Seed for the random number generator. Defaults to None.
-
-    Returns:
-        ndarray: A 3D array of the augmented images, with dimensions (num_images, height, width).
+    Returns
+    -------
+    ndarray
+        Blended images with shape (num_augmentations, H, W).
     """
 
     #assert images.ndim != 3, "Input images must have dimensions (num_images, height, width)"
@@ -455,20 +457,29 @@ def image_blending(images, num_augmentations=1, blend_ratio=0.5, blending_func='
 
 def resize(data, size=50):
     """
-    Resizes the data by cropping out the outer boundaries outside the size x size limit.
-    Can be either a 2D array containing one sample, or a 3D array for multiple samples.
-    
-    Note:
-        By design this function will not work if the data is a single sample, multiple channels (img_width, img_height, img_num_channels). 
-        In this case, reshape to be 4-D: data = data.reshape(1, img_width, img_height, img_num_channels)
+    Center-crop square images to a fixed size.
 
-    Args:
-        data (array): 2D array to resize.
-        size (int): The length/width of the output array. Defaults to 50 pixels. 
-            Can be set to None to return the same image size.
+    Parameters
+    ----------
+    data : ndarray
+        Input as a single image (H×W), a stack (N×H×W), or a multi-channel stack (N×H×W×C with C ≤ 3); samples must be square. Default is required.
+    size : int or None, optional
+        Target side length in pixels for the center crop; if None, return the input unchanged. Default is 50.
 
-    Returns:
-        The cropped out array.
+    Returns
+    -------
+    ndarray
+        Cropped image(s) with shape (H'×W'), (N×H'×W'), or (N×H'×W'×C), where H'=W'=size.
+
+    Raises
+    ------
+    ValueError
+        If input is 1D, non-square, has more than 3 channels, or has an unsupported shape.
+
+    Notes
+    -----
+    - If the current side length already equals `size`, the input is returned unchanged.
+    - For a single sample with channels (H×W×C), reshape to (1×H×W×C) before calling.
     """
 
     if size is None:
@@ -523,64 +534,110 @@ def resize(data, size=50):
 
     return resized_data
 
-def random_skew(image, max_angle=15, intensity=0.1, seed=None):
+
+def random_skew(
+    image: np.ndarray,
+    max_angle: float = 15.0,
+    intensity: float = 0.1,
+    seed: Optional[int] = None,
+    order: int = 1,
+    mode: str = "constant",
+    cval: float = 0.0,
+    ) -> np.ndarray:
     """
-    Apply random skewness to a 2D image.
+    Apply a random 2‑D shear (“skew”) to an image without using OpenCV.
 
-    Args: 
-        image (array): The input 2D image to be skewed.
-        max_angle (float): The maximum absolute value of the skew angle, 
-            in degrees. Defaults to 15.
-        intensity (float): The maximum amount of skew to apply. A lower intensity 
-            value will result in a more subtle skew, while a higher intensity value 
-            will result in a more significant skew. Defaults to 0.1. Must be <= 1.
-        seed (int): Seed for the random number generator. Defaults to None.
+    Parameters
+    ----------
+    image : np.ndarray
+        2‑D array representing the input image.
+    max_angle : float, optional
+        Maximum absolute shear angle (degrees) sampled independently
+        for *x* and *y* directions.  Default is 15°.
+    intensity : float, optional
+        Additional multiplicative control on the magnitude of the shear. 
+    seed : int or None, optional
+        Seed for the RNG; set for reproducibility.
+    order : int, optional
+        Interpolation order passed to ``scipy.ndimage.affine_transform``. Defaults to 1.
+    mode : {'constant', 'nearest', 'mirror', 'wrap'}, optional
+        How values outside the input are filled.  Passed directly to
+        ``affine_transform``.  Default is ``'constant'``.
+    cval : float, optional
+        Constant value used when ``mode='constant'``.  Default=0.0.
 
-    Returns:
-        The skewed image.
+    Returns
+    -------
+    np.ndarray
+        Skewed image with the same shape and dtype as *image*.
     """
+    if image.ndim != 2:
+        raise ValueError("`image` must be a 2‑D array.")
 
-    if seed is not None:
-        np.random.seed(seed)
+    if not (0.0 <= intensity <= 1.0):
+        raise ValueError("`intensity` must lie in the interval [0,1].")
 
-    skew_x = np.random.uniform(-intensity, intensity)
-    skew_y = np.random.uniform(-intensity, intensity)
+    rng = np.random.default_rng(seed)
 
-    # Get image dimensions
-    rows, cols = image.shape
+    # Random shear angles in radians, scaled by intensity
+    theta_x = np.deg2rad(rng.uniform(-max_angle, max_angle)) * intensity
+    theta_y = np.deg2rad(rng.uniform(-max_angle, max_angle)) * intensity
 
-    # Define source points for affine transformation
-    src_points = np.float32([[0, 0], [cols - 1, 0], [0, rows - 1]])
+    shear_x = np.tan(theta_x)
+    shear_y = np.tan(theta_y)
 
-    # Define destination points for affine transformation
-    max_skew_angle = np.deg2rad(max_angle)
-    dst_x = np.random.uniform(-max_skew_angle, max_skew_angle)
-    dst_y = np.random.uniform(-max_skew_angle, max_skew_angle)
-    dst_x = skew_x * cols + dst_x * rows
-    dst_y = skew_y * rows + dst_y * cols
-    dst_points = src_points + np.float32([[dst_x, dst_y], [dst_x + cols, dst_y], [dst_x, dst_y + rows]])
+    # Forward shear matrix (output → input coordinates)
+    M = np.array([[1.0, shear_x],
+                  [shear_y, 1.0]], dtype=float)
 
-    # Define affine transformation matrix
-    matrix = cv2.getAffineTransform(src_points, dst_points)
+    # Invert because ndimage wants the mapping *from* output pixels *to* input
+    M_inv = np.linalg.inv(M)
 
-    # Apply affine transformation
-    skewed_image = cv2.warpAffine(image, matrix, (cols, rows))
+    # Center the transform so the image skews around its midpoint
+    center = (np.array(image.shape[::-1]) - 1) / 2.0  # (x, y)
+    offset = center - M_inv @ center
 
-    return skewed_image
+    skewed = affine_transform(
+        image,
+        matrix=M_inv,
+        offset=offset,
+        order=order,
+        mode=mode,
+        cval=cval,
+        output_shape=image.shape,
+        prefilter=(order > 1),
+    )
+
+    return skewed.astype(image.dtype)
 
 def random_zoom(images, zoom_min=0.9, zoom_max=1.1, seed=None):
     """
-    Randomly applies zoom in/out to a 3D array of images (or 2D for a single image)
-    along the height and width dimensions.
+    Randomly apply isotropic zoom to 2D or 3D image arrays.
 
-    Args:
-        images (ndarray): 2D or 3D numpy array of shape (height, width) or (num_images, height, width)
-        zoom_min (float): Minimum ratio to decrease the image by. Defaults to 0.9.
-        zoom_max (float): Maximum ratio to increase the image by. Defaults to 1.1.
-        seed (int): Seed for the random number generator. Defaults to None.
+    Parameters
+    ----------
+    images : ndarray
+        Input image(s) as (H×W) or (N×H×W); 2D input is treated as a single image. Default is required.
+    zoom_min : float, optional
+        Lower bound on the random zoom factor; values < 1.0 shrink and > 1.0 enlarge. Default is 0.9.
+    zoom_max : float, optional
+        Upper bound on the random zoom factor; must be ≥ `zoom_min`. Default is 1.1.
+    seed : int or None, optional
+        Random seed for reproducibility; if None, use global RNG state. Default is None.
 
-    Returns:
-        2D or 3D numpy array of image(s) with the random zoom applied.
+    Returns
+    -------
+    ndarray
+        Zoomed image(s), shape matches input dimensionality: (H×W) or (N×H×W).
+
+    Raises
+    ------
+    ValueError
+        If `images` is not 2D or 3D, or if `zoom_max` < `zoom_min`.
+
+    Notes
+    -----
+    - Nearest-neighbor interpolation is used (order=0) and edges are filled with nearest values.
     """
 
     if seed is not None:
@@ -599,18 +656,28 @@ def random_zoom(images, zoom_min=0.9, zoom_max=1.1, seed=None):
 
 def plot(data, cmap='gray', title=''):
     """
-    Plots 2D array using a robust colorbar range to
-    ensure proper visibility.
-    
-    Args:
-        data (array): 2D array for single image, or 3D array with stacked channels.
-        cmap (str): Colormap to use when generating the image.
-        title (str, optional): Title displayed above the image. 
+    Plot a 2D image (or stacked-channel image) with robust contrast limits.
 
-    Returns:
-        AxesImage.
+    Parameters
+    ----------
+    data : ndarray
+        2D array for a single-channel image, or 3D array with stacked channels (e.g., H×W×C where C∈{1,3}). Default is required.
+    cmap : str, optional
+        Matplotlib colormap name applied for 2D input; ignored for true-color (H×W×3). Default is 'gray'.
+    title : str, optional
+        Text displayed above the image; empty string shows no title. Default is ''.
+
+    Returns
+    -------
+    AxesImage
+        Handle from `matplotlib.pyplot.imshow`.
+
+    Notes
+    -----
+    Contrast limits are computed over finite pixels using a median/MAD-like scale:
+    vmin = median − 3×MAD and vmax = median + 10×MAD.
     """
-    
+
     index = np.where(np.isfinite(data))
     std = np.median(np.abs(data[index]-np.median(data[index])))
     vmin = np.median(data[index]) - 3*std
@@ -619,7 +686,6 @@ def plot(data, cmap='gray', title=''):
     plt.imshow(data, vmin=vmin, vmax=vmax, cmap=cmap)
     plt.title(title)
     plt.show()
-
 
 
     

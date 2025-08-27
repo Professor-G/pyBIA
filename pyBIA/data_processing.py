@@ -11,21 +11,30 @@ from tensorflow.keras.utils import to_categorical
 
 def find_duplicate_features(features, tolerance=1e-9):
     """
-    This function will check if there are any duplicate columns 
-    within the array by comparing each column with the next columns. 
+    Check for duplicate feature columns using elementwise closeness.
 
-    Args:
-        features (ndarray): 2D array of features, column-wise.
-        tolerance (float): tolerance level for comparison of values.
-    Returns:
-        A set of duplicate indices.
+    Parameters
+    ----------
+    features : ndarray, shape (n_samples, n_features)
+        Feature matrix with features stored column-wise.
+    tolerance : float, optional
+        Absolute tolerance for equality checks passed to np.isclose. Default is 1e-9.
+
+    Returns
+    -------
+    set of int
+        Zero-based indices of columns identified as duplicates of at least one other column within the tolerance; empty if none.
     """
+
     # Initialize a set to store the unique feature indices
     unique_indices = set()
+
     # Initialize a set to store the duplicate feature indices
     duplicate_indices = set()
+
     # Get the transpose of the features array
     features_T = features.T
+
     # Get the number of columns
     num_cols = features_T.shape[0]
     for i in range(num_cols):
@@ -39,48 +48,30 @@ def find_duplicate_features(features, tolerance=1e-9):
                 if j not in unique_indices:
                     unique_indices.add(j)
                     duplicate_indices.add(j)
+
     return duplicate_indices
 
 def crop_image(data, x, y, size=50, invert=False):
     """
-    This function takes a 2D array and returns a sub-array
-    centered around x and y. The sub array will be a square of length = size.
+    Return a square sub-array of length `size` centered on (x, y) from a 2D image, padding with NaNs if the crop extends beyond the image bounds.
 
-    Note:
-        When applying data augmentation techniques it is best to start with a larger
-        image and then crop it to the appropriate size afterward, so as to avoid the 
-        rotational shear visible on the edges.
+    Parameters
+    ----------
+    data : ndarray
+        Input 2D image array.
+    x : int
+        Column (x) coordinate of the crop center, in the image's coordinate convention.
+    y : int
+        Row (y) coordinate of the crop center, in the image's coordinate convention.
+    size : int, optional
+        Width/height of the output crop in pixels; must be a positive integer. Default is 50.
+    invert : bool, optional
+        If True, swap the provided (x, y) before cropping (useful when inputs come from FITS-style top-left origins but the cropper assumes standard indexing). Default is False.
 
-        IMPORTANT: When loading data from a .fits file the pixel convention
-        is switched. The (x, y) = (0, 0) position is on the top left corner of the .fits
-        image. The standard convention is for the (x, y) = (0, 0) to be at the bottom left
-        corner of the data. We strongly recommend you double-check your data coordinate
-        convention. We made use of .fits data with the (x, y) = (0, 0) position at the top
-        left of the image, for this reason we switched x and y when cropping out individual
-        objects. The parameter invert=True performs the coordinate switch for us. This is only
-        required because pyBIA's cropping function assumes standard convention.
-
-    Args:
-        data (array): 2D array.
-        x (int): Central x-position of the sub-array to be cropped out, relative
-            to the entire data.
-        y (int): Central y-position of the sub-array to be cropped out, relative
-            to the entire data.
-        size (int): length/width of the output array. Defaults to 50.
-        invert (bool): If True the x & y coordinates will be switched
-            when cropping out the object, see Note above. Defaults to False.
-    Returns:
-        The cropped array.
-
-    Example:
-        If we have a 100x100 image, we can crop this by setting x,y = (50,50), which
-        would be the center of of the image. Since pyBIA standard is 50x50, we will 
-        set the size of the reshaped array to 50.
-
-        >>> from pyBIA import data_processing
-        >>> resize = data_processing.crop_image(data, x=50, y=50, size=50)
-
-        If your image is 200x200, then x, y = (100,100), and so on.
+    Returns
+    -------
+    ndarray
+        Cropped array of shape (size, size); regions falling outside the input image are padded with NaNs.
     """
 
     if invert:
@@ -100,19 +91,21 @@ def crop_image(data, x, y, size=50, invert=False):
 
 def concat_channels(channel1, channel2, channel3=None):
     """
-    This function concatenates multiple 2D arrays, useful for image classification when using multiple filters.
+    Concatenate up to three single-band 2D images along a new last axis, producing a multi-channel tensor.
 
-    Can combine SDSS g,r,i for example, to make one 3D image. Order at which
-    they are stacked must be conistent when data is input for classification.
-    
-    Args:
-        Channel1 (array): 2D array of the first channel.
-        Channel2 (array): 2D array of the second channel.
-        Channel3 (array, optional): 2D array of the third channel.
+    Parameters
+    ----------
+    channel1 : ndarray
+        2D array for the first channel (H × W). Must have the same height and width as the other channels.
+    channel2 : ndarray
+        2D array for the second channel (H × W). Must have the same height and width as the other channels.
+    channel3 : ndarray or None, optional
+        2D array for the third channel (H × W). Must have the same height and width as the other channels. Default is None.
 
-    Returns:
-        3D array with each channel stacked.
-
+    Returns
+    -------
+    ndarray
+        3D array of shape (H, W, C) where C is 2 if `channel3` is None, otherwise 3. The dtype matches the input arrays.
     """
     
     if channel3 is None:
@@ -122,37 +115,31 @@ def concat_channels(channel1, channel2, channel3=None):
 
     return np.concatenate(colorized, axis=-1)
 
-
 def normalize_pixels(channels, min_pixel, max_pixel, img_num_channels):
     """
-    This function will apply min-max normalization. It returns a 4-d array.
-    
-    Note:
-        min_pixel must be a single input, but the max_pixel can either be 
-        an int/float or a list. If it is an int/float then
+    Clip and min–max normalize image data per channel into [0, 1], handling 2D, 3D, and 4D inputs.
 
-        Non-subtracted images in the NDWFS Bootes survey data (Bw):
-        NDWFS min 0.01% : 638.186
-        NDWFS max 99.99% : 7350.639
-        Max intensity of expected blobs : ~3000
-    
+    Parameters
+    ----------
+    channels : ndarray
+        Input image data as (H, W), (N, H, W), (H, W, C), or (N, H, W, C); non-finite values are set to `min_pixel`.
+    min_pixel : float
+        Lower clip bound applied to all channels before normalization.
+    max_pixel : float or list of float
+        Upper clip bound; a scalar for single-channel data or a list of length `img_num_channels` for multi-channel data.
+    img_num_channels : int
+        Number of channels expected in the output; used to validate or reshape inputs.
 
-    Args:
-        channel (array): 2D array for one image, 3D array for multiple images.
-        min_pixel (int, optional): The minimum pixel count, defaults to 0. 
-            Pixels with counts below this threshold will be set to this limit.
-        max_pixel (int, optional): The maximum pixel count, defaults to 100. 
-            Pixels with counts above this threshold will be set to this limit.
+    Returns
+    -------
+    ndarray
+        Normalized array with values in [0, 1]; shape is (N, H, W) for single-channel inputs or (N, H, W, C) for multi-channel inputs.
 
-    Returns:      
-        Reshaped data and label arrays.
-
-    Note:
-        In the context of diffuse nebulae detection, the max_pixel value should 
-        be slightly above the maximum expected count for the nebula, as anything 
-        brighter (such as stars) will be set to the same limit of max_pixel, which
-        will result in more robust classification performance.
-        
+    Raises
+    ------
+    ValueError
+        If `max_pixel` type is incompatible with `img_num_channels`, if shapes are inconsistent with `img_num_channels`,
+        or if the input dimensionality is not 2D, 3D, or 4D.
     """
 
     if isinstance(max_pixel, int) and img_num_channels != 1:
@@ -177,7 +164,7 @@ def normalize_pixels(channels, min_pixel, max_pixel, img_num_channels):
     if len(images.shape) == 4:
         axis = images.shape[0]
         if images.shape[-1] != img_num_channels:
-            raise ValueError('img_num_channels parameter must match the number of filters! Number of filters detected: '+str(channel.shape[-1]))
+            raise ValueError('img_num_channels parameter must match the number of filters! Number of filters detected: '+str(channels.shape[-1]))
         img_width, img_height = images[0].shape[1], images[0].shape[0]
     elif len(images.shape) == 3:
         if img_num_channels == 1:
@@ -199,31 +186,29 @@ def normalize_pixels(channels, min_pixel, max_pixel, img_num_channels):
 
 def process_class(channel, label=None, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000):
     """
-    Takes image data and returns the reshaped data array, which is required when 
-    entering data into the CNN classifier. Note that if using multiple bands, the filters
-    must be processed individually, and concatenated afterwards.
-    
-    If label is set to either 0 or 1, then the reshaped data is
-    returned along with an array containing the label array. 
-    This is used for generating training or validations sets of appropriate shape.
-    
-    Note:
-        Image anomalies can be removed by setting normalize=True, as the 
-        values below/above the thresholds are set to the min/max limits. We
-        strongly recommend normalizing your data.
+    Reshape image data to (N, H, W, C) and optionally apply per-channel min–max normalization; optionally return one-hot labels.
 
-    Args:
-        channel (array): 2D array for one image, 3D array for multiple images.
-        img_num_channels (int): The number of filters used. Defaults to 1.
-        label (int, optional): Class label, 0 for blob, 1 for other. Defaults to None.
-        normalize (bool, optional): True will apply min-max normalization.
-        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
-            Pixels with counts below this threshold will be set to this limit.
-        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
-            Pixels with counts above this threshold will be set to this limit.
+    Parameters
+    ----------
+    channel : ndarray
+        Input images as (H, W) for one image, (N, H, W) for many images, (H, W, C) for one multi-channel image, or (N, H, W, C) for many multi-channel images.
+    label : int or None, optional
+        Class label encoded as 0 or 1; if provided, a one-hot label array is returned alongside the data; Default is None.
+    img_num_channels : int, optional
+        Number of channels per sample used to validate and reshape the output; Default is 1.
+    normalize : bool, optional
+        If True, clip to [`min_pixel`, `max_pixel`] and scale each channel to [0, 1] using `normalize_pixels`; Default is True.
+    min_pixel : float, optional
+        Lower clip bound applied when `normalize=True`, with non-finite values also set to this bound; Default is 638.
+    max_pixel : float or list of float, optional
+        Upper clip bound(s) applied when `normalize=True`, scalar for single-channel or list of length `img_num_channels` for multi-channel; Default is 3000.
 
-    Returns:      
-        Reshaped data and label arrays.
+    Returns
+    -------
+    ndarray
+        Data array shaped (N, H, W, C) with values in [0, 1] if normalized, otherwise an unscaled copy.
+    ndarray
+        One-hot label array shaped (N, 2) returned only when `label` is not None.
     """
 
     if normalize:
@@ -266,37 +251,33 @@ def process_class(channel, label=None, img_num_channels=1, normalize=True, min_p
 
 def create_training_set(blob_data, other_data, img_num_channels=1, normalize=True, min_pixel=638, max_pixel=3000):
     """
-    Combines image data of known class to create a training set.
-    This is used for training the machine learning models. The 
-    max_pixel parameter can be a single value corresponding to a single channel
-    or to a list containing the value for each individual band.
+    Combine positive and negative image stacks into a single training tensor with one-hot labels.
 
-    Note: 
-        This function is for binary classification only, the manual procedure for multiclass
-        training set creation looks as follows:
+    Parameters
+    ----------
+    blob_data : ndarray
+        Positive-class images shaped (N, H, W) or (N, H, W, C) with C = img_num_channels; these receive label 1.
+    other_data : ndarray
+        Negative-class images shaped (N, H, W) or (N, H, W, C) with C = img_num_channels; these receive label 0.
+    img_num_channels : int, optional
+        Number of channels per sample used to validate/reshape the output; Default is 1.
+    normalize : bool, optional
+        If True, clip to [min_pixel, max_pixel] and scale per channel to [0, 1] using `normalize_pixels`; Default is True.
+    min_pixel : float, optional
+        Lower clip bound applied when `normalize` is True; non-finite values are also set to this bound; Default is 638.
+    max_pixel : float or list of float, optional
+        Upper clip bound(s) applied when `normalize` is True; scalar for single-channel or list of length `img_num_channels` for multi-channel; Default is 3000.
 
-        >>> from pyBIA.data_processing import process_class
-        >>> import numpy as np 
+    Returns
+    -------
+    ndarray
+        Training images shaped (N_total, H, W, C) with C = img_num_channels; values in [0, 1] when `normalize` is True.
+    ndarray
+        One-hot labels shaped (N_total, 2) with class 1 for `blob_data` and class 0 for `other_data`.
 
-        >>> class1_data, class1_label = process_class(data1, label=0)
-        >>> class2_data, class2_label = process_class(data2, label=1)
-        >>> class3_data, class3_label = process_class(data3, label=2)
-
-        >>> training_data = np.r_[class1_data, class2_data, class3_data]
-        >>> training_labels = np.r_[class1_label class2_label, class3_label]
-
-    Args:
-        blob_data (array): 3D array containing more than one image of diffuse objects.
-        other_data (array): 3D array containing more than one image of non-diffuse objects.
-        img_num_channels (int): The number of filters used. Defaults to 1.
-        normalize (bool, optional): True will normalize the data using the input min and max pixels
-        min_pixel (int, optional): The minimum pixel count, defaults to 638. 
-            Pixels with counts below this threshold will be set to this limit.
-        max_pixel (int, optional): The maximum pixel count, defaults to 3000. 
-            Pixels with counts above this threshold will be set to this limit.
-    
-    Returns:      
-        Reshaped data and label arrays.
+    Notes
+    -----
+    This function is for binary classification only; for multi-class workflows, call `process_class` per class and concatenate the results.
     """
 
     class1_data, class1_label = process_class(blob_data, label=1, normalize=normalize, min_pixel=min_pixel, max_pixel=max_pixel, img_num_channels=img_num_channels)
@@ -307,4 +288,24 @@ def create_training_set(blob_data, other_data, img_num_channels=1, normalize=Tru
 
     return training_data, training_labels
 
+# Log transformation for the Hu moments
+def signed_log_transform(x, eps=1e-12):
+    """
+    Apply a signed base-10 logarithmic transform that preserves the sign of each value.
 
+    This is useful for features spanning several orders of magnitude (e.g., Hu moments)
+    that can be positive or negative; zeros remain zero due to the sign factor.
+
+    Parameters
+    ----------
+    x : array-like or scalar
+        Input value(s) to transform.
+    eps : float, optional
+        Small positive constant added inside the log to avoid log(0); Default is 1e-12.
+
+    Returns
+    -------
+    ndarray or scalar
+        Transformed value(s) with the same shape as `x`.
+    """
+    return np.sign(x) * np.log10(np.abs(x) + eps)

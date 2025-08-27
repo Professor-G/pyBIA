@@ -21,7 +21,7 @@ from astropy.utils.exceptions import AstropyWarning
 from astropy.convolution import Gaussian2DKernel, convolve
 from photutils.segmentation import detect_threshold, detect_sources, deblend_sources, SourceCatalog
 from photutils.aperture import ApertureStats, CircularAperture, CircularAnnulus
-from progress import bar
+from progress import bar 
 
 from pyBIA import data_processing
 from pyBIA.image_moments import make_moments_table
@@ -37,10 +37,69 @@ filterwarnings("ignore", category=RuntimeWarning)
 
 class Catalog:
     """
-    Photometric + morphological catalog builder for postage-stamp images.
+    Build photometric and morphological catalogs from postage-stamp astronomical images.
+
+    This class extracts source positions and performs aperture photometry along with
+    segmentation-based morphological analysis. Sources can be detected automatically
+    via image segmentation or specified manually through input coordinates. The resulting
+    catalog includes flux measurements, optional background subtraction, and a comprehensive
+    set of shape descriptors for use in classification pipelines.
+
+    Parameters
+    ----------
+    data : ndarray
+        2D image array.
+    x, y : array-like or None, optional
+        Pixel coordinates of source centers. If None, sources are detected automatically.
+    bkg : float or None, optional
+        Background mode. Use 0 if background is already subtracted; None to estimate
+        the local sky background.
+    error : ndarray or None, optional
+        Pixel-wise error map with the same shape as `data`.
+    zp : float or None, optional
+        Zeropoint for magnitude calculations. If None, magnitudes are not computed.
+    exptime : float or None, optional
+        Exposure time in seconds. If provided, `data` is normalized (e.g., counts per sec)
+        when performing segmentation and computing morphology.
+    morph_params : bool, optional
+        If True, compute moment-based morphological features (default is True).
+    nsig : float, optional
+        Detection threshold in units of background sigma. Pixels above `nsig` are
+        considered in segmentation. Default is 0.3.
+    threshold : int, optional
+        Radius (in pixels) around the source center used to validate detection.
+        If no object is found within this region, the source is flagged as a non-detection.
+        Set to 0 to require exact overlap. Default is 10.
+    deblend : bool, optional
+        If True, enables deblending of overlapping sources. Default is False
+        (recommended for diffuse, extended objects).
+    obj_name : array-like or None, optional
+        List of object names for catalog rows.
+    field_name : array-like or None, optional
+        List of field names for catalog rows.
+    flag : array-like or None, optional
+        List of flags for catalog rows.
+    aperture : int, optional
+        Aperture radius (in pixels) for photometry. Default is 15.
+    annulus_in : int, optional
+        Inner radius (in pixels) of background annulus for local sky estimation.
+        Default is 20.
+    annulus_out : int, optional
+        Outer radius (in pixels) of background annulus. Default is 35.
+    kernel_size : int, optional
+        Size of Gaussian kernel (in pixels) for segmentation smoothing. Default is 21.
+    npixels : int, optional
+        Minimum area (in pixels) for segmentation detection. Default is 9.
+    connectivity : int, optional
+        Pixel connectivity for segmentation (4 or 8). Default is 8.
+    invert : bool, optional
+        If True, flips the (x, y) input order when cropping sub-images.
+        Useful for data with (row, column) indexing or FITS-style origin.
+        Default is False.
+    cat : pandas.DataFrame or None, optional
+        Existing catalog to augment or use for metadata.
     """
 
-    #
     def __init__(
         self,
         data: np.ndarray,
@@ -52,7 +111,7 @@ class Catalog:
         zp: float | None = None,
         exptime: float | None = None,
         morph_params: bool = True,
-        nsig: float = 0.7,
+        nsig: float = 0.3,
         threshold: int = 10,
         deblend: bool = False,
         obj_name=None,
@@ -85,12 +144,12 @@ class Catalog:
         self.npixels = npixels
         self.connectivity = connectivity
         self.invert = invert
-
-        # 
         self.bkg = bkg
+
+        # The catalog, can be input to extract obj_name, field_name and object flag (may remove in future versions)
         self.cat = cat
 
-        # 
+        # Source positions and field info
         self.x = None if x is None else np.atleast_1d(x)
         self.y = None if y is None else np.atleast_1d(y)
         self.obj_name = None if obj_name is None else np.atleast_1d(obj_name)
@@ -103,20 +162,48 @@ class Catalog:
                 with suppress(KeyError):
                     setattr(self, key, np.array(cat[key]))
 
-    def create(self, *, save_file: bool = True, path: str | None = None,
-               filename: str | None = None):
+    def create(
+        self, 
+        *, 
+        save_file: bool = True, 
+        path: str | None = None, 
+        filename: str | None = None
+        ):
         """
-        Build full catalog; returns a `pandas.DataFrame`.
+        Build the full photometric and morphological catalog.
+
+        This method performs source detection (via segmentation or user-supplied positions),
+        computes aperture photometry, and optionally includes morphological features. It
+        returns the catalog as a pandas DataFrame and can also save it to disk.
 
         Parameters
         ----------
-        save_file : bool
-            Save CSV output to disk.
-        path : str or None
-            Target directory (defaults to `Path.home()`).
-        filename : str or None
-            Output filename (defaults to ``pyBIA_catalog.csv``).
+        save_file : bool, optional
+            If True, saves the catalog as a CSV file. Default is True.
+        path : str or None, optional
+            Directory where the output CSV file will be saved. If None, defaults to the home directory.
+        filename : str or None, optional
+            Name of the output CSV file. Defaults to "pyBIA_catalog.csv".
+
+        Returns
+        -------
+        pandas.DataFrame
+            DataFrame containing the photometric and morphological measurements for all detected sources.
+
+        Raises
+        ------
+        ValueError
+            If background mode (`bkg`) is invalid, `data` and `error` shapes mismatch,
+            aperture and annulus sizes are incompatible, or if `x` and `y` coordinates differ in length.
+
+        Notes
+        -----
+        - If `x` and `y` are not provided, automatic source detection is run on the full frame.
+        - If `x` and `y` are given, photometry and morphology are computed only at those positions.
+        - Catalog output includes flux, flux error, optional magnitudes, and morphology features
+          depending on initialization settings.
         """
+
         # Input checks
         if self.bkg not in (None, 0):
             raise ValueError("If data are background-subtracted set bkg=0; otherwise use bkg=None to estimate local sky.")
@@ -126,6 +213,8 @@ class Catalog:
             raise ValueError("Must satisfy aperture < annulus_in < annulus_out.")
         if (self.x is not None) and (len(self.x) != len(self.y)):
             raise ValueError("`x` and `y` must be same length.")
+        if not (isinstance(self.threshold, (int, float))):
+            raise TypeError('The `threshold` parameter must be >= 0! Set to 0 if a detection must be present at the specific position(s).')
 
         # Source detection 
         if self.x is None:
@@ -140,14 +229,19 @@ class Catalog:
             self.cat.to_csv(path / filename, index=False)
 
         return self.cat
-
-    # 
+ 
     def _auto_detect_sources(self):
-        """Run segmentation on whole frame and build catalog."""
+        """
+        Automatically detect sources using segmentation and build the catalog.
+
+        This method performs full-frame source detection via image segmentation
+        (using `photutils.detect_sources`), estimates background if needed, computes
+        aperture photometry, and optionally derives morphological features using 
+        moment-based shape descriptors. Results are stored in `self.cat`.
+        """
 
         if self.nsig > 1 and not self.deblend:
             warn("Very high `nsig`; consider lowering or enabling `deblend`.")
-
 
         # Subtract background if data is not yet background-subtracted (e.g., bkg=None)
         self.data_bgsub = self._subtract_global_background() if self.bkg is None else self.data
@@ -180,7 +274,8 @@ class Catalog:
                 self.data_bgsub, self.x, self.y, exptime=self.exptime,
                 nsig=self.nsig, kernel_size=self.kernel_size,
                 npixels=self.npixels, connectivity=self.connectivity, 
-                median_bkg=None, invert=self.invert, deblend=self.deblend
+                median_bkg=None, invert=self.invert, deblend=self.deblend, 
+                threshold=self.threshold
             )
             tbl = make_table(props_list, moments)
         else:
@@ -191,10 +286,16 @@ class Catalog:
             obj_name=self.obj_name, field_name=self.field_name, flag=self.flag,
             flux=aper_stats.sum, flux_err=flux_err, median_bkg=None
         )
-
-    # 
+ 
     def _aperture_photometry(self):
-        """Photometry for user-supplied positions."""
+        """
+        Perform aperture photometry at user-supplied positions and build the catalog.
+
+        This method computes circular-aperture fluxes at specified `(x, y)` coordinates,
+        optionally subtracts a local background estimated from an annular region, and
+        calculates flux errors if an error map is provided. Morphological features are
+        computed if enabled. The resulting catalog is stored in `self.cat`.      
+        """
 
         positions = list(zip(self.x, self.y))
         apertures = CircularAperture(positions, r=self.aperture)
@@ -206,7 +307,7 @@ class Catalog:
             bkg_stats = ApertureStats(self.data, ann, error=self.error, sigma_clip=SigmaClip())
             bkg = bkg_stats.median
             flux = aper_stats.sum - bkg * apertures.area
-        else: # data already backgroud-subtracted 
+        else: # if data is already backgroud-subtracted 
             bkg, flux = None, aper_stats.sum
 
         # morph params
@@ -231,86 +332,135 @@ class Catalog:
             flux=flux, flux_err=flux_err, median_bkg=bkg,
         )
 
-    # Only used when no catalog positions are input 
     def _subtract_global_background(self):
-        """Estimate median sky in 2×annulus_out square per object."""
+        """
+        Estimate and subtract a global background level from the image. Only used when no catalog positions are input.
+
+        For large images, the method estimates the background using a sliding box 
+        of size `2 × annulus_out`, ensuring the region encompasses the largest 
+        background annulus used for photometry. For small images, a single 
+        sigma-clipped median value is subtracted instead.
+
+        Returns
+        -------
+        ndarray
+            Background-subtracted image.
+        """
 
         length = self.annulus_out * 2 * 2 #The sub-array when padding will be a square encapsulating the outer annuli
+        
         if (self.data.shape[0] < length) or (self.data.shape[1] < length):
             bg = sigma_clipped_stats(self.data)[1]
             return self.data - bg
+        
         return subtract_background(self.data, length=length)
 
 
-
-def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=21, npixels=9, connectivity=8, median_bkg=None, 
-    invert=False, deblend=False, exptime=None):
+def morph_parameters(
+    data, 
+    x, 
+    y, 
+    size=100, 
+    nsig=0.6, 
+    threshold=10, 
+    kernel_size=21, 
+    median_bkg=None, 
+    invert=False, 
+    deblend=False, 
+    exptime=None, 
+    npixels=9, 
+    connectivity=8):
     """
-    Applies image segmentation on each object to calculate morphological 
-    parameters calculated from the moment-based properties. These parameters 
-    can be used to train a machine learning classifier.
+    Compute segmentation-based morphological features for sources at given positions.
 
-    By default the data is assumed to be background subtracted, otherwise the
-    median_bkg argument needs to be set for proper image detection.
-    
-    Args:
-        data (ndarray): 2D array.
-        x (ndarray): 1D array or list containing the x-pixel position.
-            Can contain one position or multiple samples.
-        y (ndarray): 1D array or list containing the y-pixel position.
-            Can contain one position or multiple samples.
-        size (int, optional): The size of the box to consider when calculating
-            features related to the local environment. Default is 100x100 pixels.
-        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
-            deviations from the background will be detected during segmentation. Defaults to 0.6.
-        threshold (int): To avoid non-detections the segmentation map will be cropped at the center,
-            this central subarray will be of size (threshold x threshold). If no segmentation object
-            is located in this central area, the source will be flagged as a non-detection. Defaults
-            to 5 pixels.
-        median_bkg (ndarray, optional): 1D array containing the median background
-            in the annuli of each around each (x,y) object. This is not a standard rms or background
-            map input. Defaults to None, in which case data is assumed to be background-subtracted.
-        invert (bool): If True the x & y coordinates will be switched
-            when cropping out the object, see Note below. Defaults to False.
-        deblend (bool, optional): If True, the objects are deblended during the segmentation
-            procedure, thus deblending the objects before the morphological features
-            are computed. Defaults to False so as to keep blobs as one segmentation object.
-        exptime (float, optional):
+    For each (x, y) position, a `size × size` cutout is extracted, optionally background-
+    corrected and exposure-normalized, then segmented (via `segm_find`) to isolate the
+    central source. Moment-based features are measured (via `make_moments_table`) and
+    photutils-like source properties are recorded. Results are suitable for downstream
+    classification tasks.
 
-    Note:
-        This function requires x & y positions as each source 
-        is isolated before the image segmentation is performed as this is
-        computationally more efficient. If you need the x and y positions, you can
-        run the catalog.create function, which will include the x & y pixel 
-        positions of all cataloged sources.
+    Parameters
+    ----------
+    data : ndarray
+        2D image array.
+    x, y : array-like or scalar
+        Pixel coordinates of source centers. Scalars are accepted and will be promoted
+        to length-1 arrays.
+    size : int, optional
+        Side length (pixels) of the square cutout used per source. If the image is
+        smaller than `size` along any axis, the largest square that fits is used.
+        Default is 100.
+    nsig : float, optional
+        Detection threshold in units of background sigma for segmentation. Pixels
+        above `nsig` contribute to detected regions. Default is 0.6.
+    threshold : int, optional
+        Central-detection validation radius (pixels). If `threshold == 0`, require
+        that the exact central pixel belongs to a segmented object; otherwise, require
+        at least one segmented pixel within a central circular region of radius
+        `threshold`. Sources failing this test are flagged as non-detections.
+        Default is 10.
+    kernel_size : int, optional
+        Gaussian kernel size (pixels) used by `segm_find` for segmentation smoothing.
+        Default is 21.
+    median_bkg : array-like or None, optional
+        Per-source median background values to subtract from each cutout (not a full
+        background map). If None, input `data` is assumed to be background-subtracted.
+        Length must match `x`/`y` if provided. Default is None.
+    invert : bool, optional
+        If True, swap (x, y) when cropping (useful for data in row–column indexing
+        or FITS-style top-left origin). Default is False.
+    deblend : bool, optional
+        If True, enable deblending in `segm_find` to split overlapping sources.
+        Default is False.
+    exptime : float or None, optional
+        Exposure time in seconds. If provided, each cutout is divided by `exptime`
+        prior to segmentation/feature measurement (e.g., to convert counts to counts/s).
+        Default is None.
+    npixels : int, optional
+        Minimum area (pixels) for valid segmented regions. Default is 9.
+    connectivity : int, optional
+        Pixel connectivity for segmentation (4 or 8). Default is 8.
 
-        IMPORTANT: When loading data from a .fits file the pixel convention
-        is switched. The (x, y) = (0, 0) position is on the top left corner of the .fits
-        image. The standard convention is for the (x, y) = (0, 0) to be at the bottom left
-        corner of the data. We strongly recommend you double-check your data coordinate
-        convention. We made use of .fits data with the (x, y) = (0, 0) position at the top
-        left of the image, for this reason we switched x and y when cropping out individual
-        objects. The parameter invert=True performs the coordinate switch for us. This is only
-        required because pyBIA's cropping function assumes standard convention.
-    
-    Return:
-        A catalog of morphological parameters. If multiple positions are input, then the
-        output will be a list containing multiple morphological catalogs, one for
-        each position.
-        
+    Returns
+    -------
+    props_list : ndarray of object
+        Array of per-source photutils-like property selections (e.g., slices from
+        `SourceCatalog`). For non-detections, the sentinel value `-999` is inserted.
+    moments_list : list of pandas.DataFrame
+        Per-source moment feature tables returned by `make_moments_table`. For
+        non-detections, the sentinel value `-999` is inserted.
+    segm_map : ndarray
+        Segmentation map (int labels) for the last processed cutout. If any source
+        failed detection, a zero array of that cutout's shape is returned.
+
+    Raises
+    ------
+    ValueError
+        If the number of properties and moment tables differs (internal consistency check).
+
+    Notes
+    -----
+    - Each source is processed independently using a cropped cutout for computational efficiency.
+    - Central-detection validation:
+        * `threshold == 0` enforces exact central-pixel membership in a segment.
+        * `threshold > 0` accepts any segment intersecting the central circular mask.
+      The segment nearest the center is retained when multiple intersect the mask.
+    - FITS coordinate convention: Many FITS images use a top-left origin (row, column).
+      If your coordinates follow this convention, set `invert=True` so cropping treats
+      inputs correctly. `pyBIA` assumes standard (x to the right, y upward) unless inverted.
+    - For very small images (`< ~50` pixels on a side), results may be unstable if the
+      source is truncated at the edges (a warning is printed).
     """
 
-    if data.shape[0] < 100:
+    if data.shape[0] < 50:
         print('Small image warning: results may be unstable if the object does not fit entirely within the frame.')
-    try: #If position array is a single number it will be converted into a list of unit length
-        __ = len(x)
-    except:
+    if not isinstance(x, (list, tuple, np.ndarray)):
         x, y = [x], [y]
 
     size = size if data.shape[0] > size and data.shape[1] > size else min(data.shape[0],data.shape[1])
 
     prop_list, moment_list = [], []
-    progess_bar = bar.FillingSquaresBar('Applying image segmentation...', max=len(x))
+    progress_bar = bar.FillingSquaresBar('Applying image segmentation...', max=len(x))
 
     for i in range(len(x)):
         new_data = data_processing.crop_image(data, int(x[i]), int(y[i]), size, invert=invert)
@@ -322,40 +472,65 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
         segm, convolved_data = segm_find(new_data, nsig=nsig, kernel_size=kernel_size, deblend=deblend, npixels=npixels, connectivity=connectivity)
         try:
             props = SourceCatalog(new_data, segm, convolved_data=convolved_data)
-        except:
-            prop_list.append(-999), moment_list.append(-999) #If there are no segmented objects in the image
-            progess_bar.next()
+        except: #If there are no segmented objects in the image
+            prop_list.append(-999)
+            moment_list.append(-999)
+            progress_bar.next()
             continue
 
-        # Mask a circular area at the center of the image, using radius=threshold
-        # Flag if there is no segmented object within the circular mask 
-        cx = cy = int(size / 2)
-        x_pos, y_pos = np.ogrid[:new_data.shape[0], :new_data.shape[1]]
-        r2 = (x_pos - cx) ** 2 + (y_pos - cy) ** 2
-        mask = r2 <= threshold ** 2
+        # If user requires central source detection but nothing is present!
+        if threshold == 0:
+            if segm.data[size//2, size//2] == 0: # If no segmentation patch is in the center it is considered a non-detection
+                prop_list.append(-999)
+                moment_list.append(-999)
+                progress_bar.next()
+                continue
+            else:
+                segm_label = segm.data[size//2, size//2] # The patch that goes over the center
+                new_data[segm.data != segm_label] = 0
+                inx = np.where(props.label == segm_label)[0]
+                prop_list.append(props[inx])
+        else:
+            # Mask a circular area at the center of the image, using radius=threshold
+            # Flag if there is no segmented object within the circular mask 
+            rr, cc = np.ogrid[:size, :size]
+            cx = cy = size // 2
+            mask = (rr - cx) ** 2 + (cc - cy) ** 2 <= threshold**2
+            """
+            labels_in_mask = np.unique(segm.data[mask])
+            labels_in_mask = labels_in_mask[labels_in_mask != 0]  # drop background
+            if labels_in_mask.size == 0:
+                prop_list.append(-999)
+                moment_list.append(-999)
+                progress_bar.next()
+                continue
 
-        if np.count_nonzero(segm.data[mask]) == 0: 
-            prop_list.append(-999), moment_list.append(-999)
-            progess_bar.next()
-            continue
+            # map those labels to indices in props
+            idxs = [np.where(props.label == lab)[0][0] for lab in labels_in_mask]
+            # pick the intersecting object whose centroid is closest to center
+            dists = [np.hypot(float(props[i].centroid[0]) - cx, float(props[i].centroid[1]) - cy) for i in idxs]
+            inx = np.array([idxs[int(np.argmin(dists))]])
+            new_data[segm.data != props[inx].label] = 0
+            prop_list.append(props[inx])
+            """
+            if np.count_nonzero(segm.data[mask]) == 0: 
+                prop_list.append(-999)
+                moment_list.append(-999)
+                progress_bar.next()
+                continue
 
-        sep_list=[]
-        for xx in range(len(props)): #This is to select the segmented object closest to the center, (x,y)=(size/2, size/2)
-            xcen = float(props[xx].centroid[0])
-            ycen = float(props[xx].centroid[1])
-            sep_list.append(np.sqrt((xcen-(size/2))**2 + (ycen-(size/2))**2))
+            #This is to select the segmented object closest to the center, (x,y)=(size/2, size/2)
+            separations = [np.hypot(float(p.centroid[0]) - cx, float(p.centroid[1]) - cy) for p in props]
+            inx = np.array([np.argmin(separations)])
 
-        inx = np.where(sep_list == np.min(sep_list))[0]
-        if len(inx) > 1: #In case objects can't be deblended
-            inx = inx[0] 
+            new_data[segm.data != props[inx].label] = 0
+            prop_list.append(props[inx])
 
-        ##### Image Moments #####
-        new_data[segm.data != props[inx].label] = 0
+        ##### Image Moments (Our own computations) #####
         moments_table = make_moments_table(new_data)
-        
-        prop_list.append(props[inx]), moment_list.append(moments_table)
-        progess_bar.next()
-    progess_bar.finish()
+        moment_list.append(moments_table)
+        progress_bar.next()
+    progress_bar.finish()
 
     if len(prop_list) != len(moment_list):
         raise ValueError('The properties list does not match the image moments list.')
@@ -368,30 +543,53 @@ def morph_parameters(data, x, y, size=100, nsig=0.6, threshold=10, kernel_size=2
 
 def make_table(props, moments):
     """
-    Returns the morphological parameters calculated from the sementation image.
-    A list of the parameters and their function is available in the Photutils
-    Source Catalog documentation: https://photutils.readthedocs.io/en/stable/api/photutils.segmentation.SourceCatalog.html
-    
-    Args:
-        Props (source catalog): A source catalog containing the segmentation parameters.
-        
-    Returns:
-        Array containing the morphological features. 
+    Assemble a flat feature array from photutils `SourceCatalog` properties and custom moments.
 
+    For each source, this function concatenates (i) the moment-based features from
+    `moments` and (ii) a selected subset of photutils segmentation properties from
+    `props`. The resulting per-source feature vector is suitable for ML pipelines.
+
+    Parameters
+    ----------
+    props : sequence
+        Sequence (length N) where each element is an indexable selection of a
+        photutils `SourceCatalog` (e.g., `props[i][0]`) representing the segmented
+        source for sample i. If a source is missing (e.g., no segment), that entry
+        should still exist but may be unusable; this function will emit sentinels.
+    moments : sequence
+        Sequence (length N) of mapping-like objects (e.g., dict or DataFrame row)
+        containing scalar moment features keyed by the following names:
+        `["M00","M10","M01","M20","M11","M02","M30","M21","M12","M03",
+          "mu00","mu10","mu01","mu20","mu11","mu02","mu30","mu21","mu12","mu03",
+          "G00","G10","G01","G20","G11","G02","G30","G21","G12","G03",
+          "Hu1","Hu2","Hu3","Hu4","Hu5","Hu6","Hu7",
+          "L00","L10","L01","L20","L11","L02","L30","L21","L12","L03"]`.
+
+    Returns
+    -------
+    features : ndarray, shape (N, D)
+        Per-source feature matrix. 
+
+    Notes
+    -----
+    - If a source has no valid segmented object or moments, the function fills the
+      entire feature vector for that source with the sentinel value `-999`.
+    - The `'isscalar'` property is cast to an integer flag: 1 for True (single source),
+      0 for False.
+    - All other properties are extracted as scalars from the photutils table.
     """
-    moment_list = [
-        'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
-        'mu00', 'mu10', 'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
-        'G00', 'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
-        'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
-        'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03'
-    ]
+
+    moment_list = ["M00","M10","M01","M20","M11","M02","M30","M21","M12","M03",
+        "mu00","mu10","mu01","mu20","mu11","mu02","mu30","mu21","mu12","mu03",
+        "G00","G10","G01","G20","G11","G02","G30","G21","G12","G03",
+        "Hu1","Hu2","Hu3","Hu4","Hu5","Hu6","Hu7",
+        "L00","L10","L01","L20","L11","L02","L30","L21","L12","L03"]
 
     prop_list = ['area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigvals', 
         'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 
-        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma',
+        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 
         'isscalar', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'max_value', 'maxval_xindex', 
-        'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex', 'moments', 'moments_central']
+        'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex']
     
     table = []
     print('Writing catalog...')
@@ -404,26 +602,21 @@ def make_table(props, moments):
             for moment in moment_list:
                 morph_feats.append(float(moments[i][moment]))
         except:
-            for j in range(len(prop_list+moment_list)+31): #+1 because covariance eigenvalue param is actually 2 params, and +30 for the 2 4x4 moment matrices 
+            for j in range(len(prop_list+moment_list) + 1): #+1 because the covariance_eigvals represents the 2 eigenvalues of the covariance matrix
                 morph_feats.append(-999)
             table.append(morph_feats)
             continue
 
         QTable = props[i][0].to_table(columns=prop_list)
         for param in prop_list:
-            if param == 'moments' or param == 'moments_central': #To 3rd order photutils outputs a 4x4 matrix (obselete?)
-                for moment in np.ravel(QTable[param]):
-                    morph_feats.append(moment)
-            elif param == 'covariance_eigvals': 
-                morph_feats.append(np.ravel(QTable[param])[1].value)
+            if param == 'covariance_eigvals': 
+                morph_feats.append(np.ravel(QTable[param])[1].value) #This is the first eigval
                 morph_feats.append(np.ravel(QTable[param])[0].value) #This is the second eigval
             elif param == 'isscalar':
-                if QTable[param] == True: #Checks whether it's a single source, 1 for true, 0 for false
+                if QTable[param]: #Checks whether it's a single source, 1 for true, 0 for false
                     morph_feats.append(1)
                 else:
                     morph_feats.append(0)
-            elif param == 'bbox': #Calculate area of bounding box
-                morph_feats.append(props[i][0].bbox.shape[0] * props[i][0].bbox.shape[1])
             else:
                 morph_feats.append(QTable[param].value[0])
 
@@ -431,148 +624,183 @@ def make_table(props, moments):
 
     return np.array(table, dtype=object)
 
-def make_dataframe(table=None, x=None, y=None, zp=None, flux=None, flux_err=None, median_bkg=None, 
-    obj_name=None, field_name=None, flag=None, save=True, path=None, filename=None):
+
+def make_dataframe(
+    table=None, 
+    x=None, 
+    y=None, 
+    zp=None, 
+    flux=None,
+    flux_err=None, 
+    median_bkg=None, 
+    obj_name=None,
+    field_name=None, 
+    flag=None, 
+    save=True,
+    path=None, 
+    filename=None
+    ):
     """
-    This function takes as input the catalog of morphological features
-    and other metrics and compiles the data as a Pandas dataframe. 
+    Assemble a photometry+morphology catalog into a pandas DataFrame (and optional CSV).
 
-    Args:
-        table (ndarray, optional): Array containing the object features. Can make with make_table() function.
-            If None then a Pandas dataframe containing only the input columns will be generated. Defaults to None.
-        x (ndarray, optional): 1D array containing the x-pixel position.
-            If input it must be an array of x positions for all objects in the table. 
-            This x position will be appended to the dataframe for cataloging purposes. Defaults to None.
-        y (ndarray, optional): 1D array containing the y-pixel position.
-            If input it must be an array of y positions for all objects in the table. 
-            This y position will be appended to the dataframe for cataloging purposes. Defaults to None.
-        zp (float): Zeropoint of the instrument.
-        exptime (float): Not currently used.
-        flux (ndarray, optional): 1D array containing the calculated flux
-            of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
-        flux_err (ndarray, optional): 1D array containing the calculated flux error
-            of each object. This will be appended to the dataframe for cataloging purposes. Defaults to None.
-        median_bkg (ndarray, optional):  1D array containing the median background around the source annuli.
-            This will be appended to the dataframe for cataloging purposes. Defaults to None.
-        name (ndarray, str, optional): A corresponding array or list of object name(s). This will be appended to 
-            the dataframe for cataloging purposes. Defaults to None.
-        flag (ndarray, optional): 1D array containing a flag value for each object corresponding
-            to the x & y positions. Defaults to None. 
-        save (bool, optional): If False the dataframe CSV file will not be saved to the local
-            directory. Defaults to True. 
-        path (str, optional): Absolute path where CSV file should be saved, if save=True. If 
-            path is not set, the file will be saved to the local directory.
-        filename(str, optional): Name of the output catalog. Default name is 'pyBIA_catalog'.
+    This function merges per-source metadata (names, positions, flags), photometric
+    measurements (flux, flux error, optional magnitudes), background statistics, and
+    morphology features (moments + photutils properties) into a single DataFrame. If
+    requested, the table is also written to disk as a CSV.
 
-    Note:
-        These features can be used to create a machine learning model. 
+    Parameters
+    ----------
+    table : array-like or None, optional
+        Feature matrix from `make_table`, shape (N, D) or (D,) for a single source.
+        Columns are expected to be ordered as:
+        moments ["M00","M10","M01","M20","M11","M02","M30","M21","M12","M03",
+                 "mu00","mu10","mu01","mu20","mu11","mu02","mu30","mu21","mu12","mu03",
+                 "G00","G10","G01","G20","G11","G02","G30","G21","G12","G03",
+                 "Hu1","Hu2","Hu3","Hu4","Hu5","Hu6","Hu7",
+                 "L00","L10","L01","L20","L11","L02","L30","L21","L12","L03"]
+        followed by photutils properties
+        ["area","covar_sigx2","covar_sigy2","covar_sigxy",
+         "covariance_eigval1","covariance_eigval2",
+         "cxx","cxy","cyy","eccentricity","ellipticity","elongation",
+         "equivalent_radius","fwhm","gini","orientation","perimeter",
+         "semimajor_sigma","semiminor_sigma","isscalar",
+         "bbox_xmax","bbox_xmin","bbox_ymax","bbox_ymin",
+         "max_value","maxval_xindex","maxval_yindex",
+         "min_value","minval_xindex","minval_yindex"].
+        Default is None (no morphology columns added).
+    x, y : array-like or None, optional
+        Pixel coordinates of source centers. If provided, columns `xpix`, `ypix`
+        are added. Length should match the number of rows N. Default is None.
+    zp : float or None, optional
+        Photometric zeropoint. If provided with `flux`, columns `mag` and `mag_err`
+        are computed as `-2.5*log10(flux) + zp` and `(2.5/ln 10)*(flux_err/flux)`,
+        respectively. Default is None.
+    flux : array-like or None, optional
+        Aperture-sum fluxes; adds column `flux`. Default is None.
+    flux_err : array-like or None, optional
+        Flux uncertainties; adds column `flux_err`. If `zp` is also provided,
+        `mag_err` is computed. Default is None.
+    median_bkg : array-like or None, optional
+        Per-source median background values; adds column `median_bkg`. Default is None.
+    obj_name : array-like or None, optional
+        Per-source object names; adds column `obj_name`. Default is None.
+    field_name : array-like or None, optional
+        Per-source field names; adds column `field_name`. Default is None.
+    flag : array-like or None, optional
+        Per-source flag values; adds column `flag`. Default is None.
+    save : bool, optional
+        If True, write the DataFrame to CSV. Default is True.
+    path : str or Path or None, optional
+        Output directory for CSV. If None, use the user's home directory. Default is None.
+    filename : str or None, optional
+        Output CSV filename. Default is "pyBIA_catalog.csv".
 
-    Example:
+    Returns
+    -------
+    df : pandas.DataFrame
+        Catalog with available columns among:
+        - Metadata: `obj_name`, `field_name`, `flag`
+        - Positions: `xpix`, `ypix`
+        - Background: `median_bkg`
+        - Photometry: `flux`, `flux_err`, and (if `zp` provided) `mag`, `mag_err`
+        - Morphology: the full set listed in `table` (moments + photutils properties)
 
-        >>> props, moments = morph_parameters(data, x=xpix, y=ypix)
-        >>> table = make_table(props, moments)
-        >>> dataframe = make_dataframe(table, x=xpix, y=ypix)
-
-    Returns:
-        Pandas dataframe containing the parameters and features of all objects
-        in the input data table. If save=True, a CSV file titled 'pybia_catalog'
-        will be saved to the local directory, unless a path is specified.
-
+    Notes
+    -----
+    - If `table` is 1D, it is promoted to 2D with a single row.
+    - Magnitudes are computed only when both `flux` and `zp` are provided; no
+      guards are applied here for non-positive `flux` (users should prefilter or
+      post-handle infinities/NaNs if needed).
+    - When `save=True`, the CSV is written to `path/filename` with `index=False`.
     """
 
-    if filename is None:
-        filename = 'pyBIA_catalog'
+    filename = filename or "pyBIA_catalog.csv"
 
-    prop_list = [
-        'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
-        'mu00', 'mu10', 'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
-        'G00', 'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
-        'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
-        'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03', 
-        'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 
-        'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 
-        'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma',
-        'isscalar', 'bbox_xmax', 'bbox_xmin', 'bbox_ymax', 'bbox_ymin', 'max_value', 'maxval_xindex', 
-        'maxval_yindex', 'min_value', 'minval_xindex', 'minval_yindex'
-        ]
+    # This combines the two lists in the make_table function but instead of covariance_eigvals 
+    base_cols = ["M00","M10","M01","M20","M11","M02","M30","M21","M12","M03",
+        "mu00","mu10","mu01","mu20","mu11","mu02","mu30","mu21","mu12","mu03",
+        "G00","G10","G01","G20","G11","G02","G30","G21","G12","G03",
+        "Hu1","Hu2","Hu3","Hu4","Hu5","Hu6","Hu7",
+        "L00","L10","L01","L20","L11","L02","L30","L21","L12","L03",
+        "area","covar_sigx2","covar_sigy2","covar_sigxy",
+        "covariance_eigval1","covariance_eigval2",
+        "cxx","cxy","cyy","eccentricity","ellipticity","elongation",
+        "equivalent_radius","fwhm","gini","orientation","perimeter",
+        "semimajor_sigma","semiminor_sigma","isscalar",
+        "bbox_xmax","bbox_xmin","bbox_ymax","bbox_ymin",
+        "max_value","maxval_xindex","maxval_yindex",
+        "min_value","minval_xindex","minval_yindex"]
 
-    for i in range(16): #Photutils API returns 4x4 matrix
-        prop_list = prop_list + ['moments_'+str(i)]
-    for i in range(16):
-        prop_list = prop_list + ['moments_central_'+str(i)]
-
+    # To store the catalog
     data_dict = {}
 
-    if obj_name is not None:
-        data_dict['obj_name'] = obj_name
-    if field_name is not None:
-        data_dict['field_name'] = field_name
-    if flag is not None:
-        data_dict['flag'] = flag
-    if x is not None:
-        data_dict['xpix'] = x
-    if y is not None:
-        data_dict['ypix'] = y
-    if median_bkg is not None:
-        data_dict['median_bkg'] = median_bkg
+    if obj_name is not None: data_dict["obj_name"] = obj_name
+    if field_name is not None:data_dict["field_name"] = field_name
+    if flag is not None: data_dict["flag"] = flag
+    if x is not None: data_dict["xpix"] = x
+    if y is not None: data_dict["ypix"] = y
+    if median_bkg is not None:data_dict["median_bkg"] = median_bkg
     if flux is not None:
-        if zp is None:
-            data_dict['flux'] = flux
-        else:
-            data_dict['flux'] = flux
-            data_dict['mag'] = -2.5*np.log10(np.array(flux))+zp 
+        data_dict["flux"] = flux
+        if zp is not None:
+            data_dict["mag"] = -2.5 * np.log10(np.array(flux)) + zp
     if flux_err is not None:
-        if zp is None:
-            data_dict['flux_err'] = flux_err
-        else:
-            data_dict['flux_err'] = flux_err
-            data_dict['mag_err'] = (2.5/np.log(10))*(np.array(flux_err)/np.array(flux))
-    
-    if table is None:
-        df = pd.DataFrame(data_dict)
-        if save == True:
-            if path is None:
-                print("No path specified, saving catalog to local home directory.")
-                path = str(Path.home())+'/'
-            df.to_csv(path+filename, index=False) 
-            return df
-        return df
+        data_dict["flux_err"] = flux_err
+        if zp is not None:
+            data_dict["mag_err"] = (2.5/np.log(10)) * (np.array(flux_err)/np.array(flux))
 
-    try:
-        __ = len(table)
-    except: #TypeError
-        table = [table]
-
-    for i in range(len(prop_list)):
-        data_dict[prop_list[i]] = table[:,i]
+    # build the df
+    if table is not None:
+        table = np.atleast_2d(table)
+        for col, vals in zip(base_cols, table.T):
+            data_dict[col] = vals
 
     df = pd.DataFrame(data_dict)
-    if save == True:
-        if path is None:
-            print("No path specified, saving catalog to local home directory.")
-            path = str(Path.home())+'/'
-        df.to_csv(path+filename, index=False) 
-        return df
-    return df    
 
+    if save:
+        save_path = Path(path) if path else Path.home()
+        df.to_csv(save_path / filename, index=False)
+
+    return df
+  
 def subtract_background(data, length=150):
     """
-    Removes the background by subtracting the local median pixel value 
-    in sub-regions of size (length x length). The data matrix will be 
-    padded accordingly usying symmetrical boundary conditions to ensure
-    the local regions can expand evenly.
+    Subtract a local background estimate from a 2D image.
 
-    Args:
-        data (ndarray): 2D array of a single image.
-        length (int): The length of the rectangular local regions. Default
-            is 150 pixels, thus the local background is subtracted by calculating
-            a robust median in 150x150 regions.
+    The image is divided into non-overlapping square regions of size
+    `length × length`. For each region, the sigma-clipped median pixel
+    value is computed and subtracted from that region. For images whose
+    dimensions are not divisible by `length`, the array is padded
+    symmetrically so that tiles align evenly. Padding is removed before
+    return.
 
-    Returns:
-        The background subtracted data array.
+    Parameters
+    ----------
+    data : ndarray
+        2D image array.
+    length : int, optional
+        Side length (pixels) of local regions used for background estimation.
+        Default is 150. Smaller values capture more local variations, while
+        larger values enforce a smoother background.
+
+    Returns
+    -------
+    data_sub : ndarray
+        Background-subtracted image of the same shape as input.
+
+    Notes
+    -----
+    - For small images (`min(data.shape) < length`), no tiling is done;
+      instead, the global sigma-clipped median is subtracted.
+    - Padding is applied symmetrically (`mode='symmetric'`) so that
+      regions near the edges are treated consistently. Padding is sliced
+      away before returning.
+    - Background estimation uses `astropy.stats.sigma_clipped_stats`,
+      which is robust against outliers.
     """
 
-    Nx, Ny = data.shape[1], data.shape[0]
+    Ny, Nx = data.shape
+
     if Nx < length or Ny < length: #Small image, no need to pad, just take robust median
         background  = sigma_clipped_stats(data)[1] #Sigma clipped median
         data -= background
@@ -603,31 +831,64 @@ def subtract_background(data, length=150):
 
     return data
 
-def segm_find(data: np.ndarray, *, nsig: float = 0.6, kernel_size: int = 21, deblend: bool = False, npixels: int = 9, connectivity: int = 8):
+def segm_find(
+    data: np.ndarray, 
+    *, 
+    nsig: float = 0.6, 
+    kernel_size: int = 21, 
+    deblend: bool = False, 
+    npixels: int = 9, 
+    connectivity: int = 8
+    ):
     """
-    Finds objects using the segmentation detection threshold. 
-    
-    Note:
-        Data must be background subtracted.
+    Perform image segmentation to detect sources above a sigma threshold.
 
-    Args:
-        data (ndarray): 2D array of a single image.
-        nsig (float): The sigma detection limit. Objects brighter than nsig standard 
-            deviations from the background will be detected during segmentation. Defaults to 0.6.
-        kernel_size (int): The size lenght of the square Gaussian filter kernel used to convolve 
-            the data. This length must be odd. Defaults to 21.
-        deblend (bool, optional): If True, the objects are deblended during the segmentation
-            procedure, thus deblending the objects before the morphological features
-            are computed. Defaults to False so as to keep blobs as one segmentation object.
-        npxiels (int): From photutils: Detected sources must have npixels connected pixels that are each greater than the threshold value in the input data
-        connectivity (int): From photutils: The type of pixel connectivity used in determining how pixels are grouped into a detected source. The options are 4 or 8 (default). 4-connected pixels touch along their edges. 8-connected pixels touch along their edges or corners.
-    Returns:
-        First output is the segmentation image object, the second output is the convolved data
-        that was used when cataloging the segmentation objects.
+    The input image is convolved with a 2D Gaussian kernel, then thresholded
+    at `nsig × sigma` to identify sources. Optionally, overlapping sources can
+    be deblended. Returns both the segmentation map and the convolved image.
 
+    Parameters
+    ----------
+    data : ndarray
+        2D background-subtracted image array.
+    nsig : float, optional
+        Detection threshold in units of background sigma. Pixels above
+        `nsig` are considered during segmentation. Default is 0.6.
+    kernel_size : int, optional
+        Size (pixels) of the square Gaussian kernel used for convolution.
+        Must be odd. Default is 21.
+    deblend : bool, optional
+        If True, deblend overlapping sources in the segmentation map.
+        Default is False (recommended when preserving diffuse blobs as
+        single objects).
+    npixels : int, optional
+        Minimum number of connected pixels above threshold required to
+        define a source. Default is 9.
+    connectivity : int, optional
+        Pixel connectivity: 4 (edge-connected) or 8 (edge+corner-connected).
+        Default is 8.
+
+    Returns
+    -------
+    segm : `photutils.segmentation.SegmentationImage` or None
+        Segmentation image labeling detected sources. None if no sources
+        are found.
+    convolved_data : ndarray
+        Gaussian-convolved version of the input `data` used for source
+        detection.
+
+    Notes
+    -----
+    - Input `data` must be background-subtracted prior to calling this
+      function.
+    - The Gaussian kernel is constructed with FWHM = 9 pixels
+      (`sigma = 9 × gaussian_fwhm_to_sigma`) and size `kernel_size × kernel_size`.
+    - If `deblend=True`, `photutils.segmentation.deblend_sources` is applied
+      to split overlapping sources.
     """
+
     threshold = detect_threshold(data, nsigma=nsig, background=0.0)
-    sigma_pix = 9.0 * gaussian_fwhm_to_sigma   # FWHM = 9. smooth the data with a 2D circular Gaussian kernel with a FWHM of 3 pixels to filter the image prior to thresholding:
+    sigma_pix = 9.0 * gaussian_fwhm_to_sigma   # FWHM = 9. smooth the data with a 2D circular Gaussian kernel with a FWHM of 3 pixels to filter the image prior to thresholding
     kernel = Gaussian2DKernel(sigma_pix, x_size=kernel_size, y_size=kernel_size, mode='center')
     convolved_data = convolve(data, kernel, normalize_kernel=True, preserve_nan=True)
     segm = detect_sources(convolved_data, threshold, npixels=npixels, connectivity=connectivity)
@@ -636,208 +897,473 @@ def segm_find(data: np.ndarray, *, nsig: float = 0.6, kernel_size: int = 21, deb
     
     return segm, convolved_data 
 
-def get_segmentation(data, nsig, pix_conversion, xpix=100, ypix=100, size=100, median_bkg=0, kernel_size=21, deblend=False, r_in=20, r_out=35, npixels=9, connectivity=8, invert=False, threshold=10):
+def get_segmentation(
+    data,
+    nsig,
+    *,
+    xpix=100,
+    ypix=100,
+    size=100,
+    median_bkg=None,
+    kernel_size=21,
+    deblend=False,
+    r_in=20,
+    r_out=35,
+    npixels=9,
+    connectivity=8,
+    invert=False,
+    threshold=10,
+    ):
     """
-    INTENDED TO WORK ON AN IMAGE WHERE ONLY ONE OBJECT IS OF INTEREST! THUS IN PRINCIPLE WE MUST ENSURE XPIX AND YPIX TAKE AT MOST ONE VALUE
-    """
+    Extract the segmentation map of a single central object in a postage stamp.
 
-    if data.shape[1] < size:
-        size = data.shape[1]
+    A square cutout is taken around `(xpix, ypix)` (or the frame center if
+    unspecified), background-subtracted, and segmented using `segm_find`.
+    Central validation matches `morph_parameters` behavior:
+      * If `threshold == 0`, require the exact central pixel to belong to a
+        segmented object.
+      * If `threshold > 0`, require that at least one segmented pixel lies
+        within a central circular mask of radius `threshold`, then select the
+        object whose centroid is **closest to the center** (from all segments).
 
-    if xpix is None and ypix is None:
-        xpix, ypix = data.shape[1]/2, data.shape[1]/2
-        size = data.shape[1]
-
-    try: 
-        __ = len(xpix)
-    except:
-        xpix = [xpix]
-    try:
-        __ = len(ypix)
-    except:
-        ypix = [ypix]
-    try:
-        __ = len(median_bkg)
-    except:
-        if median_bkg is not None:
-            median_bkg = [median_bkg]
-        
-    for i in range(len(xpix)):
-        if size == data.shape[1]:
-            new_data = data
-        else: 
-            new_data = data_processing.crop_image(data, int(xpix[i]), int(ypix[i]), size, invert=invert)
-
-        if median_bkg is None: #Hard coding annuli size, inner:25 -> outer:35
-            print("Subtracting background...")
-            if new_data.shape[0] > 200 and len(xpix) == 1:
-                print('Calculating background in local regions, this will take a while... if data is background subtracted set median_bkg=0.')
-                new_data = subtract_background(new_data)
-            else:
-                annulus_apertures = CircularAnnulus((new_data.shape[1]/2, new_data.shape[0]/2), r_in=r_in, r_out=r_out)
-                bkg_stats = ApertureStats(new_data, annulus_apertures, sigma_clip=SigmaClip())
-                new_data -= bkg_stats.median
-        elif median_bkg == 0:
-            new_data -= median_bkg 
-        else:
-            new_data -= median_bkg[i]
-
-        segm, convolved_data = segm_find(new_data, nsig=nsig, kernel_size=kernel_size, deblend=deblend, npixels=npixels, connectivity=connectivity)
-
-        try:
-            _ = segm.data
-        except AttributeError:
-            print(f"DETECTION WARNING: No segmentation patches could be generated anywhere on the image for sigma={nsig}, kernel size={kernel_size}, npixels={npixels}, and connectivity={connectivity}. Adjust the detection settings and try again! Returning zero-like array...")
-            segm = np.zeros((size, size))
-            return segm
-
-        try:
-            props = SourceCatalog(new_data, segm, convolved_data=convolved_data)
-        except:
-            print(f"CATALOG WARNING: No source catalog could be generated for sigma={nsig}, kernel size={kernel_size}, npixels={npixels}, and connectivity={connectivity}. Adjust the detection settings and try again! Returning zero-like array...")
-            segm = np.zeros((size, size))
-            return segm
-
-        # Mask a circular area at the center of the image, using radius=threshold
-        # Flag if there is no segmented object within the circular mask 
-        cx = cy = int(size / 2)
-        x_pos, y_pos = np.ogrid[:new_data.shape[0], :new_data.shape[1]]
-        r2 = (x_pos - cx) ** 2 + (y_pos - cy) ** 2
-        mask = r2 <= threshold ** 2
-
-        if np.count_nonzero(segm.data[mask]) == 0:
-            print(f"DETECTION WARNING: No segmentation patches present within a circular mask of radius (threshold)={threshold}, for sigma={nsig}, kernel size={kernel_size}, npixels={npixels}, and connectivity={connectivity}. Returning zero-like array...")
-            segm = np.zeros((size, size))
-            return segm
-
-        sep_list=[]
-        for xx in range(len(props)): #This is to select the segmented object closest to the center, (x,y)=(size/2, size/2)
-            xcen = float(props[xx].centroid[0])
-            ycen = float(props[xx].centroid[1])
-            sep_list.append(np.sqrt((xcen-(size/2))**2 + (ycen-(size/2))**2))
-
-        inx = np.where(sep_list == np.min(sep_list))[0]
-        if len(inx) > 1:
-            inx = inx[0] 
-
-        segm.data[segm.data != props[inx].label] = 0
-
-    return segm.data
-
-
-def compute_layered_segmentation(image, sigma_values, pix_conversion, xpix, ypix, size, median_bkg=0, kernel_size=21, deblend=False, r_in=20, r_out=35, npixels=9, connectivity=8, threshold=10):
-    """
-    For each sigma threshold in sigma_values, compute a segmentation mask (by calling
-    get_segmentation with data1 and data2 – here if only one image is available we pass
-    the same image twice). Each mask is then normalized and stored.
-    
-    Finally, a layered segmentation image is built by overlaying the masks.
-    (The first threshold’s mask is assigned intensity 1.0, the second 0.7, then 0.4 and 0.1.)
-    """
-    segm_list = []
-    # Use the default intensities for up to four sigma values:
-    default_intensities = [1.0, 0.7, 0.4, 0.1]
-    #default_intensities = np.linspace(0.1, 1, 4) ** 0.5  # sqrt for better perceptual contrast
-    #default_intensities = default_intensities[::-1]
-    intensities = default_intensities[:len(sigma_values)]
-    
-    for sval in sigma_values:
-        segm = get_segmentation(data=image, nsig=sval, pix_conversion=pix_conversion, xpix=xpix, ypix=ypix, size=size, median_bkg=median_bkg, kernel_size=kernel_size, deblend=deblend, r_in=r_in, r_out=r_out, npixels=npixels, connectivity=connectivity, threshold=threshold)
-        segm[segm != 0] = 1000
-        segm_list.append(segm)
-    
-    # Build the layered segmentation image
-    layered = np.zeros_like(segm_list[0], dtype=float)
-    for segm, inten in zip(segm_list, intensities):
-        layered[segm == 1000] = inten
-    return layered
-
-def get_extent(img, pix_conversion):
-    """
-    Returns an extent for imshow in arcsec assuming the image is centered.
-    """
-    height, width = img.shape
-    center_x = width // 2
-    center_y = height // 2
-    x = np.arange(width) - center_x
-    y = np.arange(height) - center_y
-    x_arcsec = x / pix_conversion
-    y_arcsec = y / pix_conversion
-    return [x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()]
-
-def get_display_limits(img):
-    """
-    Compute robust display limits based on the median and robust std (using median absolute deviation).
-    """
-    finite = np.isfinite(img)
-    med = np.median(img[finite])
-    std = np.median(np.abs(img[finite] - med))
-    return med - 3*std, med + 10*std
-
-
-def plot_objects_segmentation(
-        *images,
-        pix_conversion=1.0,
-        sigma_values=[0.1, 0.25, 0.55, 0.95],
-        titles=None,
-        suptitle='',
-        xpix=None,
-        ypix=None,
-        size=None,
-        median_bkg=0, kernel_size=21, deblend=False, r_in=20, r_out=35, npixels=9, connectivity=8, threshold=10, cmap='viridis',
-        savepath='/Users/daniel/Desktop/segm_multi.png', savefig=True):
-    """
-    Plot up to five objects (default behaviour still works for one or two).
+    If validation fails, a zero array is returned.
 
     Parameters
     ----------
-    *images : 2-D numpy arrays
-        One to five postage-stamp images.  The first row shows the data,
-        the second the layered segmentation masks.
-    pix_conversion : float
-        Pixels-to-arcsec conversion factor.
-    sigma_values : list
-        Detection‐σ thresholds (≤ 4 values), highest σ plotted brightest.
-    titles : list/tuple of str or None
-        Per-panel titles for the imaging row; supply len(titles) == len(images).
-    suptitle : str
-        Global figure title.
-    xpix, ypix, size : int or None
-        If all three are given each image is cropped with
-        ``crop_image(img, xpix, ypix, size)`` before processing.
-    savepath : str
-        Path to ``plt.savefig`` output.
+    data : ndarray
+        2D image array.
+    nsig : float
+        Detection threshold in units of background sigma (passed to
+        `segm_find`).
+    xpix, ypix : int or None, optional
+        Central pixel coordinates of the target object. If both are None,
+        the image center is used. Default is 100 each.
+    size : int, optional
+        Side length (pixels) of the square cutout. If larger than the image
+        dimensions, reduced to fit. Default is 100.
+    median_bkg : float or None, optional
+        Background estimate for the cutout. If None, a local annulus
+        (radii `r_in`, `r_out`) is used. If 0, no subtraction is applied.
+        Default is None.
+    kernel_size : int, optional
+        Size (pixels) of Gaussian kernel used in `segm_find`. Default is 21.
+    deblend : bool, optional
+        If True, deblend overlapping sources in the segmentation map.
+        Default is False.
+    r_in, r_out : int, optional
+        Inner and outer radii (pixels) of the annulus used for local
+        background estimation when `median_bkg` is None. Defaults are 20
+        and 35.
+    npixels : int, optional
+        Minimum number of connected pixels above threshold required for
+        detection (passed to `segm_find`). Default is 9.
+    connectivity : int, optional
+        Pixel connectivity: 4 (edge-connected) or 8 (edge+corner-connected).
+        Default is 8.
+    invert : bool, optional
+        If True, swap (x, y) ordering when cropping. Default is False.
+    threshold : int, optional
+        Central validation parameter (pixels). See behavior above. Default is 10.
 
     Returns
     -------
-    fig : matplotlib.figure.Figure
+    seg : ndarray
+        Segmentation map of shape `(size, size)` with only the selected object
+        retained (nonzero label). If validation fails, a zero array is returned.
     """
+
+    # single-source use
+    x0 = None if xpix is None else np.atleast_1d(xpix)[0]
+    y0 = None if ypix is None else np.atleast_1d(ypix)[0]
+    mbg = None if median_bkg is None else np.atleast_1d(median_bkg)[0]
+
+    size = int(size)
+    if size > min(data.shape):
+        size = min(data.shape)
+
+    # full-frame preview if user omitted coordinates
+    if x0 is None and y0 is None:
+        x0 = data.shape[1] // 2
+        y0 = data.shape[0] // 2
+        size = min(data.shape)
+
+    # Crop and background-subtract
+    stamp = data if size == data.shape[0] == data.shape[1] else data_processing.crop_image(
+        data, int(x0), int(y0), size, invert=invert
+    )
+
+    if mbg is None:  # local background
+        cx_ann = stamp.shape[1] / 2.0
+        cy_ann = stamp.shape[0] / 2.0
+        ann = CircularAnnulus((cx_ann, cy_ann), r_in=r_in, r_out=r_out)
+        bg_stats = ApertureStats(stamp, ann, sigma_clip=SigmaClip())
+        stamp = stamp - bg_stats.median
+    elif mbg != 0:
+        stamp = stamp - float(mbg)
+
+    # Run segmentation
+    segm, conv = segm_find(
+        stamp,
+        nsig=nsig,
+        kernel_size=kernel_size,
+        deblend=deblend,
+        npixels=npixels,
+        connectivity=connectivity,
+    )
+
+    if segm is None or getattr(segm, "data", None) is None:
+        warn("No segmentation detected – returning zeros.", RuntimeWarning)
+        return np.zeros((size, size))
+
+    try:
+        catalog = SourceCatalog(stamp, segm, convolved_data=conv)
+    except Exception:
+        warn("SourceCatalog failed – returning zeros.", RuntimeWarning)
+        return np.zeros((size, size))
+
+    # central validation to match `morph_parameters`
+    h, w = segm.data.shape
+    cx = w // 2
+    cy = h // 2
+
+    if int(threshold) == 0:
+        # exact central-pixel membership required
+        if segm.data[cy, cx] == 0:
+            warn("No segment at exact center – returning zeros.", RuntimeWarning)
+            return np.zeros((h, w))
+        seg_label = segm.data[cy, cx]
+        seg = np.array(segm.data, copy=True)
+        seg[seg != seg_label] = 0
+        return seg
+
+    # threshold > 0: require at least one segmented pixel in central mask
+    rr, cc = np.ogrid[:h, :w]
+    mask = (rr - cy) ** 2 + (cc - cx) ** 2 <= float(threshold) ** 2
+
+    if np.count_nonzero(segm.data[mask]) == 0:
+        warn("No segment in central mask – returning zeros.", RuntimeWarning)
+        return np.zeros((h, w))
+
+    # choose the object whose centroid is closest to center (from ALL segments),
+    separations = [np.hypot(float(p.centroid[0]) - cx, float(p.centroid[1]) - cy) for p in catalog]
+    best_idx = int(np.argmin(separations))
+    best_label = catalog[best_idx].label
+
+    # keep only the selected label
+    seg = np.array(segm.data, copy=True)
+    seg[seg != best_label] = 0
+
+    return seg
+
+def compute_layered_segmentation(
+    image,
+    sigma_values,
+    pix_conversion,
+    xpix,
+    ypix,
+    size,
+    *,
+    median_bkg=None,
+    kernel_size=21,
+    deblend=False,
+    r_in=20,
+    r_out=35,
+    npixels=9,
+    connectivity=8,
+    threshold=10,
+    ):
+    """
+    Generate a layered segmentation map across multiple detection thresholds.
+
+    For each sigma threshold in `sigma_values`, `get_segmentation` is called to
+    isolate the central source in a postage stamp. The resulting masks are stacked
+    into a single 2D array, with different intensity values assigned to each layer.
+    Higher sigma thresholds receive larger intensity values, creating a graded
+    segmentation useful for visualization and contouring.
+
+    Parameters
+    ----------
+    image : ndarray
+        2D image array.
+    sigma_values : sequence of float
+        Detection thresholds (in sigma) to apply sequentially. Each value is
+        passed as `nsig` to `get_segmentation`.
+    pix_conversion : float
+        Pixel-to-arcsecond (or other physical unit) conversion factor.
+        Currently unused internally, but included for consistency with
+        downstream plotting routines.
+    xpix, ypix : int
+        Pixel coordinates of the central source.
+    size : int
+        Side length (pixels) of the square cutout to extract.
+    median_bkg : float or None, optional
+        Background estimate for the cutout. If None, a local annulus
+        (radii `r_in`, `r_out`) is used. If 0, no subtraction is applied.
+        Default is None.
+    kernel_size : int, optional
+        Gaussian kernel size (pixels) used for segmentation convolution.
+        Default is 21.
+    deblend : bool, optional
+        If True, apply deblending to split overlapping sources.
+        Default is False.
+    r_in, r_out : int, optional
+        Inner and outer radii (pixels) for annular background estimation
+        if `median_bkg` is None. Defaults are 20 and 35.
+    npixels : int, optional
+        Minimum number of connected pixels above threshold to define a
+        source. Default is 9.
+    connectivity : int, optional
+        Pixel connectivity (4 or 8). Default is 8.
+    threshold : int, optional
+        Central circular mask radius (pixels) used in `get_segmentation`
+        to enforce detection near the cutout center. Default is 10.
+
+    Returns
+    -------
+    layered : ndarray of float, shape (size, size)
+        Composite segmentation map. Pixels belonging to a detection at
+        the i-th sigma level are assigned intensity values:
+        [1.0, 0.7, 0.4, 0.1] (truncated to the number of sigma levels).
+        Higher sigma levels correspond to higher intensities.
+
+    Notes
+    -----
+    - If fewer than four sigma values are provided, only the corresponding
+      fraction of the default intensity sequence is used.
+    - If more than four sigma values are provided, only the first four are
+      represented (later thresholds are ignored).
+    - This function is designed primarily for visualization (e.g.,
+      multi-level contours), not for quantitative feature extraction.
+    """
+
+    default_intensities = [1.0, 0.7, 0.4, 0.1]
+    intensities = default_intensities[: len(sigma_values)]
+
+    layered = np.zeros((size, size), dtype=float)
+
+    for sval, inten in zip(sigma_values, intensities):
+        segm = get_segmentation(
+            data=image,
+            nsig=sval,
+            xpix=xpix,
+            ypix=ypix,
+            size=size,
+            median_bkg=median_bkg,
+            kernel_size=kernel_size,
+            deblend=deblend,
+            r_in=r_in,
+            r_out=r_out,
+            npixels=npixels,
+            connectivity=connectivity,
+            threshold=threshold,
+        )
+        layered[segm != 0] = inten
+
+    return layered
+
+def get_extent(img: np.ndarray, pix_conversion: float):
+    """
+    Compute the spatial extent of an image for `matplotlib.imshow`.
+
+    The extent is centered on (0, 0) and converted from pixels to arcseconds
+    (or other physical units) using the provided pixel-to-unit conversion.
+
+    Parameters
+    ----------
+    img : ndarray
+        2D image array.
+    pix_conversion : float
+        Pixel scale conversion factor (pixels per arcsecond, or pixels per unit).
+        The returned extent is expressed in the reciprocal units (e.g., arcsec).
+
+    Returns
+    -------
+    extent : list of float [xmin, xmax, ymin, ymax]
+        Extent values suitable for passing to `imshow(extent=...)`, with
+        coordinates centered on (0, 0).
+
+    Notes
+    -----
+    - The extent is computed as:
+      ``x = (arange(width) - width/2) / pix_conversion``,
+      ``y = (arange(height) - height/2) / pix_conversion``.
+    - Units depend on `pix_conversion`: for example, if
+      `pix_conversion = 3.8961` pixels per arcsec, then the output extent
+      is in arcseconds.
+    """
+
+    h, w = img.shape
+    x = (np.arange(w) - w / 2) / pix_conversion
+    y = (np.arange(h) - h / 2) / pix_conversion
+
+    return [x.min(), x.max(), y.min(), y.max()]
+
+def get_display_limits(img: np.ndarray):
+    """
+    Compute robust display limits for image visualization.
+
+    The limits are based on the median and median absolute deviation (MAD) of
+    finite pixels in the image, providing a stretch that is less sensitive to
+    outliers than standard min/max scaling.
+
+    Parameters
+    ----------
+    img : ndarray
+        2D image array. Non-finite values (NaN, inf) are ignored.
+
+    Returns
+    -------
+    vmin, vmax : float
+        Lower and upper display limits, defined as:
+        ``vmin = median - 3 * MAD``
+        ``vmax = median + 10 * MAD``
+
+    Notes
+    -----
+    - This stretch is useful for displaying faint, extended features while
+      suppressing noise and extreme outliers.
+    - MAD is defined as ``median(|x - median(x)|)``.
+    - The asymmetric scaling (-3 × MAD, +10 × MAD) biases toward emphasizing
+      positive flux features.
+    """
+
+    finite = np.isfinite(img)
+    med = np.median(img[finite])
+    mad = np.median(np.abs(img[finite] - med))
+    
+    return med - 3 * mad, med + 10 * mad
+
+def plot_objects_segmentation(
+    *images,
+    pix_conversion=1.0,
+    sigma_values=(0.1, 0.25, 0.55, 0.95),
+    titles=None,
+    suptitle="",
+    xpix=None,
+    ypix=None,
+    size=None,
+    median_bkg=None,
+    kernel_size=21,
+    deblend=False,
+    r_in=20,
+    r_out=35,
+    npixels=9,
+    connectivity=8,
+    threshold=10,
+    cmap="viridis",
+    savepath="segm_multi.png",
+    savefig=True,
+    ):
+    """
+    Plot images alongside layered segmentation masks.
+
+    Each input image is displayed in the top row, with its corresponding
+    layered segmentation map (computed from `sigma_values`) displayed
+    directly below. This provides a side-by-side visualization of raw
+    data and threshold-dependent segmentation.
+
+    Parameters
+    ----------
+    *images : ndarray
+        One or more 2D image arrays. Between 1 and 5 are allowed.
+    pix_conversion : float, optional
+        Pixel-to-arcsecond (or other unit) conversion factor. Used to
+        compute axis extents. Default is 1.0.
+    sigma_values : sequence of float, optional
+        Detection thresholds (in sigma) for layered segmentation.
+        Default is (0.1, 0.25, 0.55, 0.95).
+    titles : list of str or None, optional
+        Titles for each image panel (top row). Length must match
+        number of images. Default is no titles.
+    suptitle : str, optional
+        Figure-wide title. Default is "".
+    xpix, ypix : int or None, optional
+        Central pixel coordinates for cropping. If all of `xpix`, `ypix`,
+        and `size` are given, each image is cropped to that region before
+        plotting. Default is None.
+    size : int or None, optional
+        Side length (pixels) of cropped cutouts, if cropping is applied.
+        Default is None (no cropping).
+    median_bkg : float or None, optional
+        Background estimate for segmentation. If None, background is
+        estimated locally via annuli of radii `r_in` and `r_out`.
+        If 0, no subtraction is applied. Default is None.
+    kernel_size : int, optional
+        Gaussian kernel size (pixels) for segmentation convolution.
+        Default is 21.
+    deblend : bool, optional
+        If True, split overlapping sources during segmentation.
+        Default is False.
+    r_in, r_out : int, optional
+        Inner and outer radii (pixels) for annular background estimation.
+        Defaults are 20 and 35.
+    npixels : int, optional
+        Minimum connected pixel area (pixels) required for detection.
+        Default is 9.
+    connectivity : int, optional
+        Pixel connectivity: 4 (edge-connected) or 8 (edge+corner-connected).
+        Default is 8.
+    threshold : int, optional
+        Central circular mask radius (pixels) used to validate detections
+        during segmentation. Default is 10.
+    cmap : str, optional
+        Matplotlib colormap for displaying the original images. Default
+        is "viridis".
+    savepath : str, optional
+        Output path for saving the figure when `savefig=True`.
+        Default is "segm_multi.png".
+    savefig : bool, optional
+        If True, save the figure to `savepath`. If False, display with
+        `plt.show()`. Default is True.
+
+    Returns
+    -------
+    None
+        Displays or saves the figure. Does not return a DataFrame or array.
+
+    Notes
+    -----
+    - A maximum of 5 images may be passed at once.
+    - Each figure has two rows: raw images (top) and layered segmentation
+      masks (bottom).
+    - A legend indicates which intensity levels correspond to the
+      `sigma_values` used in layered segmentation.
+    - Axis labels are expressed in arcseconds if `pix_conversion` is
+      given in pixels per arcsecond.
+    """
+
     if not 1 <= len(images) <= 5:
-        raise ValueError('Supply between 1 and 5 images.')
+        raise ValueError("Supply between 1 and 5 images.")
 
     ncols = len(images)
-    if titles is None:
-        titles = [''] * ncols
-    elif len(titles) != ncols:
-        raise ValueError('len(titles) must equal number of images.')
+    titles = titles or [""] * ncols
+    if len(titles) != ncols:
+        raise ValueError("len(titles) must equal number of images.")
 
     proc_imgs, extents, vmins, vmaxs, layereds = [], [], [], [], []
 
-    # ------------------------------------------------------------------
     for img in images:
-        # optional crop
-        if (xpix is not None) and (ypix is not None) and (size is not None):
+        if all(v is not None for v in (xpix, ypix, size)):
             img = data_processing.crop_image(img, xpix, ypix, size)
 
         extent = get_extent(img, pix_conversion)
         vmin, vmax = get_display_limits(img)
         layered = compute_layered_segmentation(
-            img, sigma_values, pix_conversion,
-            xpix=int(img.shape[0]/2),#xpix if xpix is not None else img.shape[0]/2,
-            ypix=int(img.shape[1]/2),#ypix if ypix is not None else img.shape[1]/2,
-            size=int(img.shape[0]), #size if size is not None else img.shape[0],
-            median_bkg=median_bkg, kernel_size=kernel_size, deblend=deblend, r_in=r_in, r_out=r_out, npixels=npixels, connectivity=connectivity, threshold=threshold
-            )
+            img,
+            sigma_values,
+            pix_conversion,
+            xpix=int(img.shape[1] / 2),
+            ypix=int(img.shape[0] / 2),
+            size=img.shape[0],
+            median_bkg=median_bkg,
+            kernel_size=kernel_size,
+            deblend=deblend,
+            r_in=r_in,
+            r_out=r_out,
+            npixels=npixels,
+            connectivity=connectivity,
+            threshold=threshold,
+        )
 
         proc_imgs.append(img)
         extents.append(extent)
@@ -845,76 +1371,232 @@ def plot_objects_segmentation(
         vmaxs.append(vmax)
         layereds.append(layered)
 
-    fig_w = 4 * ncols          # keep aspect similar to original (8×8 for 2 cols)
-    fig = plt.figure(figsize=(fig_w, 8))
+    fig = plt.figure(figsize=(4 * ncols, 8))
     spec = gridspec.GridSpec(2, ncols, wspace=0, hspace=0)
-
-    binary_cmap = plt.get_cmap('binary')
+    bin_cmap = plt.get_cmap("binary")
 
     for idx in range(ncols):
-        # --- imaging row ---
-        ax_img = fig.add_subplot(spec[0, idx])
-        ax_img.imshow(np.flip(proc_imgs[idx], axis=0),
-                      vmin=vmins[idx], vmax=vmaxs[idx],
-                      cmap=cmap, extent=extents[idx], origin='lower')
-        ax_img.set_title(f'{titles[idx]}')
-        if idx != 0:
-            ax_img.set_yticklabels([])
-        else:
-            ax_img.set_ylabel(r'$\Delta \delta$ (arcsec)')
-        ax_img.set_xticklabels([])
 
-        ax_seg = fig.add_subplot(spec[1, idx])
-        ax_seg.imshow(np.flip(layereds[idx], axis=0),
-                      cmap='binary', vmin=0, vmax=1,
-                      extent=extents[idx], origin='lower', interpolation='nearest')
+        ax = fig.add_subplot(spec[0, idx])
+        ax.imshow(
+            np.flip(proc_imgs[idx], axis=0),
+            vmin=vmins[idx],
+            vmax=vmaxs[idx],
+            cmap=cmap,
+            extent=extents[idx],
+            origin="lower",
+        )
+        ax.set_title(titles[idx])
+        ax.set_xticklabels([])
         if idx == 0:
-            ax_seg.set_ylabel(r'$\Delta \delta$ (arcsec)')
+            ax.set_ylabel(r"$\Delta \delta$ (arcsec)")
         else:
-            ax_seg.set_yticklabels([])
-        ax_seg.set_xlabel(r'$\Delta \alpha$ (arcsec)')
+            ax.set_yticklabels([])
+
+        ax_s = fig.add_subplot(spec[1, idx])
+        ax_s.imshow(
+            np.flip(layereds[idx], axis=0),
+            cmap="binary",
+            vmin=0,
+            vmax=1,
+            extent=extents[idx],
+            origin="lower",
+            interpolation="nearest",
+        )
+        if idx == 0:
+            ax_s.set_ylabel(r"$\Delta \delta$ (arcsec)")
+        else:
+            ax_s.set_yticklabels([])
+        ax_s.set_xlabel(r"$\Delta \alpha$ (arcsec)")
 
     fig.suptitle(suptitle, y=1.09)
 
-    default_intensities = [1.0, 0.7, 0.4, 0.1]
-    intensities_used = default_intensities[:len(sigma_values)]
-    legend_handles = [
-        Patch(color=mcolors.to_hex(binary_cmap(inten)),
-              label=f'{sigma}') for sigma, inten in zip(sigma_values, intensities_used)
+    intensities = [1.0, 0.7, 0.4, 0.1][: len(sigma_values)]
+    handles = [
+        Patch(color=mcolors.to_hex(bin_cmap(i)), label=str(s))
+        for i, s in zip(intensities, sigma_values)
     ]
-    fig.legend(legend_handles, [h.get_label() for h in legend_handles],
-               loc='upper center', handlelength=1.,
-               title=r'$\sigma_{\rm det}$',
-               bbox_to_anchor=(0.5, 1.063), ncol=len(sigma_values),
-               frameon=True, fancybox=True)
+
+    fig.legend(
+        handles,
+        [h.get_label() for h in handles],
+        loc="upper center",
+        handlelength=1.0,
+        title=r"$\sigma_{\rm det}$",
+        bbox_to_anchor=(0.5, 1.063),
+        ncol=len(sigma_values),
+        frameon=True,
+        fancybox=True
+    )
 
     if savefig:
-        plt.savefig(savepath, dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.savefig(savepath, dpi=300, bbox_inches="tight")
+        plt.close(fig)
     else:
         plt.show()
 
+def plot_images_grid_2x2(
+    img1, img2, img3, img4,
+    *,
+    pix_conversion=1.0,
+    titles=None,
+    suptitle="",
+    xpix=None,
+    ypix=None,
+    size=None,
+    cmap="viridis",
+    savepath="outliers.png",
+    savefig=True,
+    ):
+    """
+    Display four images in a 2×2 grid with consistent visualization settings.
 
+    This function mirrors the style of the *image panels* from
+    `plot_objects_segmentation`: identical extent handling, robust
+    (median±MAD) display limits, axis labeling, spacing, and aesthetics.
+    Useful for side-by-side comparison of four sources or cutouts.
+
+    Parameters
+    ----------
+    img1, img2, img3, img4 : ndarray
+        Four 2D image arrays to display.
+    pix_conversion : float, optional
+        Pixel-to-arcsecond (or other unit) conversion factor. Passed to
+        `get_extent`. Default is 1.0.
+    titles : list of str or None, optional
+        Titles for the four panels, in row-major order
+        ([top-left, top-right, bottom-left, bottom-right]).
+        Must be length 4. Default is None (no titles).
+    suptitle : str, optional
+        Figure-level title. Default is "".
+    xpix, ypix, size : int or None, optional
+        If all three are provided, each image is cropped to a square
+        cutout using `data_processing.crop_image(img, xpix, ypix, size)`.
+        Default is None (no cropping).
+    cmap : str, optional
+        Matplotlib colormap for images. Default is "viridis".
+    savepath : str, optional
+        Output file path if saving the figure. Default is "outliers.png".
+    savefig : bool, optional
+        If True, save the figure to `savepath`. If False, display the
+        figure interactively with `plt.show()`. Default is True.
+
+    Returns
+    -------
+    None
+        Displays or saves the figure. Does not return arrays or DataFrames.
+
+    Notes
+    -----
+    - Each panel is flipped vertically (consistent with other plotting
+      functions in this module) and labeled in arcseconds relative to
+      the cutout center.
+    - Robust display scaling is applied via `get_display_limits`.
+    - Grid layout uses equal spacing (no white space between panels).
+    """
+
+    images = [img1, img2, img3, img4]
+
+    titles = (titles or ["", "", "", ""])
+    if len(titles) != 4:
+        raise ValueError("titles must be a list of four strings (row-major order).")
+
+    proc, extents, vmins, vmaxs = [], [], [], []
+    for img in images:
+        im = img
+        if all(v is not None for v in (xpix, ypix, size)):
+            im = data_processing.crop_image(im, xpix, ypix, size)
+
+        extent = get_extent(im, pix_conversion)
+        vmin, vmax = get_display_limits(im)
+
+        proc.append(im)
+        extents.append(extent)
+        vmins.append(vmin)
+        vmaxs.append(vmax)
+
+    fig = plt.figure(figsize=(8, 8))
+    spec = gridspec.GridSpec(2, 2, wspace=0, hspace=0)
+
+    # Helper to set axes the same way as in the original image panels
+    def _style_ax(ax, row, col):
+        # Titles on top row panels
+        ax.set_title(titles[row * 2 + col])
+
+        # Remove x tick labels on the top row
+        if row == 0:
+            ax.set_xticklabels([])
+        else:
+            ax.set_xlabel(r"$\Delta \alpha$ (arcsec)")
+
+        # Left column keeps y labels; right column removes them
+        if col == 0:
+            ax.set_ylabel(r"$\Delta \delta$ (arcsec)")
+        else:
+            ax.set_yticklabels([])
+
+    # Draw the four panels
+    for row in range(2):
+        for col in range(2):
+            idx = row * 2 + col
+            ax = fig.add_subplot(spec[row, col])
+            ax.imshow(
+                np.flip(proc[idx], axis=0),
+                vmin=vmins[idx],
+                vmax=vmaxs[idx],
+                cmap=cmap,
+                extent=extents[idx],
+                origin="lower",
+            )
+            _style_ax(ax, row, col)
+
+    fig.suptitle(suptitle, y=0.935)
+
+    if savefig:
+        plt.savefig(savepath, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+    else:
+        plt.show()
 
 def align_error_array(data, error, data_coords, error_coords):
     """
-    Aligns the error array with the data array by shifting and padding the error array.
-    This can be used in the event that the error map size does not match the data size.
-    By manually identifying the coordinates of a prominent object in both arrays,
-    this function can be used to perform the proper alignment and padding/cropping. 
-    This was used as the NDWFS Bootes R-band data size was inconsistent with the corresponding rms maps,
-    causing the pixel locations to be inconsistent, although this can be worked around by using
-    the RA and DEC and invoking the WCS from the astropy API.
+    Align an error map with a data array by shifting and padding.
 
-    Args:
-        data (ndarray): The data array.
-        error (ndarray): The error array.
-        data_coords (tuple): The (x, y) coordinates of an object in the data array. Must be integers.
-        error_coords (tuple): The (x, y) coordinates of the same object in the error array. Must be integers.
+    This function shifts the error array so that a reference object
+    (identified by coordinates in both arrays) is aligned, then pads
+    or crops as needed to match the shape of `data`. Useful when
+    error maps (e.g., rms images) are offset relative to science
+    images due to inconsistent sizes or coordinate origins.
 
-    Returns:
-        ndarray: The aligned and padded error array.
+    Parameters
+    ----------
+    data : ndarray
+        Target 2D science image array.
+    error : ndarray
+        Error map (e.g., rms image) to align with `data`.
+    data_coords : tuple of int
+        (x, y) pixel coordinates of a reference object in `data`.
+    error_coords : tuple of int
+        (x, y) pixel coordinates of the same object in `error`.
+
+    Returns
+    -------
+    padded_error : ndarray
+        Error array aligned and padded/cropped to the same shape
+        as `data`. Non-overlapping regions are filled with zeros.
+
+    Notes
+    -----
+    - This approach assumes both arrays are on the same pixel grid
+      up to an integer shift, and does not perform interpolation.
+    - Alignment is determined by the relative offset between
+      `data_coords` and `error_coords`.
+    - This was originally motivated by the NDWFS Boötes R-band
+      data, where rms maps and images had inconsistent dimensions.
+      In general, a WCS-based solution (via `astropy.wcs`) may be
+      preferable if RA/Dec information is available.
     """
+
     #Calculate the required shifts in x and y directions
     x_shift, y_shift = data_coords[0] - error_coords[0], data_coords[1] - error_coords[1]
 
@@ -933,3 +1615,5 @@ def align_error_array(data, error, data_coords, error_coords):
     padded_error[data_start_y:data_end_y, data_start_x:data_end_x] = error[error_start_y:error_end_y, error_start_x:error_end_x]
     
     return padded_error
+
+

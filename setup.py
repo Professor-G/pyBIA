@@ -43,7 +43,6 @@ setup(
         "tqdm==4.67.1",
         "scikit-image==0.25.2",
         "PyWavelets==1.8.0",
-        "joblib==1.5.1",
     ],
     python_requires='>=3.12',
     include_package_data=True,

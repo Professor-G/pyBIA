@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors 
-from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
+from matplotlib.ticker import ScalarFormatter, AutoMinorLocator
 from cycler import cycler
 from warnings import warn
 from pathlib import Path
@@ -24,9 +24,14 @@ from contextlib import suppress
 from sklearn import decomposition
 from xgboost import XGBClassifier
 from sklearn.svm import OneClassSVM, SVC
-from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
-from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier, AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, HistGradientBoostingClassifier, GradientBoostingClassifier, ExtraTreesClassifier
 from sklearn.neural_network import MLPClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+
+from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 from sklearn.metrics import confusion_matrix, auc, RocCurveDisplay
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 #from scikitplot.metrics import plot_roc
@@ -35,19 +40,7 @@ from sklearn.manifold import TSNE
 from optuna.importance import get_param_importances, FanovaImportanceEvaluator
 from pyBIA.optimization import hyper_opt, borutashap_opt, impute_missing_values
 
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, HistGradientBoostingClassifier, IsolationForest, GradientBoostingClassifier
-from xgboost import XGBClassifier
-from sklearn.svm import SVC, OneClassSVM
-from sklearn.neural_network import MLPClassifier
-
-from sklearn.linear_model import LogisticRegression
-
-from lightgbm import LGBMClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.neighbors import KNeighborsClassifier
-
-from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.tree import DecisionTreeClassifier
+#from lightgbm import LGBMClassifier
 
 
 with suppress(ModuleNotFoundError):
@@ -71,7 +64,7 @@ class Classifier:
         1D array of labels aligned to `data_x`.
     clf : str
         Estimator to build. One of {'rf','nn','xgb','histgb','adaboost','svc',
-        'logreg','lightgbm','bdt','gaussian_nb','knn','extratrees','tree','ocsvm'}.
+        'logreg','bdt','gaussian_nb','knn','extratrees','tree','ocsvm'}.
         Defaults to 'rf'.
     optimize : bool
         Run BorutaSHAP (when `boruta_trials` > 0) and Optuna search before fitting.
@@ -132,7 +125,8 @@ class Classifier:
         Seed propagated to internal routines.
     """
 
-    def __init__(self, 
+    def __init__(
+        self, 
         data_x=None, 
         data_y=None, 
         clf='rf', 
@@ -235,8 +229,6 @@ class Classifier:
             model = LogisticRegression(random_state=self.SEED_NO)
         elif self.clf == 'xgb':
             model = XGBClassifier(random_state=self.SEED_NO)
-        elif self.clf == 'lightgbm':
-            model = LGBMClassifier(random_state=self.SEED_NO)
         elif self.clf == 'bdt':
             model = GradientBoostingClassifier(random_state=self.SEED_NO)
         elif self.clf == 'gaussian_nb':
@@ -253,7 +245,7 @@ class Classifier:
                     raise ValueError('The clf parameter has been set to "ocsvm" but OneClassSVM requires that only the positive class be input!')
             model = OneClassSVM() # No seed required as this algo is deterministic!
         else:
-            raise ValueError('clf argument must either be "rf", "nn", "ocsvm", "histgb", or "xgb".')
+            raise ValueError('Invalid clf argument!')
         #
         if all(isinstance(val, (int, str)) for val in self.data_y):
             print('XGBoost classifier requires numerical class labels! Converting class labels as follows:')
@@ -1139,7 +1131,6 @@ class Classifier:
             plt.show()
 
         return
-
 
     def plot_hyper_param_importance(self, plot_time=True, savefig=False):
         """

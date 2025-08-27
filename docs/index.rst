@@ -62,8 +62,6 @@ Pages
 .. toctree::
    :maxdepth: 1
 
-   source/Lyman-alpha Blobs
-   source/Examples
    source/Godines et al 2025
 
 Documentation

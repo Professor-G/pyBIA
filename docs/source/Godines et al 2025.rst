@@ -1,32 +1,30 @@
 .. _figures:
 
-Godines et al 2025
-========
+Godines et al. 2025
+===========
 
-
-Figure 1
+Image Segmentation
 -----------
 
 The multi-band data (Bw and R) for the five broadband-selected Lyman-alpha blobs (LABs) from `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_ can be :download:`downloaded here. <confirmed_LAB.npy>`
 
 The corresponding names for these five objects (as cataloged in the NDWFS Bootes Survey) can be :download:`downloaded here. <confirmed_LAB_names.txt>`
 
-
-To visualize the affect the sigma detection threshold has on the image segmentation object, we used the `plot_objects_segmentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_objects_segmentation>`_ function available in the pyBIA.catalog module.
+To visualize the affect the sigma detection threshold has on the image segmentation object, we can use the `plot_objects_segmentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_objects_segmentation>`_ function available in the catalog module.
 
 .. code-block:: python
 
-	import numpy as np 
+	import numpy as np
 	from pyBIA import catalog
-	    
+
 	# Load the five broadband-selected LABs from Prescott+12
-	five_confirmed = np.load('confirmed_LABs.npy')
+	five_confirmed = np.load('/Users/daniel/work/pyBIA/docs/source/confirmed_LAB.npy')
 
 	# These are the Bw images, second axis contains the R-band data
 	five_confirmed_bw = five_confirmed[:,:,:,0]
 
 	# The corresponding cataloged names
-	names = np.loadtxt('confirmed_diffuse_names.txt', dtype=str)
+	names = np.loadtxt('/Users/daniel/work/pyBIA/docs/source/confirmed_LAB_names.txt', dtype=str)
 
 	# Index the images of each LAB according to its cataloged name
 	PRG1 = five_confirmed_bw[(names == 'NDWFS_J143512.2+351108')][0]
@@ -38,27 +36,48 @@ To visualize the affect the sigma detection threshold has on the image segmentat
 	# Plotting parameters
 	median_bkg = 0 # Whether to subtract the background (set to None if background subtraction required)
 	pix_conversion = 3.8961 # NDWFS survey pixel-per-arcsecond (for setting the axes)
-	crop_size = 100 # Will crop the image to be of this size, otherwise set to None 
-	xpix = ypix = 125 # Cropped image will be centered about these coords, if not cropping set to None
+	crop_size = 100 # Will crop the image to be of this size, otherwise set to None
+	xpix = ypix = five_confirmed.shape[1] // 2 # Cropped image will be centered about these coords, if not cropping set to None
 
 	# Figure parameters
 	fig_title = r'Image Segmentation Example ($B_W$ Imaging)' # Figure suptitle
-	sup_titles = ['PRG1','PRG2','PRG3','PRG4','LABd05'] # Title(s) above each individual panel
+	sup_titles = ['LABd05', 'PRG1','PRG2','PRG3','PRG4'] # Title(s) above each individual panel
 	cmap = 'viridis' # Colormap to use when displaying input image, the segmentation patches always use binary
 
 	# Segm detection parameters
 	sigma_vals = [0.1, 0.3, 0.7, 1.3] # The detection threshold(s) to apply
-	deblend = False # Whether to deblend detected sources 
+	deblend = False # Whether to deblend detected sources
 	kernel_size = 21 # Gaussian filter kernel size used to convolve the data prior to segmentation
 	npixels = 9 # Required number of pixels above the sigma threshold required to detect a source
 	connectivity = 8 # Scheme to determine how pixels are grouped into a detected source, either 4 (touch along edges) or 8 (edges and corners)
+	threshold = 10 # Will plot the closest object within a circular mask of radius 10 (pixels) within the center 
+	savefig = True # Whether to save the figure, it False it will show instead
+	savepath = 'segm_example_LAB.png' # Path (and/or filename) to save in/as
 
 	# This function takes in up to 5 images, and plots the detection thresholds (up to 4 thresholds allowed)
-	catalog.plot_objects_segmentation(PRG1, PRG2, PRG3, PRG4, LABd05, 
-	    pix_conversion=pix_conversion, sigma_values=sigma_vals, deblend=deblend, 
-	    kernel_size=kernel_size, npixels=npixels, connectivity=connectivity,
-	    titles=sup_titles, suptitle=fig_title, cmap=cmap,
-	    xpix=xpix, ypix=ypix, size=crop_size, savefig=True)
+	catalog.plot_objects_segmentation(
+	    np.flip(LABd05, axis=0), 
+	    np.flip(PRG1, axis=0), 
+	    np.flip(PRG2, axis=0), 
+	    np.flip(PRG3, axis=0), 
+	    np.flip(PRG4, axis=0),
+	    pix_conversion=pix_conversion, 
+	    sigma_values=sigma_vals, 
+	    deblend=deblend,
+	    kernel_size=kernel_size, 
+	    npixels=npixels, 
+	    connectivity=connectivity, 
+	    threshold=threshold,
+	    titles=sup_titles, 
+	    suptitle=fig_title, 
+	    cmap=cmap,
+	    xpix=xpix, 
+	    ypix=ypix, 
+	    size=crop_size, 
+	    median_bkg=median_bkg, 
+	    savefig=savefig, 
+	    savepath='segm_example_LAB.png')
+
 
 .. figure:: _static/segm_multi.png
     :align: center
@@ -66,14 +85,14 @@ To visualize the affect the sigma detection threshold has on the image segmentat
 |
 
 
-Figure 2
+Morphological Catalog
 -----------
 
 To download the images used in this study please visit the `NoirLab <https://noirlab.edu/science/data-services/other/ndwfs>`_ website. We utilized the Bootes field data, from which there are 27 total subfields to download, in addition to the corresponding error maps. The data avaialable are in .fits format.
 
-The training set objects used in our study can be :download:`download here <training_set_objects.csv>`. This dataframe contains catalog information on the 866 DIFFUSE candidates compiled by Prescott et al 2012, as well as 3200 randomly selected OTHER sources from the same dataset. 
+The training set objects used in our study can be :download:`download here <training_set.csv>`. This dataframe contains catalog information on the 866 DIFFUSE candidates compiled by Prescott et al 2012, as well as 3200 randomly selected OTHER sources from the same dataset. 
 
-The code below demonstrates how we conducted our detection threshold analysis. Using the catalog information available in the provided training set, we extracted the morphological features using image segmentation at different thresholds between 0.1 to 1.5 rms of the noise.  
+The code below demonstrates how we conducted our detection threshold analysis. Using the catalog information available in the provided training set, we extracted the morphological features using image segmentation at different thresholds, between 0.1 to 1.5 standard deviations above the background rms.
 
 .. code-block:: python
 
@@ -82,18 +101,36 @@ The code below demonstrates how we conducted our detection threshold analysis. U
 	from astropy.io import fits 
 	from sklearn.model_selection import cross_validate
 	from pyBIA import catalog, ensemble_model
+	import scienceplots
+	import matplotlib.pyplot as plt
+	plt.style.use("science")
+	plt.rcParams.update({"font.size": 21,})
+	PLOTS_SCALE = 8
 
 	### Create the Data Files to Generate Figure 2 ###
 
-	data_path = 'NDWFS_Bootes/Bw/'
+	# This is where the subfield fits files are stored including the error maps
+	data_path = 'NDWFS/fits_images/Bw_FITS/'
 	data_error_path = 'NDWFS_Bootes/Error_Maps/Bw/'
 
 	#866 DIFFUSE candidates from Prescott et al. (2012) plus 3200 randomly selected OTHER objects
-	training_set = pd.read_csv('training_set_objects.csv')
+	training_set = pd.read_csv('/Users/daniel/Desktop/pyBIA_PLOTS/training_set.csv')
 
+	# The training features will be computed using the following varying sigma thresholds
 	sigs = np.around(np.arange(0.1, 1.51, 0.01), decimals=2)
 
+	# Where the training set files will be saved
+	nsig_path = 'nsigs/'
+
+	deblend = False # Whether to deblend detected sources
+	kernel_size = 21 # Gaussian filter kernel size used to convolve the data prior to segmentation
+	npixels = 9 # Required number of pixels above the sigma threshold required to detect a source
+	connectivity = 8 # Scheme to determine how pixels are grouped into a detected source, either 4 (touch along edges) or 8 (edges and corners)
+	threshold = 10 # Will plot the closest object within a circular mask of radius 10 (pixels) within the center 
+	invert = True # Flips the (x, y) input order when cropping sub-images
+
 	for sig in sigs:
+		print(sig)
 		frame = [] #To store all 27 subfields
 		for fieldname in np.unique(np.array(training_set['field_name'])):
 			# Load the field data
@@ -105,151 +142,263 @@ The code below demonstrates how we conducted our detection threshold analysis. U
 			xpix, ypix = training_set[['xpix', 'ypix']].iloc[subfield_index].values.T
 			objname, field, flag = training_set[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
 			# Create the catalog object
-			cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, exptime=exptime, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
+			cat = catalog.Catalog(
+				data_map, 
+				error=error_map, 
+				x=xpix, 
+				y=ypix, 
+				zp=zeropoint, 
+				exptime=exptime, 
+				nsig=sig, 
+				flag=flag, 
+				obj_name=objname, 
+				field_name=field, 
+				deblend=deblend, 
+				kernel_size=kernel_size, 
+				npixels=npixels, 
+				connectivity=connectivity, 
+				threshold=threshold, 
+				invert=invert)
 			# Generate the catalog and append the ``cat`` attribute to the frame list
-			cat.create(save_file=False); frame.append(cat.cat)
+			cat.create(save_file=False)
+			frame.append(cat.cat)
 		# Combine all 27 sub-catalogs into one master frame and save
-		frame = pd.concat(frame, axis=0, join='inner'); frame.to_csv('_Bw_training_set_nsig_'+str(sig), chunksize=1000)
+		frame = pd.concat(frame, axis=0, join='inner')
+		frame.to_csv(nsig_path + '_Bw_training_set_nsig_' + str(sig) + '.csv', index=False)
 
-These 141 nsig files are available for `download <https://drive.google.com/file/d/1Hdce4sA8cfN43lT_S9ilOTGfGyZvD5aj/view?usp=drive_link>`_. 
-These files will be used to create base RF and XGBoost models, one per file:
+
+These 141 nsig files are available for :download:`download here. <nsigs.tar.xz>`.
+
+
+Baseline Classification Models
+-----------
+
+The files generated above will be used to create baseline classifiers:
 
 .. code-block:: python
 
 	###  Read the Data Files ###
+	import numpy as np 
+	import pandas as pd
+	from sklearn.model_selection import cross_validate, StratifiedKFold
+	from pyBIA import data_processing, ensemble_model, optimization
 
-	#These are the features to use, note that the catalog includes more than this!
-	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 'mu01',
-		'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 'legendre_2',
-		'legendre_3', 'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 'area', 'covar_sigx2',
-		'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity',
-		'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
+	SEED_NO = 1909  # Fixed seed to initialize all random processes, including NumPy's RNG
 
-	rf_scores, xgb_scores = [], [] # To store the baseline accuracies as a function of sigma threshold (Left Panel of Figure 2)
-	blob_nondetect, other_nondetect = [], [] # To store the number of non-detections (Right Panel of Figure 2)
-	impute = True; num_cv_folds = 10 # Will impute NaN values and then assess accuracy using 10-fold CV
-
+	# The training features were computed using the following varying sigma thresholds
 	sigs = np.around(np.arange(0.1, 1.51, 0.01), decimals=2)
 
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
+
+	#These are the features to use, note that the catalog includes more than this!
+	#Removing mu00 and G00 since these will be the same as M00
+	#Also removing mu10 and mu01 since these should be zero but in practice they are not but are very small 
+	#due to floating-point precision errors and minor asymmetries in the image; thus contribute little meaningful variance for classification.
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
+
+	# To store the baseline performance as a function of sigma threshold for all classifiers
+	classifiers = ['tree', 'rf', 'xgb', 'logreg', 'svc', 'nn']
+	all_metrics = {clf: {'nsig': [], 'accuracy': [], 'f1': [], 'precision': [], 'recall': [], 'roc_auc': []} for clf in classifiers}
+
+	blob_nondetect, other_nondetect = [], [] # To store the number of non-detections (Right Panel of Figure 2)
+	impute = False # Will not impute NaN values, as they should not be present after masking non-detections
+	num_cv_folds = 10 # Will assess the model's accuracy using 10-fold CV
+
+	###  Read the Data Files ###
 	for sig in sigs:
-		# Load each nsig file
-		df = pd.read_csv('_Bw_training_set_nsig_'+str(sig))
-		# Omit any non-detections
-		mask = np.where((df['area'] != -999) & np.isfinite(df['mag']))[0]
+		print(sig)
+		# Load the corresponding nsig file
+		df = pd.read_csv(nsig_path+'_Bw_training_set_nsig_'+str(sig))
+
+		# Log-transform the Hu moments
+		hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+		df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
+
+		# Omit any non-detections (nan mags (~10%) and nan Hu moments (~0.02%))
+		mask = np.where((df['area'] != -999) & np.isfinite(df['mag']) & np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
+		
 		# Balance both classes to be of same size
 		blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
 		other_index = np.where(df['flag'].iloc[mask] == 0)[0]
 		df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
-		# Training data arrays
+
+		# Feature matrix and labels array
 		data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
-		# Create RF model first
-		model = ensemble_model.Classifier(data_x, data_y, clf='rf', impute=impute); model.create()
-		cross_val = cross_validate(model.model, model.data_x, model.data_y, cv=num_cv_folds)
-		rf_scores.append(np.mean(cross_val['test_score']))
-		# Change to XGB model and re-create
-		model.clf = 'xgb'; model.create()
-		cross_val = cross_validate(model.model, model.data_x, model.data_y, cv=num_cv_folds)
-		xgb_scores.append(np.mean(cross_val['test_score']))
+
+		# Instantiate the Classifier class
+		model = ensemble_model.Classifier(data_x, data_y, impute=impute)
+
+		for clf_name in all_metrics.keys():
+			# The last three in the list, these classifiers require the training data to be standardized
+			if clf_name in ['logreg', 'svc', 'nn']:
+				model.data_x = optimization.standardize_data(data_x, method='standard', return_scaler=False)
+			else:
+				model.data_x = data_x  
+				
+			model.clf = clf_name
+			model.create(overwrite_training=False)
+			
+			# 10 fold CV, save multiple metrics
+			cv_splitter = StratifiedKFold(n_splits=num_cv_folds, shuffle=True, random_state=SEED_NO)
+			cross_val = cross_validate(model.model, model.data_x, model.data_y, cv=cv_splitter, scoring=['accuracy', 'f1', 'precision', 'recall', 'roc_auc'])
+			
+			# Append nsig and scores
+			all_metrics[clf_name]['nsig'].append(sig)
+			for metric in ['accuracy', 'f1', 'precision', 'recall', 'roc_auc']:
+				all_metrics[clf_name][metric].append(np.mean(cross_val[f'test_{metric}']))
+
 		# This checks how many normalized non-detections occurred at this threshold
 		blob_index, other_index = np.where(df['flag'] == 1)[0], np.where(df['flag'] == 0)[0]
 		blob_nondetect.append(len(np.where(df.area.iloc[blob_index] == -999)[0]) / len(blob_index))
 		other_nondetect.append(len(np.where(df.area.iloc[other_index] == -999)[0]) / len(other_index))
 
-	score_data = np.c_[sigs, rf_scores, xgb_scores]
+	rows = []
+	for clf_name, metrics in all_metrics.items():
+	    for i, nsig in enumerate(metrics['nsig']):
+	        rows.append({
+	            'classifier': clf_name,
+	            'nsig': nsig,
+	            'accuracy': metrics['accuracy'][i],
+	            'f1': metrics['f1'][i],
+	            'precision': metrics['precision'][i],
+	            'recall': metrics['recall'][i],
+	            'roc_auc': metrics['roc_auc'][i]
+	        })
+
+	df_metrics = pd.DataFrame(rows)
+	df_metrics.to_csv('baseline_classifiers.csv', index=False)
+		
 	non_detect_data = np.c_[sigs, blob_nondetect, other_nondetect]
-	np.savetxt('nsig_scores_Bw', score_data, header="nsigs, RF_scores, XGB_scores")
 	np.savetxt('non_detections_Bw', non_detect_data, header="nsigs, blob_non_detections, other_non_detections")
 
 The two files generated above can be downloaded: 
 
-- :download:`nsig_scores_Bw <nsig_scores_Bw>`
+- :download:`baseline_classifiers.csv <baseline_classifiers.csv>`
 - :download:`non_detections_Bw <non_detections_Bw>`
 
-We can now create the plots:
+We can now plot the non-detections and performance as a function of detection threshold:
 
 .. code-block:: python
 
 	### Generate the Plots ###
-
-	import numpy as np 
-	import matplotlib.pyplot as plt   
-	from matplotlib.ticker import FuncFormatter
-	from pyBIA.ensemble_model import _set_style_
-
-	score_data = np.loadtxt('nsig_scores_Bw')
-	non_detect_data = np.loadtxt('non_detections_Bw')
-
-	_set_style_() #The custom matplotlib style
-
-	# Figure 2 Left Panel
-	max_rf_score = np.where(score_data[:,1]==np.max(score_data[:,1]))[0][0]
-	max_xgb_score = np.where(score_data[:,2]==np.max(score_data[:,2]))[0][0]
-	optimal_index = max_xgb_score if score_data[:,2][max_xgb_score] > score_data[:,1][max_rf_score] else max_rf_score
-
-	# ACCURACY PLOT
-	fig, ax1 = plt.subplots()
-	lns1, = ax1.plot(score_data[:,0], score_data[:,1], linestyle='--', color='b')
-	lns2, = ax1.plot(score_data[:,0], score_data[:,2], linestyle='-', color='r')
-	yscatter = score_data[:,2][optimal_index] if score_data[:,2][max_xgb_score] >= score_data[:,1][max_rf_score] else score_data[:,1][optimal_index]
-	lns3 = ax1.scatter(score_data[:,0][optimal_index], yscatter, marker='*', s=225, edgecolors='black', c='green', alpha=0.63, label='Optimal')
-	ax1.legend([lns1, lns2, lns3], ['RF', 'XGBoost', 'Optimal'], loc='upper center', ncol=3, frameon=False, handlelength=2)
-	ax1.set_title('RF vs XGBoost: Baseline Performance')
-	ax1.set_xlabel(r'$\sigma$ Noise Detection Limit'); ax1.set_ylabel('10-Fold CV Acc')
-	ax1.set_xlim((0.1, 1.5)); ax1.set_ylim((0.875, 0.93))
-	plt.show()
-
-.. figure:: _static/nsigs.png
-    :align: center
-    :class: with-shadow with-border
-    :width: 600px
-|
-
-.. code-block:: python
-
-	# Figure 2 Right Panel
-
-	def y_axis_formatter(x, pos):
-	    return '{:.2f}'.format(round(x, 2))
-
-	fig, ax1 = plt.subplots()
-	ax2 = ax1.twinx()
-	lns1, = ax1.plot(non_detect_data[:,0], non_detect_data[:,2], linestyle='--', color='k')
-	lns2, = ax2.plot(non_detect_data[:,0], non_detect_data[:,1], linestyle='-', color='k')
-	lns3 = ax1.scatter(non_detect_data[:,0][optimal_index], non_detect_data[:,2][optimal_index], marker='*', s=225, edgecolors='black', c='green', alpha=0.63, label='Optimal')
-	ax1.legend([lns1, lns2, lns3], ['OTHER', 'DIFFUSE', 'Optimal'], loc='upper center', ncol=3, frameon=False)
-	ax1.set_title('Normalized Non-Detections')
-	ax1.set_xlabel(r'$\sigma$ Noise Detection Limit')
-	ax2.set_ylabel('DIFFUSE'); ax1.set_ylabel('OTHER')
-	ax2.set_xlim((0.1, 1.5));ax2.set_ylim((0, 0.16)); ax1.set_ylim(0, 0.7)
-	ax1.yaxis.set_major_formatter(FuncFormatter(y_axis_formatter))
-	ax2.yaxis.set_major_formatter(FuncFormatter(y_axis_formatter))
-	plt.show() 
-
-.. figure:: _static/nsigs_nondetect.png
-    :align: center
-    :class: with-shadow with-border
-    :width: 600px
-|
-
-
-Figures 3 & 4
------------
-
-Given the analysis from Figure 2, we now proceed with the generated training set at the optimal detection threshold. As the above analysis trained base models, at this step we invoke our optimization routine to select the optimal features to use as well as the best hyperparameters for our XGBoost engine:
-
-.. code-block:: python
-
-	### Figures 3 and 4 ###
-
 	import numpy as np
 	import pandas as pd
-	from pyBIA import ensemble_model
+	import matplotlib.pyplot as plt
+	from matplotlib.ticker import FuncFormatter
+	from matplotlib.lines import Line2D
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size': 21, 'lines.linewidth':1.5})
 
-	sig = 0.31 #The optimal sig threshold to apply as per Figure 2
-	df = pd.read_csv('_Bw_training_set_nsig_'+str(sig))     
+	# Load the data saved in previous script
+	df_metrics = pd.read_csv('baseline_classifiers.csv')
+	non_detect_data = np.loadtxt('non_detections_Bw')
 
-	# Omit any non-detections
-	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']))[0]
+	# Query best classifier according to the F1 score at chosen sigma
+	metric = 'f1'
+	best_sigma = 0.32  # The highest F1 score is at sigma=0.38 but comparable at 0.32 which yields more detections
+	subdf = df_metrics[df_metrics['nsig'] == best_sigma]
+	chosen_row = subdf[subdf[metric] == subdf[metric].max()].iloc[0]
+	best_clf = chosen_row['classifier']
+	best_f1 = chosen_row[metric]
+
+	# Plots
+	fig1, ax1 = plt.subplots(figsize=(8, 8))
+
+	# Line styles
+	colors = plt.cm.tab10.colors  
+	linestyles = ['-', '--', '-.', ':', (0, (4, 2, 1, 2, 1, 2)), (0, (1, 3))]
+
+	# The classifiers in order so they show from best to worst in legend (top left to bottom right)
+	clf_order = ['xgb', 'nn', 'rf', 'logreg', 'svc', 'tree']
+	clf_display = {'xgb': 'XGBoost', 'nn': 'MLP', 'rf': 'RF', 'logreg': 'LogReg', 'svc': 'SVC', 'tree': 'Tree'}
+
+	for i, clf in enumerate(clf_order):
+	    subdf = df_metrics[df_metrics['classifier'] == clf]
+	    ax1.plot(subdf['nsig'], subdf[metric], label=clf_display[clf], color=colors[i % 10], linestyle=linestyles[i % len(linestyles)])
+
+	# Highlight the optimal detection threshold
+	ax1.axvline(best_sigma, linestyle=(0, (2, 2)), alpha=0.75, color='gray')
+	ax1.annotate(f'Optimal: {clf_display[best_clf]}\n' + r'$\sigma_{\rm det}$ = ' + f'{best_sigma:.2f}', 
+	    xy=(best_sigma, 0.881), 
+	    xytext=(0.47, 0), 
+	    textcoords='offset points',
+	    ha='center', va='top',
+	    color='gray', rotation=90)
+
+	ax1.set_title('Baseline Classification Performance')
+	ax1.set_xlabel(r'Segmentation Detection Threshold ($\sigma_{\rm det}$)')
+	ax1.set_ylabel('F1 Score (10-Fold Cross-Validation)')
+	ax1.set_xlim((0.1, 1.5)); ax1.set_ylim(0.82, 0.932)
+	ax1.legend(loc='lower center', ncol=3, handlelength=1, handletextpad=0.3, columnspacing=0.7, labelspacing=0.3, frameon=True, fancybox=True)
+	fig1.savefig('nsigs_f1_all_classifiers.png', dpi=300, bbox_inches='tight')
+	plt.show()
+
+	# Plot the non-detections
+	fig2, ax2 = plt.subplots(figsize=(8, 8))
+
+	lns1, = ax2.plot(non_detect_data[:, 0], non_detect_data[:, 2], linestyle='--', label='OTHER', color='tab:blue')
+	lns2, = ax2.plot(non_detect_data[:, 0], non_detect_data[:, 1], linestyle='-', label='LAB', color='tab:orange')
+
+	ax2.axvline(best_sigma, linestyle=(0, (2, 2)), alpha=0.75, color='gray')
+	ax2.annotate(f'Optimal: {clf_display[best_clf]}\n' + r'$\sigma_{\rm det}$ = ' + f'{best_sigma:.2f}',
+	    xy=(best_sigma, 0.4), 
+	    xytext=(0.47, 0), 
+	    textcoords='offset points',
+	    ha='center', va='top',
+	    color='gray', rotation=90)
+
+	ax2.legend(handles=[lns2, lns1], labels=['LAB', 'OTHER'], loc='upper center', ncol=2, handlelength=1,  handletextpad=0.3, columnspacing=0.7, labelspacing=0.3, frameon=True, fancybox=True)
+
+	ax2.set_title('Segmentation Non-Detections')
+	ax2.set_xlabel(r'Segmentation Detection Threshold ($\sigma_{\rm det}$)')
+	ax2.set_ylabel('Fraction of Instances')
+	ax2.set_xlim((0.1, 1.5)); ax2.set_ylim(0, 0.7)
+	ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:.2f}'))
+
+	fig2.savefig('nsigs_normalized_non_detections.png', dpi=300, bbox_inches='tight')
+	plt.show()
+
+.. figure:: _static/nsigs_f1_all_classifiers.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/nsigs_normalized_non_detections.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+We now re-train the optimal model (XGBoost) and the optimal detection threshold of 0.32 to plot the corresponding confusion matrix.
+
+.. code-block:: python
+	import numpy as np
+	import pandas as pd
+	from pyBIA import ensemble_model, data_processing
+
+	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
+	df = pd.read_csv('nsigs/_Bw_training_set_nsig_'+str(sig))                                                                                                                                                                                                                         
+
+	# Log-transform the Hu moments
+	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
+
+	# Omit any non-detections (nan mags (~10%) and nan Hu moments (~0.02%))
+	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']) & np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
 
 	# Balance both classes to be of same size
 	blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
@@ -257,91 +406,303 @@ Given the analysis from Figure 2, we now proceed with the generated training set
 	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
 
 	#These are the features to use, note that the catalog includes more than this!
-	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 'mu01',
-		'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 'legendre_2', 'legendre_3', 'legendre_4',
-		'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1',
-		'covariance_eigval2', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation', 'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
-		'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
 
 	# Training data arrays
 	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
 
-	# Create the model object with feature and hyperparameter optimization enabled (2500 trials each)
-	# Enabling 10-fold cross validation which increases the hyperparameter optimization time ten-fold
-	model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True, optimize=True, boruta_trials=2500, n_iter=2500, opt_cv=10, limit_search=False)
+	# Classifier object
+	SEED_NO = 1909 # Seed No for shuffling the data when assessing the classifier
+	impute = False # No need to impute, no NaN should be present
+	optimize = False # Disabling optimization routine, this is the baseline model
+	opt_cv = 10 # Will assess performance using 10Fold CV
+	clf = 'xgb' # Will train an XGBoost model (optimal model)
 
-	# This is how the model is created and saved afterwards
+	model = ensemble_model.Classifier(
+		data_x, 
+		data_y, 
+		clf=clf, 
+		impute=impute, 
+		optimize=optimize, 
+		opt_cv=opt_cv, 
+		SEED_NO=SEED_NO)
+
 	model.create()
-	model.save('Optimal_XGB_Model')
 
-.. figure:: _static/fig_optimization_complete.png
+	# Plot confusion matrix with text class labels (instead of numerical) for the confusion matrix
+	data_y_labels = ['LAB' if i == 1 else 'OTHER' for i in data_y]
+	model.plot_conf_matrix(data_y=data_y_labels, title=r'XGBoost Model Performance ($\sigma_{\rm det} = 0.32$)', savefig=True)
+
+.. figure:: _static/Ensemble_Confusion_Matrix.png
     :align: center
     :class: with-shadow with-border
     :width: 600px
 |
-This optimized tree-based ensemble model can be :download:`download here <Optimal_XGB_Model.zip>`.
 
-We can now generate Figure 3 using the built-in class methods, for the t-SNE projection we will need the catalog names for the five confirmed blobs in our sample, available for :download:`download here <obj_name_5>`.
+Optimize XGBoost Model
+-----------
+
+We now proceed with the generated training set at the optimal detection threshold. As the above analysis trained base models, at this step we invoke our optimization routine to select the optimal features to use as well as the best hyperparameters for our XGBoost engine. Note that in the below code, two distinct models are optimized, one using the `boruta_model`='rf' option and another with the 'xgb' option (more conservative feature selection).
 
 .. code-block:: python
 
-	# This is how the model can be loaded 
-	model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True, opt_cv=10)
-	model.load('Optimal_XGB_Model')
+	import numpy as np
+	import pandas as pd
+	from pyBIA import ensemble_model, data_processing
 
-	# Figure 3 Left Panel
+	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
+	df = pd.read_csv('nsigs/_Bw_training_set_nsig_'+str(sig))
+	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
 
-	# For plotting purposes change the labels from numeric to text
-	y_labels = []
-	for flag in data_y:
-		y_labels.append('DIFFUSE') if flag == 1 else y_labels.append('OTHER')
+	# Omit any non-detections
+	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']) & np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
 
-	# For plotting purposes, re-name the five confirmed blobs to "Confirmed LyAlpha"
-	confirmed_names = np.loadtxt('obj_name_5', dtype=str)
+	# Balance both classes to be of same size
+	blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
+	other_index = np.where(df['flag'].iloc[mask] == 0)[0]
+	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
 
-	for name in confirmed_names:
-		index = np.where(df_filtered.obj_name == name)[0][0]
-		y_labels[index] = r'Confirmed Ly$\alpha$'
+	#These are the features to use, note that the catalog includes more than this!
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
 
-	# Plotting t-SNE projection with custom y_data labels, highlighting the scatter points for the confirmed blobs
-	model.plot_tsne(data_y=y_labels, special_class=r'Confirmed Ly$\alpha$')
+	# Training data arrays
+	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
 
-	# Figure 3 Right Panel
+	# Will run the optimization routine all at once, feature selection first followed by engine hyperparameter optimization
+	# Enabling 10-fold cross validation which increases the hyperparameter optimization time ten-fold
+
+	# XGB-BASED BorutaSHAP
+	SEED_NO = 1909 # The seed number that will initialize the stochastic process (e.g., model training)
+	clf = 'xgb' # The classification model that will be trined, options are: 'xgb', 'rf' and 'nn'
+	impute = False # Whether to impute missing values (NaN)
+	optimize = True # Will enable the optimization routine
+	scoring_metric = 'f1' # The optimization trials will be assessed according to the F1 Score
+	opt_cv = 10 # The number of folds to perform during cross validation, ONLY used during optimization (`optimize`=True)
+	boruta_trials = 100 # Number of feature selection trials to perform (This is fast especially with `boruta_model`='xgb')
+	boruta_model = 'xgb' # The model to use when assessing feautre importances during feature selection (either 'rf' or 'xgb', DOES NOT have to match the `clf`)
+	n_iter = 100 # Number of hyperparameter optimization trials to perform, can set to 0 to disable hyperparam tuning
+	limit_search = True # Set to False to expand the hyperparameter search space (will take longer)
+
+	# Instantiate the Classifier
+	model = ensemble_model.Classifier(
+		data_x, 
+		data_y, 
+		clf=clf, 
+		impute=impute, 
+		optimize=optimize, 
+		boruta_trials=boruta_trials, 
+		boruta_model=boruta_model, 
+		n_iter=n_iter, 
+		scoring_metric=scoring_metric, 
+		opt_cv=opt_cv, 
+		limit_search=limit_search, 
+		SEED_NO=SEED_NO)
+
+	# Tune and train the model 
+	model.create()
+
+	# Save the model
+	model.save(dirname=f'ensemble_model_xgb_boruta_{boruta_model}')
+
+	boruta_model = 'rf' # Change to RF-based feature importance ranking during optimization
+
+	# RF-BASED BorutaSHAP
+	model = ensemble_model.Classifier(
+		data_x, 
+		data_y, 
+		clf=clf, 
+		impute=impute, 
+		optimize=optimize, 
+		boruta_trials=boruta_trials, 
+		boruta_model=boruta_model, 
+		n_iter=n_iter, 
+		scoring_metric=scoring_metric, 
+		opt_cv=opt_cv, 
+		limit_search=limit_search, 
+		SEED_NO=SEED_NO)
+
+	model.create()
+	model.save(dirname=f'ensemble_model_xgb_boruta_{boruta_model}')
+
+The XGBoost model optimized with RF-based feature importance (to compute the SHAP values) can be :download:`download here <ensemble_model_xgb_boruta_rf>`.
+The XGBoost model optimized with XGBoost-based feature importance (to compute the SHAP values) can be :download:`download here <ensemble_model_xgb_boruta_xgb>`.
+
+Below we plot the optimization results (feature selection results from the BorutaSHAP algorithm and the subsequent Optuna-based hyperparameter optimization) using the built-in class methods, 
+
+.. code-block:: python
+
+	import numpy as np
+	from pyBIA import ensemble_model, data_processing
+	import pandas as pd
+
+	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
+	df = pd.read_csv('nsigs/_Bw_training_set_nsig_'+str(sig))                                                                                                                                                                                                                         
+
+	# Log-transform the Hu moments
+	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
+
+	# Omit any non-detections (nan mags (~10%) and nan Hu moments (~0.02%))
+	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']) & np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
+
+	# Balance both classes to be of same size
+	blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
+	other_index = np.where(df['flag'].iloc[mask] == 0)[0]
+	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
+
+	#These are the features to use, note that the catalog includes more than this!
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
+
+	# Training data arrays
+	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
+
+	#LOAD THE SAVED MODELS AND PLOT THE OPTIMIZATION RESULTS
+	#XGB-Based BorutaSHAP
+
+	clf = 'xgb' # The classification model 
+	impute = False # Will not impute NaN values, as they should not be present after masking non-detections
+
+	# Instantiate the classifier and load the saved model
+
+	# First load the model that was optimized using XGBoost-based feature selection (10 features selected)
+	xgboost8_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	xgboost8_model.load('ensemble_model_xgb_boruta_xgb')
+
+	# Next load the model that was optimized using RF-based feature selection (47 features selected)
+	xgboost45_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	xgboost45_model.load('ensemble_model_xgb_boruta_rf')
+
+	# Plot the feature selection results
 
 	#Setting custom column names for plotting purposes 
-	columns = [r'$B_w$ Mag', r'$B_w$ MagErr', r'$M_{00}$', r'$M_{10}$', r'$M_{01}$', r'$M_{20}$', r'$M_{11}$', r'$M_{02}$', r'$M_{30}$', r'$M_{21}$', r'$M_{12}$',
-		r'$M_{03}$', r'$\mu_{10}$', r'$\mu_{01}$', r'$\mu_{20}$', r'$\mu_{11}$', r'$\mu_{02}$', r'$\mu_{30}$', r'$\mu_{21}$', r'$\mu_{12}$', r'$\mu_{03}$',
-		r'$h_1$', r'$h_2$', r'$h_3$', r'$h_4$', r'$h_5$', r'$h_6$', r'$h_7$', r'$L_2$', r'$L_3$', r'$L_4$', r'$L_5$', r'$L_6$', r'$L_7$', r'$L_8$', r'$L_9$',
-		'Area', r'$\sigma^2(x)$', r'$\sigma^2(y)$', r'$\sigma^2(xy)$', r'$\lambda_1$', r'$\lambda_2$', r'$C_{xx}$', r'$C_{xy}$', r'$C_{yy}$', 'Eccentricity',
-		'Ellipticity', 'Elongation', 'Equiv. Radius', 'FWHM', 'Gini', 'Orientation', 'Perimeter', r'$\sigma_{\rm major}$', r'$\sigma_{\rm minor}$', 'Max Val.', 'Min Val.']
+	columns_formatted = [
+		r'$B_W$ Mag', r'$B_W$ MagErr', 
+		r'$M_{00}$', r'$M_{10}$', r'$M_{01}$', r'$M_{20}$', r'$M_{11}$', r'$M_{02}$', r'$M_{30}$', r'$M_{21}$', r'$M_{12}$', r'$M_{03}$', 
+		r'$\mu_{20}$', r'$\mu_{11}$', r'$\mu_{02}$', r'$\mu_{30}$', r'$\mu_{21}$', r'$\mu_{12}$', r'$\mu_{03}$', 
+		r'$G_{10}$', r'$G_{01}$', r'$G_{20}$', r'$G_{11}$', r'$G_{02}$', r'$G_{30}$', r'$G_{21}$', r'$G_{12}$', r'$G_{03}$',
+		r'$h_1$', r'$h_2$', r'$h_3$', r'$h_4$', r'$h_5$', r'$h_6$', r'$h_7$', 
+		r'$L_{00}$', r'$L_{10}$', r'$L_{01}$', r'$L_{20}$', r'$L_{11}$', r'$L_{02}$', r'$L_{30}$', r'$L_{21}$', r'$L_{12}$', r'$L_{03}$', 
+		'Area', r'$\sigma^2(x)$', r'$\sigma^2(y)$', r'$\sigma^2(xy)$', r'$\lambda_1$', r'$\lambda_2$', r'$C_{xx}$', r'$C_{xy}$', r'$C_{yy}$', 
+		'Eccentricity', 'Ellipticity', 'Elongation', 'Equiv. Radius', 'FWHM', 'Gini Index', 'Orientation', 'Perimeter', 
+		r'$\sigma_{\rm major}$', r'$\sigma_{\rm minor}$', 'Max Value', 'Min Value'
+	]
 
-	# Plotting only the top 20 accepted features
-	model.plot_feature_opt(feat_names=columns, top=20, include_other=True, include_shadow=True, include_rejected=False, flip_axes=True)
+	top = 'all' # Will show all accepted features
+	include_other = True # The other accepted will be shown as a single point (combined Z-Scores)
+	include_shadow = True # Whether to include a 'random performance' benchmark (i.e., the "shadow" feature)
+	include_rejected = False # Whether to show the features that were not deemed important
+	flip_axes = True # Set to False to plot the features on the x-axis (if you're plotting a lot of them)
+	title = 'Feature Importance (8 Features)' # Figure title
+	save_data = False # Whether to save the feature importances to a csv file
+	savefig = True # Whether to save the figure (note that current version of program always saves with same figname so careful about overwrites)
 
-.. figure:: _static/tSNE_Projection.png
-    :align: center
-    :class: with-shadow with-border
-    :width: 600px
-|
+	# First plot the XGBoost-based feature selection results
+	xgboost8_model.plot_feature_opt(
+		feat_names=columns_formatted, 
+		top=top, 
+		include_other=include_other, 
+		include_shadow=include_shadow, 
+		include_rejected=include_rejected, 
+		flip_axes=flip_axes, 
+		save_data=save_data, 
+		title=title, 
+		savefig=savefig
+		)
 
-.. figure:: _static/Feature_Importance.png
-    :align: center
-    :class: with-shadow with-border
-    :width: 600px
-|
+	# Next plot the RF-based feature selection results
+	top = 15 # Only plot the top 15 accepted features
+	title = 'Feature Importance (45 Features)' # Figure title
 
-.. code-block:: python
+	xgboost45_model.plot_feature_opt(
+		feat_names=columns_formatted, 
+		top=top, 
+		include_other=include_other, 
+		include_shadow=include_shadow, 
+		include_rejected=include_rejected, 
+		flip_axes=flip_axes, 
+		save_data=save_data, 
+		title=title, 
+		savefig=savefig
+		)
 
-	# Figure 4 Left Panel
-	 
-	baseline = 0.921965 # The maximum baseline accuracy as per Figure 2
-	model.plot_hyper_opt(baseline=baseline, xlim=(1, 2500), ylim=(0.85, 0.935), xlog=True, ylog=False)
+	# Plot the hyperparameter optimization results
+	baseline = 0.92914 # The maximum XGBoost baseline accuracy as per Figure 2
+	xlim = (1, 100) # xlim axes
+	ylim = (0.91, 0.936) # ylim axes
+	xlog = False # Whether to log-scale x-axis
+	ylog = False # Whether to log-scale y-axis
+	ylabel = 'F1 Score (10-Fold Cross-Validation)'
+	loc = 'lower left' # Legend location
+	ncol = 1 # No of columns in legend
+	savefig = True # Whether to save the figure (note that current version of program always saves with same figname so careful about overwrites)
 
-	# Figure 4 Right Panel 
+	# First plot the results from the XGBoost model trained with 10 features
+	title = 'Hyperparameter Optimization (8 Features)' # Fig title
 
-	model.plot_hyper_param_importance(plot_time=True)
+	xgboost8_model.plot_hyper_opt(
+		baseline=baseline, 
+		xlim=xlim, 
+		ylim=ylim,
+		xlog=xlog, 
+		ylog=ylog, 
+		title=title,
+		ylabel=ylabel, 
+		loc=loc,
+		ncol=ncol,
+		savefig=savefig
+		)
 
-.. figure:: _static/Ensemble_Hyperparameter_Optimization.png
+	# First plot the results from the XGBoost model trained with 47 features
+	title = 'Hyperparameter Optimization (45 Features)' # Fig title
+
+	xgboost45_model.plot_hyper_opt(
+		baseline=baseline, 
+		xlim=xlim, 
+		ylim=ylim,
+		xlog=xlog, 
+		ylog=ylog, 
+		ylabel=ylabel,
+		title=title,
+		loc=loc,
+		ncol=ncol,
+		savefig=savefig
+		)
+
+.. figure:: _static/Ensemble_Hyperparameter_Importance.png
     :align: center
     :class: with-shadow with-border
     :width: 600px
@@ -353,10 +714,20 @@ We can now generate Figure 3 using the built-in class methods, for the t-SNE pro
     :width: 600px
 |
 
-Figure 5
------------
+.. figure:: _static/Ensemble_Hyperparameter_Importance.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
-With the optimal model saved, we now extract the features using the catalog module for all 2 million OTHER objects in the entire dataset. We have compiled the catalog information in the following dataframe: :download:`Other_Objects_Catalog.csv <Other_Objects_Catalog.csv.zip>`.
+.. figure:: _static/Ensemble_Hyperparameter_Importance.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+
+With the optimal model saved, we now extract the features using the catalog module for all 2 million OTHER objects in the entire dataset. We have compiled the catalog information in the following dataframe: :download:`Other_Objects_Catalog.csv <Other_Objects_Catalog.csv>`.
 
 Using this file we can now construct a catalog for the entire dataset so as to perform the XGBoost classification (note that this excludes the 866 DIFFUSE objects in the provided training set).
 
@@ -368,15 +739,18 @@ Using this file we can now construct a catalog for the entire dataset so as to p
 	from astropy.io import fits
 	from pyBIA import catalog
 
-	other_catalog = pd.read_csv('Other_Objects_Catalog')
+	other_catalog = pd.read_csv('Other_Objects_Catalog.csv')
 
-	data_path = 'NDWFS_Bootes/Bw/'
+	data_path = 'NDWFS/fits_images/Bw_FITS/'
 	data_error_path = 'NDWFS_Bootes/Error_Maps/Bw/'
 
-	sig = 0.31 # The optimal noise-detection threshold to apply
+	sig = 0.32 # The optimal noise-detection threshold to apply
 
 	# Loop through all the fields and save the field catalogs to avoid memory issues
-	for fieldname in np.unique(np.array(other_catalog['field_name'])):
+	counter=0
+	for fieldname in np.unique(np.array(other_catalog['field_name']))[18:]:
+		counter+=1
+		print(fieldname, f'{counter} out of 27')
 		# Load the field data
 		data_hdu, error_map = fits.open(data_path+fieldname+'_Bw_03_fix.fits'), fits.getdata(data_error_path+fieldname+'_Bw_03_rms.fits.fz')
 		# Extract the data and corresponding ZP and exptime
@@ -386,184 +760,40 @@ Using this file we can now construct a catalog for the entire dataset so as to p
 		xpix, ypix = other_catalog[['xpix', 'ypix']].iloc[subfield_index].values.T
 		objname, field, flag = other_catalog[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
 		# Create the catalog object
-		cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, exptime=exptime, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
+		cat = catalog.Catalog(
+			data_map, 
+			error=error_map, 
+			x=xpix, 
+			y=ypix, 
+			zp=zeropoint, 
+			exptime=exptime, 
+			nsig=sig, 
+			flag=flag, 
+			obj_name=objname, 
+			field_name=field, 
+			invert=True) # Invert is used to flip x/y coordinates, for ease in handling standard .fits coord system
 		# Generate the catalog and save the subfield catalog, after which it is appended to the master frame 
-		cat.create(save_file=True, filename='Cat_BW_Subfield_'+field_name)
+		cat.create(save_file=True, filename='Cat_BW_Subfield_'+fieldname)
 
 	# Now load each subfield individually and create one master catalog
 	fnames = [i for i in os.listdir() if 'Cat_BW_Subfield_' in i]
 
 	frame = [] #To store all 27 subfields
 	for fname in fnames:
-		cat = pd.read_csv(fname); frame.append(cat)
+		cat = pd.read_csv(fname)
+		frame.append(cat)
 
 	# Combine all 27 sub-catalogs into one master frame and save
 	frame = pd.concat(frame, axis=0, join='inner')
-	frame.to_csv('Other_Catalog_Master_'+str(sig), chunksize=1000)                              
+	frame.to_csv('Other_Catalog_Master_'+str(sig), chunksize=1000)    
+                                               
 
 This final catalog as genereated above is available for download `here <https://drive.google.com/file/d/16kJ5jyVImp7E8oEEjjUrj4l9vH2JSkCa/view?usp=sharing>`_.
 
-Using this catalog, we can now re-load the optimal model to conduct the predictions. As per the analysis conducted for this Figure, the predictions will be made using both the base and optimal model so as to compare the distribution of probability predictions. 
+Using this catalog, we can now re-load the optimal model to conduct the predictions. The predictions will be made using both the base and optimal model so as to compare the distribution of probability predictions. 
 
-.. code-block:: python
-
-	import numpy as np
-	import pandas as pd
-	import matplotlib.pyplot as plt 
-	from pyBIA import ensemble_model 
-
-	# Load all 2 million catalog objects and create a sub-catalog of DIFFUSE candidates #
-
-	# Load the original training data from the optimal nsig
-	sig = 0.31
-	df = pd.read_csv('_Bw_training_set_nsig_'+str(sig)) 
-
-	# Omit any non-detections
-	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']))[0]
-
-	# Balance both classes to be of same size
-	blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
-	other_index = np.where(df['flag'].iloc[mask] == 0)[0]
-	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
-
-	#These are the features to use, note that the catalog includes more than this!
-	columns = ['mag', 'mag_err', 'm00', 'm10', 'm01', 'm20', 'm11', 'm02', 'm30', 'm21', 'm12', 'm03', 'mu10', 'mu01', 'mu20',
-		'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03', 'hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7', 'legendre_2', 'legendre_3',
-		'legendre_4', 'legendre_5', 'legendre_6', 'legendre_7', 'legendre_8', 'legendre_9', 'area', 'covar_sigx2', 'covar_sigy2',
-		'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2', 'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
-		'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter', 'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value']
-
-	# Training data arrays
-	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
-
-	# This is the base model, no hyperparameter optimization, uses all the features
-	base_model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True)
-	base_model.create()
-
-	# This is the optimized model
-	optimized_model = ensemble_model.Classifier(data_x, data_y, clf='xgb', impute=True)
-	optimized_model.load('Optimal_XGB_Model')
-
-	# Load the catalog containing all 2 million other objects, extracted using sig=0.31
-	other_all = pd.read_csv('Other_Catalog_Master_0.31')
-
-	# Remove the 865 OTHER objects that are present in the training set, we will assess these individually using LoO
-	other_all = other_all[~other_all['obj_name'].isin(df_filtered['obj_name'])]
-
-	# Omit non-detections
-	mask = np.where((other_all['area'] != -999) & np.isfinite(other_all['mag']))[0]
-	other_all = other_all.iloc[mask]
-
-	# Create the data_x array
-	other_data_x = np.array(other_all[columns])
-
-	# Predict all samples to create a candidates catalog
-	predictions_base_model = base_model.predict(other_data_x)
-	predictions_optimized_model = optimized_model.predict(other_data_x)
-
-	# Select DIFFUSE detections (flag = 1)
-	index_base = np.where(predictions_base_model[:,0] == 1)[0]
-	index_optimized = np.where(predictions_optimized_model[:,0] == 1)[0]
-
-	# Index the catalog to select only the positive detections
-	candidate_catalog_base = other_all.iloc[index_base]
-	candidate_catalog_optimized = other_all.iloc[index_optimized]
-
-	# Save the probability predictions as a new columns in these new catalogs
-	candidate_catalog_base['proba'] = predictions_base_model[index_base][:,1]
-	candidate_catalog_optimized['proba'] = predictions_optimized_model[index_optimized][:,1]
 
 The base and optimized candidate catalogs generated above do not include the 866 DIFFUSE training objects as these were deliberately removed from the source catalog. The randomly selected objects that composed our OTHER class are indeed included in the catalog, however, as they were used for training purposes these were not fairly assessed as their presence as an OTHER object skews their probability predictions. For this reason, we perform a Leave-out-Out (LoO) cross-validation analysis, one assessing the DIFFUSE objects so as to extract an informed probability prediction threshold and select priority objects, and another assessing the OTHER objects in our training set so as to include those that would have been predicted as DIFFUSE had they not been present in the training set. These two LoO routines are executed below:
-
-.. code-block:: python
-
-	# Generate the data for the histograms in Figure 5 #
-
-	# Remove one OTHER object as the DIFFUSE will be cross-validated using LoO
-	other_training = df_filtered[df_filtered.flag == 0].iloc[1:]
-	diffuse_training =  df_filtered[df_filtered.flag == 1]
-
-	# The probas of the five confirmed blobs will be saved according to their published names
-	LABd05, PRG1, PRG2, PRG3, PRG4 = [],[],[],[],[]
-
-	# To store the probas of all the other DIFFUSE objects as well as their catalog names
-	all_diffuse_base_probas, all_diffuse_optimized_probas, names = [],[],[]
-
-	#Leave-one-Out cross-validating the DIFFUSE class
-	for i in range(len(diffuse_training)):
-		# This will be the individual DIFFUSE sample to assess
-		leave_one = np.array(diffuse_training[columns].iloc[i])
-		# Removing this validation sample from the overall DIFFUSE training bag
-		remaining = np.delete(np.array(diffuse_training[columns]), i, axis=0)
-		# Setting the new training data, flag of 1 corresponds to DIFFUSE, 0 is OTHER
-		data_x = np.r_[remaining, np.array(other_training[columns])]
-		data_y = np.r_[[1]*len(remaining), [0]*len(other_training)]
-		# Training the new base model
-		new_base_model = base_model.model.fit(data_x, data_y)
-		# Training the new optimized model, note that the optimized feats to use is invoked
-		new_optimized_model = optimized_model.model.fit(data_x[:,optimized_model.feats_to_use], data_y)
-		# Assess the left-out DIFFUSE sample using both the base and optimized models
-		proba_base = new_base_model.predict_proba(leave_one.reshape(1,-1))
-		proba_optimized = new_optimized_model.predict_proba(leave_one[optimized_model.feats_to_use].reshape(1,-1))
-		# Save only the probability prediction that the object is DIFFUSE
-		if diffuse_training.obj_name.iloc[i] == 'NDWFS_J143410.9+331730':
-			LABd05.append(float(proba_base[:,1])); LABd05.append(float(proba_optimized[:,1]))
-		elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J143512.2+351108': 
-			PRG1.append(float(proba_base[:,1])); PRG1.append(float(proba_optimized[:,1]))
-		elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J142623.0+351422':
-			PRG2.append(float(proba_base[:,1])); PRG2.append(float(proba_optimized[:,1]))
-		elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J143412.7+332939':
-			PRG3.append(float(proba_base[:,1])); PRG3.append(float(proba_optimized[:,1]))
-		elif diffuse_training.obj_name.iloc[i] == 'NDWFS_J142653.1+343856':
-			PRG4.append(float(proba_base[:,1])); PRG4.append(float(proba_optimized[:,1]))
-		else:
-			all_diffuse_base_probas.append(float(proba_base[:,1]))
-			all_diffuse_optimized_probas.append(float(proba_optimized[:,1]))
-			names.append(diffuse_training.obj_name.iloc[i])
-
-	# The first index is the base model probability predictions, the second is the optimized model's
-	five_diffuse_base_probas = np.c_[LABd05[0], PRG1[0], PRG2[0], PRG3[0], PRG4[0]][0]
-	five_diffuse_optimized_probas = np.c_[LABd05[1], PRG1[1], PRG2[1], PRG3[1], PRG4[1]][0]
-	five_names = ['LABd05', 'PRG1', 'PRG2', 'PRG3', 'PRG4']
-
-	# Save the base and optimized probabilities
-	np.savetxt('LoO_Confirmed_DIFFUSE_xgb', np.c_[five_names, five_diffuse_base_probas, five_diffuse_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')
-	np.savetxt('LoO_DIFFUSE_xgb', np.c_[names, all_diffuse_base_probas, all_diffuse_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')
-
-	# Repeat the same LoO process but evaluate the OTHER training for fair assessment of these objects
-	# Positive detections from this LoO will be added to the candidates catalog that was created above
-
-	# Remove one DIFFUSE object as this time the OTHER class will be cross-validated using LoO
-	other_training = df_filtered[df_filtered.flag == 0]
-	diffuse_training =  df_filtered[df_filtered.flag == 1].iloc[1:]
-
-	# To store the probas of all DIFFUSE objects as well as their catalog names
-	other_base_probas, other_optimized_probas, names = [],[],[]
-
-	#Leave-one-Out cross-validating the OTHER class
-	for i in range(len(other_training)):
-		print(i)
-		# This will be the individual OTHER sample to assess
-		leave_one = np.array(other_training[columns].iloc[i])
-		# Removing this validation sample from the overall OTHER training bag
-		remaining = np.delete(np.array(other_training[columns]), i, axis=0)
-		# Setting the new training data
-		data_x = np.r_[remaining, np.array(diffuse_training[columns])]
-		data_y = np.r_[[0]*len(remaining), [1]*len(diffuse_training)]
-		# Training the new base model
-		new_base_model = base_model.model.fit(data_x, data_y)
-		# Training the new optimized model
-		new_optimized_model = optimized_model.model.fit(data_x[:,optimized_model.feats_to_use], data_y)
-		# Assess the left-out OTHER sample using the base and optimized model
-		proba_base = new_base_model.predict_proba(leave_one.reshape(1,-1))
-		proba_optimized = new_optimized_model.predict_proba(leave_one[optimized_model.feats_to_use].reshape(1,-1))
-		# Save only the probability prediction that the object is DIFFUSE
-		other_base_probas.append(float(proba_base[:,1]))
-		other_optimized_probas.append(float(proba_optimized[:,1]))
-		names.append(other_training.obj_name.iloc[i])
-
-	# Save the base and optimized probabilities
-	np.savetxt('LoO_OTHER_xgb', np.c_[names, other_base_probas, other_optimized_probas], header="Names, Base_Model, Optimized_Model", fmt='%s')
 
 The three LoO analysis files are available here: 
 
@@ -573,9 +803,218 @@ The three LoO analysis files are available here:
 
 As stated above, the OTHER objects in our training set were omitted from the candidate catalogs, but after analyzing these objects using LoO, we can now determine which one of these sources should be included in the candidate catalog:
 
+
+These two candidate catalogs are available for download:
+
+- `candidate_catalog_base_xgb <https://drive.google.com/file/d/1IYbSql6xiTB-hGaM_bLp_ygCIKSyfOb_/view?usp=sharing>`_
+- `candidate_catalog_optimized_xgb <https://drive.google.com/file/d/13r0Qq7r4stemAtffEiEX8w-kQI_RjOKY/view?usp=sharing>`_
+
 .. code-block:: python
 
-	# Find these OTHER objects that were classified as DIFFUSE (probas greater than or equal to 50%)
+	import numpy as np
+	import pandas as pd
+	from pyBIA import ensemble_model, data_processing
+
+	# Load all 2 million catalog objects and create a sub-catalog of LAB candidates #
+	# LoO Analysis is performed on the training data in order to determine which of these sources would be considered new candidates
+
+	# First load the training data
+	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
+	df = pd.read_csv('/Users/daniel/Desktop/pyBIA_PLOTS/nsigs/_Bw_training_set_nsig_'+str(sig))                                                                                                                                                                                                                         
+
+	# Log-transform the Hu moments
+	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
+
+	# Omit any non-detections (nan mags (~10%) and nan Hu moments (~0.02%))
+	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']) & np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
+
+	# Balance both classes to be of same size
+	blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
+	other_index = np.where(df['flag'].iloc[mask] == 0)[0]
+	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
+
+	#These are the features to use, note that the catalog includes more than this!
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
+
+	# Training data arrays
+	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
+
+	clf = 'xgb' # The classification model 
+	impute = False # Will not impute NaN values, as they should not be present after masking non-detections
+
+	# This is the base model, no hyperparameter optimization, uses all the features
+	base_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	base_model.create()
+
+	# These are the optimized models
+	xgboost_8_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	xgboost_8_model.load('/Users/daniel/Desktop/pyBIA_PLOTS/ensemble_model_xgb_boruta_xgb')
+
+	xgboost_45_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	xgboost_45_model.load('/Users/daniel/Desktop/pyBIA_PLOTS/ensemble_model_xgb_boruta_rf')
+
+	# Load the catalog containing all 2 million other objects, extracted using sig=0.32
+	other_all = pd.read_csv('/Users/daniel/Desktop/pyBIA_PLOTS/Other_Catalog_Master_0.32')
+
+	# Remove the 859 OTHER objects that are present in the training set, we will assess these individually using LoO
+	other_all = other_all[~other_all['obj_name'].isin(df_filtered['obj_name'])]
+
+	# Log transform the Hu moments
+	other_all[hu_cols] = other_all[hu_cols].apply(data_processing.signed_log_transform)
+
+	# Omit non-detections
+	mask = np.where((other_all['area'] != -999) & np.isfinite(other_all['mag']) & np.all(np.isfinite(other_all[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
+
+	other_all = other_all.iloc[mask]
+
+	# Create the data_x array
+	other_data_x = np.array(other_all[columns])
+
+	# Predict all samples to create a candidates catalog
+	predictions_base_model = base_model.predict(other_data_x)
+	predictions_xgboost_8 = xgboost_8_model.predict(other_data_x)
+	predictions_xgboost_45 = xgboost_45_model.predict(other_data_x)
+
+	# Select LAB detections (flag = 1)
+	index_base = np.where(predictions_base_model[:,0] == 1)[0]
+	index_xgboost_8 = np.where(predictions_xgboost_8[:,0] == 1)[0]
+	index_xgboost_45 = np.where(predictions_xgboost_45[:,0] == 1)[0]
+
+	# Index the catalog to select only the positive detections
+	candidate_catalog_base = other_all.iloc[index_base]
+	candidate_catalog_xgboost_8 = other_all.iloc[index_xgboost_8]
+	candidate_catalog_xgboost_45 = other_all.iloc[index_xgboost_45]
+
+	# Save the probability predictions as a new columns
+	candidate_catalog_base['proba'] = predictions_base_model[index_base][:,1]
+	candidate_catalog_xgboost_8['proba'] = predictions_xgboost_8[index_xgboost_8][:,1]
+	candidate_catalog_xgboost_45['proba'] = predictions_xgboost_45[index_xgboost_45][:,1]
+
+	# Leave-one-Out Cross validation #
+
+	# Remove one OTHER object as the LAB will be cross-validated using LoO
+	other_training = df_filtered[df_filtered.flag == 0].iloc[1:]
+	LAB_training =  df_filtered[df_filtered.flag == 1]
+
+	# The probas of the five confirmed blobs will be saved according to their published names
+	LABd05, PRG1, PRG2, PRG3, PRG4 = [],[],[],[],[]
+
+	# To store the probas of all the other LAB objects as well as their catalog names
+	all_LAB_base_probas, all_LAB_xboost_8_probas, all_LAB_xboost_45_probas, names = [],[],[],[]
+
+	#Leave-one-Out cross-validating the LAB class
+	for i in range(len(LAB_training)):
+		print(f"{i+1} of {len(LAB_training)}")
+		#
+		# This will be the individual LAB sample to assess
+		leave_one = np.array(LAB_training[columns].iloc[i])
+		#
+		# Removing this validation sample from the overall LAB training bag
+		remaining = np.delete(np.array(LAB_training[columns]), i, axis=0)
+		#
+		# Setting the new training data, flag of 1 corresponds to LAB, 0 is OTHER
+		data_x = np.r_[remaining, np.array(other_training[columns])]
+		data_y = np.r_[[1]*len(remaining), [0]*len(other_training)]
+		#
+		# Training the new base model
+		new_base_model = base_model.model.fit(data_x, data_y)
+		#
+		# Training the new optimized models, note that the feats_to_use attribute from the feat selection is invoked
+		new_xgboost_8_model = xgboost_8_model.model.fit(data_x[:,xgboost_8_model.feats_to_use], data_y)
+		new_xgboost_45_model = xgboost_45_model.model.fit(data_x[:,xgboost_45_model.feats_to_use], data_y)
+		#
+		# Assess the left-out LAB sample using both the base and optimized models
+		proba_base = new_base_model.predict_proba(leave_one.reshape(1,-1))
+		proba_new_xgboost_8 = new_xgboost_8_model.predict_proba(leave_one[xgboost_8_model.feats_to_use].reshape(1,-1))
+		proba_new_xgboost_45 = new_xgboost_45_model.predict_proba(leave_one[xgboost_45_model.feats_to_use].reshape(1,-1))
+		
+		# Save only the probability prediction that the object is LAB
+		if LAB_training.obj_name.iloc[i] == 'NDWFS_J143410.9+331730':
+			LABd05.append(float(proba_base[:,1])); LABd05.append(float(proba_new_xgboost_8[:,1])); LABd05.append(float(proba_new_xgboost_45[:,1]))
+		elif LAB_training.obj_name.iloc[i] == 'NDWFS_J143512.2+351108': 
+			PRG1.append(float(proba_base[:,1])); PRG1.append(float(proba_new_xgboost_8[:,1])); PRG1.append(float(proba_new_xgboost_45[:,1]))
+		elif LAB_training.obj_name.iloc[i] == 'NDWFS_J142623.0+351422':
+			PRG2.append(float(proba_base[:,1])); PRG2.append(float(proba_new_xgboost_8[:,1])); PRG2.append(float(proba_new_xgboost_45[:,1]))
+		elif LAB_training.obj_name.iloc[i] == 'NDWFS_J143412.7+332939':
+			PRG3.append(float(proba_base[:,1])); PRG3.append(float(proba_new_xgboost_8[:,1])); PRG3.append(float(proba_new_xgboost_45[:,1]))
+		elif LAB_training.obj_name.iloc[i] == 'NDWFS_J142653.1+343856':
+			PRG4.append(float(proba_base[:,1])); PRG4.append(float(proba_new_xgboost_8[:,1])); PRG4.append(float(proba_new_xgboost_45[:,1]))
+		else:
+			all_LAB_base_probas.append(float(proba_base[:,1]))
+			all_LAB_xboost_8_probas.append(float(proba_new_xgboost_8[:,1]))
+			all_LAB_xboost_45_probas.append(float(proba_new_xgboost_45[:,1]))
+			names.append(LAB_training.obj_name.iloc[i])
+
+	# The first index is the base model probability predictions, the second is the optimized model's
+	five_names = ['LABd05', 'PRG1', 'PRG2', 'PRG3', 'PRG4']
+	five_LAB_base_probas = np.c_[LABd05[0], PRG1[0], PRG2[0], PRG3[0], PRG4[0]][0]
+	five_LAB_xgboost_8_probas = np.c_[LABd05[1], PRG1[1], PRG2[1], PRG3[1], PRG4[1]][0]
+	five_LAB_xgboost_45_probas = np.c_[LABd05[2], PRG1[2], PRG2[2], PRG3[2], PRG4[2]][0]
+
+	# Save the base and optimized probabilities
+	np.savetxt('/Users/daniel/Desktop/pyBIA_PLOTS/LoO_Confirmed_LAB', np.c_[five_names, five_LAB_base_probas, five_LAB_xgboost_8_probas, five_LAB_xgboost_45_probas], header="Names, Base_Model, xgboost_8_Model, xgboost_45_Model", fmt='%s')
+	np.savetxt('/Users/daniel/Desktop/pyBIA_PLOTS/LoO_LAB', np.c_[names, all_LAB_base_probas, all_LAB_xboost_8_probas, all_LAB_xboost_45_probas], header="Names, Base_Model, xgboost_8_Model, xgboost_45_Model", fmt='%s')
+
+	#
+	# Repeat the same LoO process but evaluate the OTHER training for fair assessment of these objects
+	# Positive detections from this LoO will be added to the candidates catalog that was created above
+	#
+
+	# Remove one LAB object as this time the OTHER class will be cross-validated using LoO
+	other_training = df_filtered[df_filtered.flag == 0]
+	LAB_training =  df_filtered[df_filtered.flag == 1].iloc[1:]
+
+	# To store the probas of all LAB objects as well as their catalog names
+	other_base_probas, other_xgboost_8_probas, other_xgboost_45_probas, names = [],[],[],[]
+
+	#Leave-one-Out cross-validating the OTHER class
+	for i in range(len(other_training)):
+		print(f"{i+1} of {len(other_training)}")
+		#
+		# This will be the individual OTHER sample to assess
+		leave_one = np.array(other_training[columns].iloc[i])
+		#
+		# Removing this validation sample from the overall OTHER training bag
+		remaining = np.delete(np.array(other_training[columns]), i, axis=0)
+		#
+		# Setting the new training data
+		data_x = np.r_[remaining, np.array(LAB_training[columns])]
+		data_y = np.r_[[0]*len(remaining), [1]*len(LAB_training)]
+		#
+		# Training the new base model
+		new_base_model = base_model.model.fit(data_x, data_y)
+		#
+		# Training the new optimized models
+		new_xgboost_8_model = xgboost_8_model.model.fit(data_x[:,xgboost_8_model.feats_to_use], data_y)
+		new_xgboost_45_model = xgboost_45_model.model.fit(data_x[:,xgboost_45_model.feats_to_use], data_y)
+		#
+		# Assess the left-out OTHER sample using the base and optimized model
+		proba_base = new_base_model.predict_proba(leave_one.reshape(1,-1))
+		proba_new_xgboost_8 = new_xgboost_8_model.predict_proba(leave_one[xgboost_8_model.feats_to_use].reshape(1,-1))
+		proba_new_xgboost_45 = new_xgboost_45_model.predict_proba(leave_one[xgboost_45_model.feats_to_use].reshape(1,-1))
+		#
+		# Save only the probability prediction that the object is LAB
+		other_base_probas.append(float(proba_base[:,1]))
+		other_xgboost_8_probas.append(float(proba_new_xgboost_8[:,1]))
+		other_xgboost_45_probas.append(float(proba_new_xgboost_45[:,1]))
+		names.append(other_training.obj_name.iloc[i])
+
+	# Save the base and optimized probabilities
+	np.savetxt('/Users/daniel/Desktop/pyBIA_PLOTS/LoO_OTHER', np.c_[names, other_base_probas, other_xgboost_8_probas, other_xgboost_45_probas], header="Names, Base_Model, xgboost_8_Model, xgboost_45_Model", fmt='%s')
+
+	# Find these OTHER objects that were classified as LAB (probas greater than or equal to 50%)
 	indices = []
 
 	# Identify these positive detections
@@ -586,28 +1025,38 @@ As stated above, the OTHER objects in our training set were omitted from the can
 	# Add to the master base candidate catalog
 	df_filtered_base = other_training.iloc[indices]
 	df_filtered_base['proba'] = np.array(other_base_probas)[index]
-	candidate_catalog_base = pandas.concat([candidate_catalog_base, df_filtered_base], ignore_index=True)
+	candidate_catalog_base = pd.concat([candidate_catalog_base, df_filtered_base], ignore_index=True)
 
-	# Now do the same for the optimized catalog
+	# Now do the same for the optimized catalog (XGBoost-8)
 	indices = []
 
-	index = np.where(np.array(other_optimized_probas) >= 0.5)[0]
+	index = np.where(np.array(other_xgboost_8_probas) >= 0.5)[0]
 	for name in np.array(names)[index]:
 		indices.append(np.where(other_training.obj_name == name)[0][0])
 
 	# Add to the master optimized candidate catalog
-	df_filtered_optimized = other_training.iloc[indices]
-	df_filtered_optimized['proba'] = np.array(other_optimized_probas)[index]
-	candidate_catalog_optimized = pandas.concat([candidate_catalog_optimized, df_filtered_optimized], ignore_index=True)
+	df_filtered_xgboost_8 = other_training.iloc[indices]
+	df_filtered_xgboost_8['proba'] = np.array(other_xgboost_8_probas)[index]
+	candidate_catalog_xgboost_8 = pd.concat([candidate_catalog_xgboost_8, df_filtered_xgboost_8], ignore_index=True)
 
-	# Save candidate catalogs
-	candidate_catalog_base.to_csv('candidate_catalog_base_xgb.csv')
-	candidate_catalog_optimized.to_csv('candidate_catalog_optimized_xgb.csv')
+	# Now do the same for the optimized catalog (XGBoost-45)
+	indices = []
 
-These two candidate catalogs are available for download:
+	index = np.where(np.array(other_xgboost_45_probas) >= 0.5)[0]
+	for name in np.array(names)[index]:
+		indices.append(np.where(other_training.obj_name == name)[0][0])
 
-- `candidate_catalog_base_xgb <https://drive.google.com/file/d/1IYbSql6xiTB-hGaM_bLp_ygCIKSyfOb_/view?usp=sharing>`_
-- `candidate_catalog_optimized_xgb <https://drive.google.com/file/d/13r0Qq7r4stemAtffEiEX8w-kQI_RjOKY/view?usp=sharing>`_
+	# Add to the master optimized candidate catalog
+	df_filtered_xgboost_45 = other_training.iloc[indices]
+	df_filtered_xgboost_45['proba'] = np.array(other_xgboost_45_probas)[index]
+	candidate_catalog_xgboost_45 = pd.concat([candidate_catalog_xgboost_45, df_filtered_xgboost_45], ignore_index=True)
+
+	# Save LAB candidate catalogs
+	candidate_catalog_base.to_csv('/Users/daniel/Desktop/pyBIA_PLOTS/candidate_catalog_base.csv')
+	candidate_catalog_xgboost_8.to_csv('/Users/daniel/Desktop/pyBIA_PLOTS/candidate_catalog_optimized_xgboost_8.csv')
+	candidate_catalog_xgboost_45.to_csv('/Users/daniel/Desktop/pyBIA_PLOTS/candidate_catalog_optimized_xgboost_45.csv')
+
+
 
 We can now perform a probability prediction analysis, first with the baseline model (all features, not hyperparameter optimization):
 

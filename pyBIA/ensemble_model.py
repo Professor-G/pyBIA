@@ -664,7 +664,7 @@ class Classifier:
         normalize=True, 
         title='Confusion Matrix', 
         savefig=False
-        ):
+    ):
         """
         Plots a confusion matrix under k-fold cross-validation.
 
@@ -689,55 +689,81 @@ class Classifier:
         Returns
         -------
         AxesImage
-
-        Raises
-        ------
-        ValueError
-            If input data/labels are missing or if the model has not been created.
         """
 
         if self.data_x is None or self.data_y is None:
             raise ValueError('The data_x and data_y have not been input!')
-
         if self.model is None:
             raise ValueError('No model has been created! Run .create() first.')
 
-        if data_y is not None:
-            classes = [str(label) for label in np.unique(data_y)]
-        else:
-            if self.data_y_ is None:
-                if self.csv_file is None:
-                    classes = [str(label) for label in np.unique(self.data_y)]
+        # To derive class names in the SAME order as numeric codes used during training
+        def _classes_from_aligned_text(code_order, y_num, y_txt):
+            y_num = np.asarray(y_num, dtype=int)
+            y_txt = np.asarray(y_txt)
+            names = []
+            for c in code_order:
+                mask = (y_num == int(c))
+                if mask.any():
+                    vals, cnts = np.unique(y_txt[mask], return_counts=True)
+                    names.append(str(vals[np.argmax(cnts)]))
                 else:
-                    classes = [str(label) for label in np.unique(np.array(self.csv_file.label))]
-            else:
-                classes = [str(label) for label in np.unique(self.data_y_)]
+                    names.append(str(int(c)))  # fallback
+            return names
+
+        # Now choose the per-sample TEXT labels aligned to self.data_y 
+        data_y_text = None
+        if data_y is not None and len(data_y) == len(self.data_y):
+            data_y_text = data_y
+        elif getattr(self, "data_y_", None) is not None and len(self.data_y_) == len(self.data_y):
+            data_y_text = self.data_y_
+        elif getattr(self, "csv_file", None) is not None:
+            try:
+                lbls = np.array(self.csv_file.label)
+                if len(lbls) == len(self.data_y):
+                    data_y_text = lbls
+            except Exception:
+                pass
 
         if self.feats_to_use is not None:
             if len(self.data_x.shape) == 1:
-                data = self.data_x[self.feats_to_use].reshape(1,-1)
+                data = self.data_x[self.feats_to_use].reshape(1, -1)
             else:
-                data = self.data_x[:,self.feats_to_use]
+                data = self.data_x[:, self.feats_to_use]
         else:
             data = copy.deepcopy(self.data_x)
 
         if np.any(np.isnan(data)):
-            data = impute_missing_values(data, self.imputer) if self.imputer is not None else impute_missing_values(data, strategy=self.imp_method)[0]
-          
-        #data[data>1e7], data[(data<1e-7)&(data>0)], data[data<-1e7] = 1e7, 1e-7, -1e7
+            data = (impute_missing_values(data, self.imputer) if self.imputer is not None
+                    else impute_missing_values(data, strategy=self.imp_method)[0])
 
         if norm:
-            scaler = MinMaxScaler()
-            scaler.fit_transform(data)
+            data = MinMaxScaler().fit_transform(data)
 
         if pca:
             pca_transformation = decomposition.PCA(n_components=data.shape[1], whiten=True, svd_solver='auto')
-            pca_transformation.fit(data) 
-            pca_data = pca_transformation.transform(data)
-            data = np.asarray(pca_data).astype('float64')
+            pca_transformation.fit(data)
+            data = np.asarray(pca_transformation.transform(data)).astype('float64')
 
-        predicted_target, actual_target = evaluate_model(self.model, data, self.data_y, normalize=normalize, k_fold=k_fold, random_state=self.SEED_NO)
-        generate_matrix(predicted_target, actual_target, normalize=normalize, classes=classes, title=title, savefig=savefig)
+        predicted_target, actual_target = evaluate_model(
+            self.model, data, self.data_y, normalize=normalize, k_fold=k_fold, random_state=self.SEED_NO
+        )
+        actual_target = np.asarray(actual_target, dtype=int)
+
+        code_order = np.sort(np.unique(actual_target))
+
+        if data_y_text is not None:
+            classes = _classes_from_aligned_text(code_order, self.data_y, data_y_text)
+        else:
+            classes = [str(int(c)) for c in code_order]
+
+        return generate_matrix(
+            predicted_target,
+            actual_target,
+            normalize=normalize,
+            classes=classes,
+            title=title,
+            savefig=savefig
+        )
 
     def plot_roc_curve(
         self, 

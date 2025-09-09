@@ -4197,23 +4197,6 @@ def format_labels(labels: list) -> list:
     This function applies a set of explicit replacements; if no rule matches,
     the label is converted by replacing underscores with spaces and applying
     title case.
-
-    Explicit replacements:
-      - 'lr'               → 'Learning Rate'
-      - 'max_pixel_1'      → r"$B_W$ Max Pixel"
-      - 'max_pixel_2'      → r"$R$ Max Pixel"
-      - 'max_pixel_3'      → r"$B_W \ / \ R$ Max Pixel"
-      - 'num_aug'          → 'No. of Augmentations'
-      - 'activation_conv'  → 'Conv2D Activation'
-      - 'activation_dense' → 'FC Activation'
-      - 'loss'             → 'Loss Function'
-      - 'dense_init'       → 'FC Init.'
-      - 'conv_init'        → 'Conv2D Init.'
-      - 'beta_1'           → r"$\\beta_1"
-      - 'beta_2'           → r"$\\beta_2"
-      - 'amsgrad'          → 'AMSGrad'
-      - 'optimizer'        → 'Optimizer'
-      - 'model_reg'        → 'Regularizer'
     """
     new_labels = []
     for label in labels:

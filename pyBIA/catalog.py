@@ -1047,7 +1047,7 @@ def get_segmentation(
     labels_in_mask = np.unique(segm.data[mask])
     labels_in_mask = labels_in_mask[labels_in_mask != 0]   # drop background
 
-    # map seg labels -> SourceCatalog indices safely
+    # map seg labels
     label_to_idx = {int(lbl): int(i) for i, lbl in enumerate(np.asarray(catalog.label))}
     idxs = [label_to_idx[int(lab)] for lab in labels_in_mask if int(lab) in label_to_idx]
     if not idxs:

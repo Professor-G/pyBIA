@@ -1044,9 +1044,19 @@ def get_segmentation(
         warn("No segment in central mask – returning zeros.", RuntimeWarning)
         return np.zeros((h, w))
 
-    # choose the object whose centroid is closest to center (from ALL segments),
-    separations = [np.hypot(float(p.centroid[0]) - cx, float(p.centroid[1]) - cy) for p in catalog]
-    best_idx = int(np.argmin(separations))
+    labels_in_mask = np.unique(segm.data[mask])
+    labels_in_mask = labels_in_mask[labels_in_mask != 0]   # drop background
+
+    # map seg labels -> SourceCatalog indices safely
+    label_to_idx = {int(lbl): int(i) for i, lbl in enumerate(np.asarray(catalog.label))}
+    idxs = [label_to_idx[int(lab)] for lab in labels_in_mask if int(lab) in label_to_idx]
+    if not idxs:
+        warn("No intersecting label found in catalog – returning zeros.", RuntimeWarning)
+        return np.zeros((h, w))
+
+    # pick the intersecting object whose centroid is closest to center
+    dists = [np.hypot(float(catalog[i].centroid[0]) - cx, float(catalog[i].centroid[1]) - cy) for i in idxs]
+    best_idx = idxs[int(np.argmin(dists))]
     best_label = catalog[best_idx].label
 
     # keep only the selected label
@@ -1054,6 +1064,7 @@ def get_segmentation(
     seg[seg != best_label] = 0
 
     return seg
+
 
 def compute_layered_segmentation(
     image,

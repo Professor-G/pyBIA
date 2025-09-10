@@ -8,7 +8,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="pyBIA",
-    version="1.5",
+    version="1.51",
     author="Daniel Godines",
     author_email="danielgodinez123@gmail.com",
     description="Machine learning-based framework for Lyalpha Blob Detection",

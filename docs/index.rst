@@ -17,10 +17,10 @@ Functionality
 ==================
 The program provides four core modules:
 
--  `**Catalog Generation** <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ --- Creating a morphological catalog of astrophysical objects
--  `**Supervised Learning** <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html>`_ --- Training a supervised machine learning classifier
--  `**Anomaly Detection** <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/outlier_detection/index.html>`_ --- Training an unsupervised machine learning model for anomaly detection and outlier removal
--  `**Deep Learning Classification** <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/cnn_model/index.html>`_ --- Training a convolutional neural network classifier on single or multi-band imaging (up to 3 channels)
+-  `Catalog Generation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ --- Creating a morphological catalog of astrophysical objects
+-  `Supervised Learning <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html>`_ --- Training a supervised machine learning classifier
+-  `Anomaly Detection <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/outlier_detection/index.html>`_ --- Training an unsupervised machine learning model for anomaly detection and outlier removal
+-  `Deep Learning Classification <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/cnn_model/index.html>`_ --- Training a convolutional neural network classifier on single or multi-band imaging (up to 3 channels)
 
 Installation
 ==================

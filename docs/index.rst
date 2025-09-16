@@ -6,6 +6,10 @@
 Welcome to pyBIA's documentation!
 ===============================
 
+.. admonition:: Under Construction (last updated 2025-09-16)
+
+   This documentation is still being written and may change frequently!
+
 pyBIA is an open-source program for detecting diffuse Lyman-alpha emission in the high redshift universe, using a combination of machine learning tree-ensemble and convolutional neural network algorithms. Although developed as a tool for astronomers, the program has been coded for general application. This documentation explains how you can use pyBIA to build and train your own machine-learning classifiers.
 
 

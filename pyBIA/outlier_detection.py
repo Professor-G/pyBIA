@@ -296,11 +296,8 @@ class Classifier:
 
         Returns
         -------
-        out : ndarray, shape (N, 3)
-            Columns are:
-              - `predictions`          : int, 1 for inlier, -1 for outlier
-              - `decision_function`    : float, signed anomaly score (higher is more inlier)
-              - `raw_anomaly_scores`   : float, `decision_function + self.model.offset_`
+        ndarray of shape (N, 3)
+            Array with predicted labels, decision function scores, and raw anomaly scores for each sample.
 
         Raises
         ------
@@ -456,12 +453,10 @@ def wavelet_energy_feature_extraction(
     """
     Compute per-subband wavelet energies per channel and concatenate.
 
-    For each image channel, a 2D decimated DWT (`pywt.wavedec2`) is computed up to
-    level `L`. The feature vector per channel is the energy of the approximation
-    band at level `L` followed by the energies of the detail bands (H, V, D) for
-    levels `L..1`: `[A_L, (H,V,D)_L, …, (H,V,D)_1]`. With an orthogonal wavelet
-    (e.g., 'db4') and symmetric extension, these energies correspond to L2 power
-    per subband. Per-image features are formed by concatenating all channel vectors.
+    For each image channel, perform a 2D decimated DWT (``pywt.wavedec2``) to level
+    ``L`` and record the energy of the approximation band at level ``L`` and the
+    detail bands (H, V, D) for level ``L`` down to level 1. Channel vectors are concatenated
+    to form per-image features.
 
     Parameters
     ----------
@@ -469,7 +464,7 @@ def wavelet_energy_feature_extraction(
         Iterable of images with shape `(H, W, C)` **or** an array with shape
         `(N, H, W, C)`. Iteration is over the first dimension.
     wavelet : str, optional
-        Wavelet name for PyWavelets (e.g., 'db4'). Default is 'db4'.
+        Wavelet name for PyWavelets. Default is 'db4'.
     level : int or None, optional
         Decomposition level `L`. If None, uses the maximum level allowed by the
         image size and wavelet filter length. Default is None.
@@ -685,11 +680,9 @@ def fft_energy_feature_extraction(
     """
     Compute 2D FFT radial-band energies per channel and concatenate.
 
-    For each image/channel, the 2D power spectrum is computed and integrated over
-    Nyquist-normalized radial annuli defined by `band_edges` (0 → DC, 1 → per-axis
-    Nyquist = 0.5 cyc/pixel). Optionally apply a separable Hann window to reduce
-    spectral leakage, remove the DC component, and normalize band energies to sum
-    to one per channel.
+    For each image channel, compute standard LBP codes using ``P`` sampling points 
+    on a circle of radius ``R``. Then we build a histogram with ``2**P`` bins,
+    normalized to unit sum. Then concatenate the channel histograms to form one feature vector per image.
 
     Parameters
     ----------

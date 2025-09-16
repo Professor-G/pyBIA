@@ -1,4 +1,4 @@
-.. _figures:
+.. _godines_et_al:
 
 Godines et al. 2025
 ===========

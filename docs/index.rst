@@ -39,6 +39,8 @@ You can also clone the development version:
     cd pyBIA
     pip install .
 
+**NOTE:** The program requires Python3.12+.
+
 To learn more about pyBIA's machine learning routines, consult the pages listed below. These pages provide high-level technical details on the program’s core functionality, as well as a dedicated section describing how Godines et al. (2025) was produced, including figure-by-figure generation details.
 
 Pages

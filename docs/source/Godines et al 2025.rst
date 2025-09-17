@@ -390,6 +390,10 @@ We can now plot the non-detections and performance as a function of detection th
     :width: 600px
 |
 
+
+Baseline XGBoost Model
+-----------
+
 We now re-train the optimal model (XGBoost) and the optimal detection threshold of 0.32 to plot the corresponding confusion matrix.
 
 .. code-block:: python
@@ -459,7 +463,7 @@ We now re-train the optimal model (XGBoost) and the optimal detection threshold 
     :width: 600px
 |
 
-Optimize XGBoost Model
+Optimized XGBoost Models
 -----------
 
 We now proceed with the generated training set at the optimal detection threshold. As the above analysis trained base models, at this step we invoke our optimization routine to select the optimal features to use as well as the best hyperparameters for our XGBoost engine. Note that in the below code, two distinct models are optimized, one using the `boruta_model`='rf' option and another with the 'xgb' option (more conservative feature selection).

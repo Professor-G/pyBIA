@@ -10,11 +10,11 @@ Godines et al. 2025
 Image Segmentation
 -----------
 
-The multi-band data (Bw and R) for the five broadband-selected Lyman-alpha blobs (LABs) from `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_ can be :download:`downloaded here. <confirmed_LAB.npy>`
+The multi-band data (Bw and R) for the five broadband-selected Lyman-alpha blobs (LABs) from `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_ can be :download:`downloaded here <confirmed_LAB.npy>`.
 
-The corresponding names for these five objects (as cataloged in the NDWFS Bootes Survey) can be :download:`downloaded here. <confirmed_LAB_names.txt>`
+The corresponding names for these five objects (as cataloged in the NDWFS Bootes Survey) can be :download:`downloaded here <confirmed_LAB_names.txt>`.
 
-To visualize the affect the sigma detection threshold has on the image segmentation object, we can use the `plot_objects_segmentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_objects_segmentation>`_ function available in the catalog module.
+To visualize the affect the sigma detection threshold has on the image segmentation object, we can use the `plot_objects_segmentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_objects_segmentation>`_ function available in the `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module.
 
 .. code-block:: python
 
@@ -106,11 +106,6 @@ The code below demonstrates how we conducted our detection threshold analysis. U
 	from astropy.io import fits 
 	from sklearn.model_selection import cross_validate
 	from pyBIA import catalog, ensemble_model
-	import scienceplots
-	import matplotlib.pyplot as plt
-	plt.style.use("science")
-	plt.rcParams.update({"font.size": 21,})
-	PLOTS_SCALE = 8
 
 	### Create the Data Files to Generate Figure 2 ###
 
@@ -220,7 +215,7 @@ The files generated above will be used to create baseline classifiers:
 	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
 	]
 
-	# To store the baseline performance as a function of sigma threshold for all classifiers
+	# To store the baseline performance as a function of sigma threshold for all classifiers, note that nn corresponds to MLP in the paper
 	classifiers = ['tree', 'rf', 'xgb', 'logreg', 'svc', 'nn']
 	all_metrics = {clf: {'nsig': [], 'accuracy': [], 'f1': [], 'precision': [], 'recall': [], 'roc_auc': []} for clf in classifiers}
 
@@ -232,7 +227,7 @@ The files generated above will be used to create baseline classifiers:
 	for sig in sigs:
 		print(sig)
 		# Load the corresponding nsig file
-		df = pd.read_csv(nsig_path+'_Bw_training_set_nsig_'+str(sig))
+		df = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
 
 		# Log-transform the Hu moments
 		hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
@@ -398,12 +393,13 @@ We can now plot the non-detections and performance as a function of detection th
 We now re-train the optimal model (XGBoost) and the optimal detection threshold of 0.32 to plot the corresponding confusion matrix.
 
 .. code-block:: python
+
 	import numpy as np
 	import pandas as pd
 	from pyBIA import ensemble_model, data_processing
 
 	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
-	df = pd.read_csv('nsigs/_Bw_training_set_nsig_'+str(sig))                                                                                                                                                                                                                         
+	df = pd.read_csv(f'nsigs/_Bw_training_set_nsig_{sig}')
 
 	# Log-transform the Hu moments
 	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
@@ -448,7 +444,8 @@ We now re-train the optimal model (XGBoost) and the optimal detection threshold 
 		impute=impute, 
 		optimize=optimize, 
 		opt_cv=opt_cv, 
-		SEED_NO=SEED_NO)
+		SEED_NO=SEED_NO
+		)
 
 	model.create()
 

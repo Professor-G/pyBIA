@@ -453,7 +453,7 @@ We now re-train the optimal model (XGBoost) and the optimal detection threshold 
 	data_y_labels = ['LAB' if i == 1 else 'OTHER' for i in data_y]
 	model.plot_conf_matrix(data_y=data_y_labels, title=r'XGBoost Model Performance ($\sigma_{\rm det} = 0.32$)', savefig=True)
 
-.. figure:: _static/Ensemble_Confusion_Matrix.png
+.. figure:: _static/Ensemble_Confusion_Matrix_base_xgboost.png
     :align: center
     :class: with-shadow with-border
     :width: 600px

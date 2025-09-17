@@ -22,13 +22,13 @@ To visualize the affect the sigma detection threshold has on the image segmentat
 	from pyBIA import catalog
 
 	# Load the five broadband-selected LABs from Prescott+12
-	five_confirmed = np.load('/Users/daniel/work/pyBIA/docs/source/confirmed_LAB.npy')
+	five_confirmed = np.load('confirmed_LAB.npy')
 
 	# These are the Bw images, second axis contains the R-band data
 	five_confirmed_bw = five_confirmed[:,:,:,0]
 
 	# The corresponding cataloged names
-	names = np.loadtxt('/Users/daniel/work/pyBIA/docs/source/confirmed_LAB_names.txt', dtype=str)
+	names = np.loadtxt('confirmed_LAB_names.txt', dtype=str)
 
 	# Index the images of each LAB according to its cataloged name
 	PRG1 = five_confirmed_bw[(names == 'NDWFS_J143512.2+351108')][0]
@@ -80,10 +80,11 @@ To visualize the affect the sigma detection threshold has on the image segmentat
 	    size=crop_size, 
 	    median_bkg=median_bkg, 
 	    savefig=savefig, 
-	    savepath='segm_example_LAB.png')
+	    savepath='segm_example_LAB.png'
+	    )
 
 
-.. figure:: _static/segm_multi.png
+.. figure:: _static/segm_example_LAB.png
     :align: center
 |
 |
@@ -94,7 +95,7 @@ Morphological Catalog
 
 To download the images used in this study please visit the `NoirLab <https://noirlab.edu/science/data-services/other/ndwfs>`_ website. We utilized the Bootes field data, from which there are 27 total subfields to download, in addition to the corresponding error maps. The data avaialable are in .fits format.
 
-The training set objects used in our study can be :download:`download here <training_set.csv>`. This dataframe contains catalog information on the 866 DIFFUSE candidates compiled by Prescott et al 2012, as well as 3200 randomly selected OTHER sources from the same dataset. 
+The training set objects used in our study can be :download:`downloaded here <training_set.csv>`. This dataframe contains catalog information on the 866 DIFFUSE candidates compiled by `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_, as well as 3200 randomly selected OTHER sources from the same dataset. 
 
 The code below demonstrates how we conducted our detection threshold analysis. Using the catalog information available in the provided training set, we extracted the morphological features using image segmentation at different thresholds, between 0.1 to 1.5 standard deviations above the background rms.
 
@@ -118,7 +119,7 @@ The code below demonstrates how we conducted our detection threshold analysis. U
 	data_error_path = 'NDWFS_Bootes/Error_Maps/Bw/'
 
 	#866 DIFFUSE candidates from Prescott et al. (2012) plus 3200 randomly selected OTHER objects
-	training_set = pd.read_csv('/Users/daniel/Desktop/pyBIA_PLOTS/training_set.csv')
+	training_set = pd.read_csv('training_set.csv')
 
 	# The training features will be computed using the following varying sigma thresholds
 	sigs = np.around(np.arange(0.1, 1.51, 0.01), decimals=2)
@@ -137,14 +138,18 @@ The code below demonstrates how we conducted our detection threshold analysis. U
 		print(sig)
 		frame = [] #To store all 27 subfields
 		for fieldname in np.unique(np.array(training_set['field_name'])):
+			
 			# Load the field data
 			data_hdu, error_map = fits.open(data_path+fieldname+'_Bw_03_fix.fits'), fits.getdata(data_error_path+fieldname+'_Bw_03_rms.fits.fz')
+			
 			# Extract the data and corresponding ZP
 			data_map, zeropoint, exptime = data_hdu[0].data, data_hdu[0].header['MAGZERO'], data_hdu[0].header['EXPTIME']
+			
 			# Select only the samples from this subfield
 			subfield_index = np.where(training_set['field_name']==fieldname)[0]
 			xpix, ypix = training_set[['xpix', 'ypix']].iloc[subfield_index].values.T
 			objname, field, flag = training_set[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
+			
 			# Create the catalog object
 			cat = catalog.Catalog(
 				data_map, 
@@ -162,16 +167,19 @@ The code below demonstrates how we conducted our detection threshold analysis. U
 				npixels=npixels, 
 				connectivity=connectivity, 
 				threshold=threshold, 
-				invert=invert)
+				invert=invert
+				)
+
 			# Generate the catalog and append the ``cat`` attribute to the frame list
 			cat.create(save_file=False)
 			frame.append(cat.cat)
+
 		# Combine all 27 sub-catalogs into one master frame and save
 		frame = pd.concat(frame, axis=0, join='inner')
-		frame.to_csv(nsig_path + '_Bw_training_set_nsig_' + str(sig) + '.csv', index=False)
+		frame.to_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}.csv', index=False)
 
 
-These 141 nsig files are available for :download:`download here. <nsigs.tar.xz>`.
+These 141 nsig files are available for `download here <https://drive.google.com/file/d/12tg-bsbAVTNUWdL3yGadehPZMKOp52UJ/view?usp=sharing>`_.
 
 
 Baseline Classification Models

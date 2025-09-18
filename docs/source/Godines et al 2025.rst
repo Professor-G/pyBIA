@@ -1096,7 +1096,7 @@ The three candidate catalogs are available for download:
 - `candidate_catalog_optimized_xgboost_45 <https://drive.google.com/file/d/17rYf_Mx-eFHWsHYtmeMUeh6wMZLRrd-P/view?usp=sharing>`_
 
 
-t-SNE Projections
+Probability-Scaled t-SNE Maps
 -----------
 
 With the LOO CV results we can generate t-SNE projections and scale the points by the probability prediction. 
@@ -1303,8 +1303,242 @@ Now we can plot the probability-scaled t-SNE projections.
 |
 
 
+Next we re-do the t-SNE projections but now scale the points by the feature values, looking at the top three features. Each projection is accompanied by the Gaussian kernel density estimate (KDE) of that feature for LAB and OTHER, normalized to unit height, to summarize the class-wise distributions.
+**NOTE:** This uses scienceplots for image formatting (available via pip).
+
+.. code-block:: python
+
+	import re
+	import numpy as np
+	import pandas as pd
+	from scipy.stats import gaussian_kde
+	import matplotlib as mpl
+	from matplotlib.lines import Line2D
+	import matplotlib.pyplot as plt
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size': 21})
+
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
+
+	# Load training data
+	sig = 0.32
+	df = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
+	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']) & np.isfinite(df['mag_err']))[0]
+	blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
+	other_index = np.where(df['flag'].iloc[mask] == 0)[0]
+	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
+
+	# Load t-SNE projection data
+	xgb_results = np.loadtxt('tsne_scatter_data_8_feats.txt', dtype=str)
+	x = xgb_results[:, 0].astype(float)
+	y = xgb_results[:, 1].astype(float)
+	y_labels = xgb_results[:, 2]
+
+	# For the labels
+	special_objects = {
+	    'NDWFS_J143410.9+331730': 'LABd05',
+	    'NDWFS_J143512.2+351108': 'PRG1',
+	    'NDWFS_J142623.0+351422': 'PRG2',
+	    'NDWFS_J143412.7+332939': 'PRG3',
+	    'NDWFS_J142653.1+343856': 'PRG4'
+	}
+	special_colors = ['blue', 'green', 'cyan', 'purple', 'red']
+	special_markers = ['p', 'P', '>', 'v', '^']
+
+	# Top features to show
+	important_cols = ['mag', 'gini', 'covariance_eigval1']
+	titles = [r'$B_W$ Mag', 'Gini Index', r'$\rm \log_{10}$($\lambda_1$) ($\rm arcsec^2$)']
+
+	# Pix to arcsec conversion factor for NDWFS Bootes
+	pix_conversion = 3.8961 
+	pix_to_arcsec2 = pix_conversion ** 2
+
+	def process_feature_array(values, col):
+	    # To log-scale and convert to physical units
+	    v = values.astype(float)
+	    if col == 'covariance_eigval1':
+	        v = v / pix_to_arcsec2
+	        v = np.log10(v)
+	    return v
+
+	def process_single_value(val, col):
+	    # To log-scale and convert to physical units (for confirmed LABs only)
+	    t = float(val)
+	    if col == 'covariance_eigval1':
+	        t = t / pix_to_arcsec2
+	        t = np.log10(t)
+	    return t
+
+	# Loop and plot each one separately
+	for col_, title_ in zip(important_cols, titles):
+	    
+	    if col_ == 'mag':
+	        cmap_to_use = 'coolwarm'
+	    elif col_ == 'gini':
+	        cmap_to_use = 'PiYG'
+	    else:
+	        cmap_to_use = 'viridis'
+
+	    raw_feature_vals = np.array(df_filtered[col_])
+	    feature_vals = process_feature_array(raw_feature_vals, col_)
+
+	    lo, hi = np.percentile(feature_vals, [3, 97])
+	    norm = mpl.colors.Normalize(vmin=lo, vmax=hi, clip=True)
+
+	    marker_dict = {'Confirmed_Ly$\\alpha$': '*', 'LAB': 'o', 'OTHER': 's'}
+	    label_dict = {'LAB': 'LAB', 'OTHER': 'OTHER'}
+
+	    fig, (ax_kde, ax_tsne) = plt.subplots(ncols=2, figsize=(16, 8), gridspec_kw={'width_ratios': [1, 1.2]})
+
+	    lab_mask = (y_labels == 'Confirmed_Ly$\\alpha$') | (y_labels == 'LAB')
+	    other_mask = (y_labels == 'OTHER')
+
+	    x_grid = np.linspace(lo, hi, 200)
+	    density_lab = np.zeros_like(x_grid)
+	    density_other = np.zeros_like(x_grid)
+
+	    if np.sum(lab_mask) > 1:
+	        dl = gaussian_kde(feature_vals[lab_mask])(x_grid)
+	        if dl.max() > 0: density_lab = dl / dl.max()
+	    if np.sum(other_mask) > 1:
+	        do = gaussian_kde(feature_vals[other_mask])(x_grid)
+	        if do.max() > 0: density_other = do / do.max()
+
+	    ax_kde.plot(x_grid, density_lab, label='LAB', color='tab:blue', lw=2)
+	    ax_kde.plot(x_grid, density_other, label='OTHER', color='tab:orange', lw=2)
+	    ax_kde.set_xlabel(title_)
+	    ax_kde.set_ylabel('Normalized Kernel Density Estimate')
+	    ax_kde.legend(loc=('upper left' if col_ == 'covariance_eigval1' else 'upper right'), frameon=True, fancybox=True, handlelength=1)
+
+	    for i, (obj_name, label_obj) in enumerate(special_objects.items()):
+	        arr = df_filtered.loc[df_filtered['obj_name'] == obj_name, col_].values
+	        if arr.size > 0:
+	            sval = process_single_value(arr[0], col_)
+	            color_special = mpl.cm.viridis(norm(sval))
+	            ax_kde.plot(sval, 0, marker=special_markers[i], markersize=20,
+	                        markerfacecolor=color_special, markeredgecolor=special_colors[i],
+	                        linewidth=3.5, markeredgewidth=3., alpha=0.6)
+
+	    cmap = plt.get_cmap(cmap_to_use)
+	    for cls in np.unique(y_labels)[::-1]:
+
+	        if cls == 'Confirmed_Ly$\\alpha$':
+	            continue
+
+	        cls_mask = (y_labels == cls)
+	        ax_tsne.scatter(
+	            x[cls_mask], y[cls_mask],
+	            c=feature_vals[cls_mask],
+	            cmap=cmap, norm=norm,
+	            marker=marker_dict.get(cls, 'o'),
+	            s=120, edgecolor='black', linewidth=0.5, alpha=0.9
+	        )
+
+	    for i, (obj_name, label_obj) in enumerate(special_objects.items()):
+	        tsne_mask = (np.array(xgb_results[:, 3]) == obj_name)
+	        if tsne_mask.any():
+	            ax_tsne.scatter(
+	                x[tsne_mask], y[tsne_mask],
+	                c=feature_vals[tsne_mask],
+	                cmap=cmap, norm=norm,
+	                marker=special_markers[i],
+	                s=200, edgecolor=special_colors[i],
+	                linewidth=3.5, alpha=0.9
+	            )
+
+	    sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+	    sm.set_array([])
+	    cbar = fig.colorbar(sm, ax=ax_tsne, extend='both')
+
+	    if col_ == 'mag':
+	        cbar.ax.invert_yaxis()
+
+	    cbar.set_label(title_)
+
+	    ax_tsne.set_xlabel("t-SNE Dimension 1")
+	    ax_tsne.set_ylabel("t-SNE Dimension 2")
+	    ax_tsne.set_xlim(-20, 18.5)
+	    ax_tsne.set_ylim(-20.1, 20.1)
+
+	    tsne_handles, tsne_labels = [], []
+	    for cls in np.unique(y_labels)[::-1]:
+
+	        if cls == 'Confirmed_Ly$\\alpha$':
+	            continue
+
+	        cls_mask = (y_labels == cls)
+	        mean_val = np.mean(feature_vals[cls_mask]) if np.any(cls_mask) else np.nan
+	        m = marker_dict.get(cls, 'o')
+	        line = Line2D([], [], marker=m, color='black', markerfacecolor='none', linestyle='None', linewidth=1, markersize=np.sqrt(200))
+	        tsne_handles.append(line)
+	        tsne_labels.append(f"{label_dict.get(cls, cls)} [{mean_val:.2f} (Avg.)]")
+
+	    for i, (obj_name, label_obj) in enumerate(special_objects.items()):
+	        tsne_mask = (np.array(xgb_results[:, 3]) == obj_name)
+	        if tsne_mask.any():
+	            val_for_obj = feature_vals[tsne_mask][0]
+	            line = Line2D([], [], marker=special_markers[i], color=special_colors[i],
+	                          markerfacecolor='none', markeredgewidth=3., linestyle='None',
+	                          linewidth=1., markersize=np.sqrt(200))
+	            tsne_handles.append(line)
+	            tsne_labels.append(f"{label_obj} [{val_for_obj:.2f}]")
+
+	    ncols = 4
+	    row1_desired = ['OTHER', 'LABd05', 'PRG1', 'PRG2']
+	    row2_desired = ['LAB', 'PRG3', 'PRG4']
+
+	    def _base_name(lbl): return re.split(r'\s*\[', lbl)[0].strip()
+
+	    name_to_idx = {}
+	    for i, lbl in enumerate(tsne_labels):
+	        nm = _base_name(lbl)
+	        if nm not in name_to_idx:
+	            name_to_idx[nm] = i
+
+	    order_names, used = [], set()
+	    for j in range(ncols):
+	        if j < len(row1_desired): order_names.append(row1_desired[j])
+	        if j < len(row2_desired): order_names.append(row2_desired[j])
+
+	    ordered_handles, ordered_labels = [], []
+	    for nm in order_names:
+	        if nm in name_to_idx and nm not in used:
+	            k = name_to_idx[nm]
+	            ordered_handles.append(tsne_handles[k])
+	            ordered_labels.append(tsne_labels[k])
+	            used.add(nm)
+
+	    fig.legend(handles=ordered_handles, labels=ordered_labels,
+	               loc='upper center', ncol=ncols, frameon=True, fancybox=True,
+	               columnspacing=0.6, handletextpad=0.3,
+	               title=fr'Feature Distribution [{title_}]',
+	               bbox_to_anchor=(0.5, 1.08))
+
+	    plt.savefig(f'kde_tsne_new_8_{col_}.png', dpi=300, bbox_inches='tight')
+	    plt.show()
+	    plt.clf()
+	    plt.close()
 
 
+.. figure:: _static/kde_tsne_new_8_mag.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/kde_tsne_new_8_gini.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/kde_tsne_new_8_covariance_eigval1.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
 
 

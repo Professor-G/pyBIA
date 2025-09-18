@@ -20,50 +20,42 @@ The program provides four core modules:
 .. grid:: 2
    :gutter: 2
 
-   .. grid-item-card::
+   .. grid-item-card:: Catalog Generation
+      :link: source/Catalog Generation
       :text-align: center
-
-      **`Catalog Generation <https://pybia.readthedocs.io/en/latest/source/Catalog%20Generation.html>`_**
 
       .. image:: _static/catalog_img_link.png
          :alt: Catalog Generation
-         :target: https://pybia.readthedocs.io/en/latest/source/Catalog%20Generation.html
          :width: 200px
 
       Build a morphological catalog from imaging data using image segmentation.
 
-   .. grid-item-card::
+   .. grid-item-card:: Supervised Learning
+      :link: source/Supervised Learning Algorithms
       :text-align: center
-
-      **`Supervised Learning <https://pybia.readthedocs.io/en/latest/source/Supervised%20Learning%20Algorithms.html>`_**
 
       .. image:: _static/supervised_model_img_link.png
          :alt: Supervised Learning
-         :target: https://pybia.readthedocs.io/en/latest/source/Supervised%20Learning%20Algorithms.html
          :width: 200px
 
       Train and optimize supervised machine learning models for classification.
 
-   .. grid-item-card::
+   .. grid-item-card:: Anomaly Detection
+      :link: source/Anomaly Detection
       :text-align: center
-
-      **`Anomaly Detection <https://pybia.readthedocs.io/en/latest/source/Anomaly%20Detection.html>`_**
 
       .. image:: _static/outlier_img_link.png
          :alt: Anomaly Detection
-         :target: https://pybia.readthedocs.io/en/latest/source/Anomaly%20Detection.html
          :width: 200px
 
       Identify unusual sources with an unsupervised outlier-removal pipeline.
 
-   .. grid-item-card::
+   .. grid-item-card:: Deep Learning Classification
+      :link: source/Deep Learning Algorithms
       :text-align: center
-
-      **`Deep Learning Classification <https://pybia.readthedocs.io/en/latest/source/Deep%20Learning%20Algorithms.html>`_**
 
       .. image:: _static/cnn_model_img_link.png
          :alt: Deep Learning Classification
-         :target: https://pybia.readthedocs.io/en/latest/source/Deep%20Learning%20Algorithms.html
          :width: 200px
 
       Convolutional neural networks for single or multi-band imaging (up to 3 channels).

@@ -17,11 +17,6 @@ Functionality
 ==================
 The program provides four core modules:
 
--  `Catalog Generation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ --- Creating a morphological catalog of astrophysical objects
--  `Supervised Learning <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html>`_ --- Training a supervised machine learning classifier
--  `Anomaly Detection <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/outlier_detection/index.html>`_ --- Training an unsupervised machine learning model for anomaly detection and outlier removal
--  `Deep Learning Classification <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/cnn_model/index.html>`_ --- Training a convolutional neural network classifier on single or multi-band imaging (up to 3 channels)
-
 .. grid:: 2
    :gutter: 2
 
@@ -35,6 +30,8 @@ The program provides four core modules:
          :target: https://pybia.readthedocs.io/en/latest/source/Catalog%20Generation.html
          :width: 200px
 
+      Build a morphological catalog from imaging data using image segmentation.
+
    .. grid-item-card::
       :text-align: center
 
@@ -44,6 +41,8 @@ The program provides four core modules:
          :alt: Supervised Learning
          :target: https://pybia.readthedocs.io/en/latest/source/Supervised%20Learning%20Algorithms.html
          :width: 200px
+
+      Train and optimize supervised machine learning models for classification.
 
    .. grid-item-card::
       :text-align: center
@@ -55,6 +54,8 @@ The program provides four core modules:
          :target: https://pybia.readthedocs.io/en/latest/source/Anomaly%20Detection.html
          :width: 200px
 
+      Identify unusual sources with an unsupervised outlier-removal pipeline.
+
    .. grid-item-card::
       :text-align: center
 
@@ -64,6 +65,8 @@ The program provides four core modules:
          :alt: Deep Learning Classification
          :target: https://pybia.readthedocs.io/en/latest/source/Deep%20Learning%20Algorithms.html
          :width: 200px
+
+      Convolutional neural networks for single or multi-band imaging (up to 3 channels).
 
 
 Installation

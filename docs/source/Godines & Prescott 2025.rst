@@ -1,6 +1,6 @@
-.. _godines_et_al:
+.. _godines_and_prescott:
 
-Godines et al. 2025
+Godines & Prescott (2025)
 ===========
 
 .. admonition:: Under Construction (last updated 2025-09-17)

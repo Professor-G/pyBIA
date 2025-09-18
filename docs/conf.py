@@ -105,8 +105,11 @@ html_static_path = ["./source/_static"]
 html_logo = "./source/_static/pyBIA_logo.png"
 
 #html_logo = "_static/.png"
-project = 'Machine Learning for Astronomical Discovery'
+#project = 'Machine Learning for Astronomical Discovery'
+project = ''
 html_theme_options = {"logo_only": False}
+
+html_css_files = ['custom.css']
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

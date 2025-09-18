@@ -1,0 +1,20 @@
+/* Center logo and inject tagline under it */
+.wy-side-nav-search {
+    text-align: center;
+}
+
+/* The link element under .wy-side-nav-search becomes empty if project='' */
+.wy-side-nav-search > a {
+    display: block;
+    text-decoration: none;
+}
+
+/* Insert only tagline */
+.wy-side-nav-search > a::after {
+    content: "Machine Learning for Astronomical Discovery";
+    display: block;
+    font-size: 0.85em;
+    margin-top: 0.3em;
+    color: #ccc; /* adjust color */
+    font-style: italic; /* optional */
+}

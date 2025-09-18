@@ -3,7 +3,7 @@
 Godines et al. 2025
 ===========
 
-.. admonition:: Under Construction (last updated 2025-09-16)
+.. admonition:: Under Construction (last updated 2025-09-17)
 
    This documentation is still being written and may change frequently!
 
@@ -90,12 +90,12 @@ To visualize the affect the sigma detection threshold has on the image segmentat
 |
 
 
-Morphological Catalog
+Training Morphological Catalog
 -----------
 
 To download the images used in this study please visit the `NoirLab <https://noirlab.edu/science/data-services/other/ndwfs>`_ website. We utilized the Bootes field data, from which there are 27 total subfields to download, in addition to the corresponding error maps. The data avaialable are in .fits format.
 
-The training set objects used in our study can be :download:`downloaded here <training_set.csv>`. This dataframe contains catalog information on the 866 DIFFUSE candidates compiled by `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_, as well as 3200 randomly selected OTHER sources from the same dataset. 
+The training set objects used in our study can be :download:`downloaded here <training_set.csv>`_. This dataframe contains catalog information on the 866 LAB candidates compiled by `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_, as well as 3200 randomly selected OTHER sources from the same dataset. 
 
 The code below demonstrates how we conducted our detection threshold analysis. Using the catalog information available in the provided training set, we extracted the morphological features using image segmentation at different thresholds, between 0.1 to 1.5 standard deviations above the background rms.
 
@@ -113,7 +113,7 @@ The code below demonstrates how we conducted our detection threshold analysis. U
 	data_path = 'NDWFS/fits_images/Bw_FITS/'
 	data_error_path = 'NDWFS_Bootes/Error_Maps/Bw/'
 
-	#866 DIFFUSE candidates from Prescott et al. (2012) plus 3200 randomly selected OTHER objects
+	#866 LAB candidates from Prescott et al. (2012) plus 3200 randomly selected OTHER objects
 	training_set = pd.read_csv('training_set.csv')
 
 	# The training features will be computed using the following varying sigma thresholds
@@ -463,6 +463,7 @@ We now re-train the optimal model (XGBoost) and the optimal detection threshold 
     :width: 600px
 |
 
+
 Optimized XGBoost Models
 -----------
 
@@ -475,7 +476,7 @@ We now proceed with the generated training set at the optimal detection threshol
 	from pyBIA import ensemble_model, data_processing
 
 	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
-	df = pd.read_csv('nsigs/_Bw_training_set_nsig_'+str(sig))
+	df = pd.read_csv(f'nsigs/_Bw_training_set_nsig_{sig}')
 	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
 	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
 
@@ -532,7 +533,8 @@ We now proceed with the generated training set at the optimal detection threshol
 		scoring_metric=scoring_metric, 
 		opt_cv=opt_cv, 
 		limit_search=limit_search, 
-		SEED_NO=SEED_NO)
+		SEED_NO=SEED_NO
+		)
 
 	# Tune and train the model 
 	model.create()
@@ -555,13 +557,17 @@ We now proceed with the generated training set at the optimal detection threshol
 		scoring_metric=scoring_metric, 
 		opt_cv=opt_cv, 
 		limit_search=limit_search, 
-		SEED_NO=SEED_NO)
+		SEED_NO=SEED_NO
+		)
 
 	model.create()
 	model.save(dirname=f'ensemble_model_xgb_boruta_{boruta_model}')
 
-The XGBoost model optimized with RF-based feature importance (to compute the SHAP values) can be :download:`download here <ensemble_model_xgb_boruta_rf>`.
-The XGBoost model optimized with XGBoost-based feature importance (to compute the SHAP values) can be :download:`download here <ensemble_model_xgb_boruta_xgb>`.
+The XGBoost model optimized with RF-based feature importance (to compute the SHAP values) can be :download:`download hereed <ensemble_model_xgb_boruta_rf.zip>`.
+
+The XGBoost model optimized with XGBoost-based feature importance (to compute the SHAP values) can be :download:`downloaded here <ensemble_model_xgb_boruta_xgb.zip>`.
+
+**NOTE: These models were saved using Python3.12, to avoid pickle dependecny issues, load them using Python3.12.**
 
 Below we plot the optimization results (feature selection results from the BorutaSHAP algorithm and the subsequent Optuna-based hyperparameter optimization) using the built-in class methods, 
 
@@ -572,7 +578,7 @@ Below we plot the optimization results (feature selection results from the Borut
 	import pandas as pd
 
 	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
-	df = pd.read_csv('nsigs/_Bw_training_set_nsig_'+str(sig))                                                                                                                                                                                                                         
+	df = pd.read_csv('nsigs/_Bw_training_set_nsig_'+str(sig))
 
 	# Log-transform the Hu moments
 	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
@@ -641,7 +647,7 @@ Below we plot the optimization results (feature selection results from the Borut
 	flip_axes = True # Set to False to plot the features on the x-axis (if you're plotting a lot of them)
 	title = 'Feature Importance (8 Features)' # Figure title
 	save_data = False # Whether to save the feature importances to a csv file
-	savefig = True # Whether to save the figure (note that current version of program always saves with same figname so careful about overwrites)
+	savefig = False # Whether to save the figure (note that current version of program always saves with same figname so careful with overwrites)
 
 	# First plot the XGBoost-based feature selection results
 	xgboost8_model.plot_feature_opt(
@@ -715,34 +721,37 @@ Below we plot the optimization results (feature selection results from the Borut
 		savefig=savefig
 		)
 
-.. figure:: _static/Ensemble_Hyperparameter_Importance.png
+.. figure:: _static/Feature_Importance_8.png
     :align: center
     :class: with-shadow with-border
     :width: 600px
 |
 
-.. figure:: _static/Ensemble_Hyperparameter_Importance.png
+.. figure:: _static/Feature_Importance_45.png
     :align: center
     :class: with-shadow with-border
     :width: 600px
 |
 
-.. figure:: _static/Ensemble_Hyperparameter_Importance.png
+.. figure:: _static/Ensemble_Hyperparameter_Optimization_8.png
     :align: center
     :class: with-shadow with-border
     :width: 600px
 |
 
-.. figure:: _static/Ensemble_Hyperparameter_Importance.png
+.. figure:: _static/Ensemble_Hyperparameter_Optimization_45.png
     :align: center
     :class: with-shadow with-border
     :width: 600px
 |
 
 
-With the optimal model saved, we now extract the features using the catalog module for all 2 million OTHER objects in the entire dataset. We have compiled the catalog information in the following dataframe: :download:`Other_Objects_Catalog.csv <Other_Objects_Catalog.csv>`.
+Boötes Morphological Catalog
+-----------
 
-Using this file we can now construct a catalog for the entire dataset so as to perform the XGBoost classification (note that this excludes the 866 DIFFUSE objects in the provided training set).
+With the optimal models saved, we now extract the features using the `Catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.Catalog>`_ class for all 2 million OTHER objects in the entire dataset. We have compiled the positional catalog information in the following dataframe: `Other_Objects_Catalog <https://drive.google.com/file/d/1_Hl8Rgvc_x1n0EBP9XSY1WE27NQkaOiV/view?usp=sharing>`_.
+
+Using this file we can now construct a catalog for the entire dataset so as to perform the XGBoost classification (note that this excludes the 866 LAB objects in the provided training set).
 
 .. code-block:: python
 	
@@ -760,9 +769,9 @@ Using this file we can now construct a catalog for the entire dataset so as to p
 	sig = 0.32 # The optimal noise-detection threshold to apply
 
 	# Loop through all the fields and save the field catalogs to avoid memory issues
-	counter=0
-	for fieldname in np.unique(np.array(other_catalog['field_name']))[18:]:
-		counter+=1
+	counter = 0
+	for fieldname in np.unique(np.array(other_catalog['field_name'])):
+		counter += 1
 		print(fieldname, f'{counter} out of 27')
 		# Load the field data
 		data_hdu, error_map = fits.open(data_path+fieldname+'_Bw_03_fix.fits'), fits.getdata(data_error_path+fieldname+'_Bw_03_rms.fits.fz')
@@ -798,32 +807,24 @@ Using this file we can now construct a catalog for the entire dataset so as to p
 
 	# Combine all 27 sub-catalogs into one master frame and save
 	frame = pd.concat(frame, axis=0, join='inner')
-	frame.to_csv('Other_Catalog_Master_'+str(sig), chunksize=1000)    
+	frame.to_csv(f'Other_Catalog_Master_{sig}', chunksize=1000)    
                                                
 
-This final catalog as genereated above is available for download `here <https://drive.google.com/file/d/16kJ5jyVImp7E8oEEjjUrj4l9vH2JSkCa/view?usp=sharing>`_.
+This master catalog as genereated above is available for download `here <https://drive.google.com/file/d/1cJMafmaT4NwbWbjY0xPB9fk9La065eQ6/view?usp=sharing>`_.
 
-Using this catalog, we can now re-load the optimal model to conduct the predictions. The predictions will be made using both the base and optimal model so as to compare the distribution of probability predictions. 
-
-
-The base and optimized candidate catalogs generated above do not include the 866 DIFFUSE training objects as these were deliberately removed from the source catalog. The randomly selected objects that composed our OTHER class are indeed included in the catalog, however, as they were used for training purposes these were not fairly assessed as their presence as an OTHER object skews their probability predictions. For this reason, we perform a Leave-out-Out (LoO) cross-validation analysis, one assessing the DIFFUSE objects so as to extract an informed probability prediction threshold and select priority objects, and another assessing the OTHER objects in our training set so as to include those that would have been predicted as DIFFUSE had they not been present in the training set. These two LoO routines are executed below:
-
-The three LoO analysis files are available here: 
-
-- :download:`LoO_Confirmed_DIFFUSE_xgb <LoO_Confirmed_DIFFUSE_xgb>`
-- :download:`LoO_DIFFUSE_xgb <LoO_DIFFUSE_xgb>`
-- :download:`LoO_OTHER_xgb <LoO_OTHER_xgb>`
-
-As stated above, the OTHER objects in our training set were omitted from the candidate catalogs, but after analyzing these objects using LoO, we can now determine which one of these sources should be included in the candidate catalog:
+Using this catalog, we can now load the optimal models to make the predictions. The predictions will be made using both the base and optimal models so as to compare the distribution of probability predictions. 
 
 
-These two candidate catalogs are available for download:
+Classifications & LOO CV
+-----------
 
-- `candidate_catalog_base_xgb <https://drive.google.com/file/d/1IYbSql6xiTB-hGaM_bLp_ygCIKSyfOb_/view?usp=sharing>`_
-- `candidate_catalog_optimized_xgb <https://drive.google.com/file/d/13r0Qq7r4stemAtffEiEX8w-kQI_RjOKY/view?usp=sharing>`_
+In the following script we perform the model predictions on the entire NDWFS Boötes field to generate the candidate catalogs (i.e., sources with probability predictions greater than 0.5). 
+
+These candidate catalogs do not include the 866 LAB training objects as these were deliberately removed from the source catalog. While the randomly selected objects that composed our OTHER class are included in the catalog, they were used for training purposes as such cannot be fairly assessed as their presence as an OTHER training instance skews their probability predictions. For this reason, we perform a Leave-out-Out (LOO) cross-validation analysis, once assessing the LAB training set insstances so as to farily assess them and determine an informed probability prediction threshold, and another assessing the OTHER objects in our training set so as to include those that would have been predicted as LAB had they not been present in the training set. These two LOO routines are also executed below:
 
 .. code-block:: python
 
+	import numpy as np
 	import numpy as np
 	import pandas as pd
 	from pyBIA import ensemble_model, data_processing
@@ -833,7 +834,7 @@ These two candidate catalogs are available for download:
 
 	# First load the training data
 	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
-	df = pd.read_csv('/Users/daniel/Desktop/pyBIA_PLOTS/nsigs/_Bw_training_set_nsig_'+str(sig))                                                                                                                                                                                                                         
+	df = pd.read_csv(f'/Users/daniel/Desktop/pyBIA_PLOTS/nsigs/_Bw_training_set_nsig_{sig}')
 
 	# Log-transform the Hu moments
 	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
@@ -930,24 +931,24 @@ These two candidate catalogs are available for download:
 	#Leave-one-Out cross-validating the LAB class
 	for i in range(len(LAB_training)):
 		print(f"{i+1} of {len(LAB_training)}")
-		#
+		
 		# This will be the individual LAB sample to assess
 		leave_one = np.array(LAB_training[columns].iloc[i])
-		#
+		
 		# Removing this validation sample from the overall LAB training bag
 		remaining = np.delete(np.array(LAB_training[columns]), i, axis=0)
-		#
+		
 		# Setting the new training data, flag of 1 corresponds to LAB, 0 is OTHER
 		data_x = np.r_[remaining, np.array(other_training[columns])]
 		data_y = np.r_[[1]*len(remaining), [0]*len(other_training)]
-		#
+		
 		# Training the new base model
 		new_base_model = base_model.model.fit(data_x, data_y)
-		#
+		
 		# Training the new optimized models, note that the feats_to_use attribute from the feat selection is invoked
 		new_xgboost_8_model = xgboost_8_model.model.fit(data_x[:,xgboost_8_model.feats_to_use], data_y)
 		new_xgboost_45_model = xgboost_45_model.model.fit(data_x[:,xgboost_45_model.feats_to_use], data_y)
-		#
+		
 		# Assess the left-out LAB sample using both the base and optimized models
 		proba_base = new_base_model.predict_proba(leave_one.reshape(1,-1))
 		proba_new_xgboost_8 = new_xgboost_8_model.predict_proba(leave_one[xgboost_8_model.feats_to_use].reshape(1,-1))
@@ -977,13 +978,12 @@ These two candidate catalogs are available for download:
 	five_LAB_xgboost_45_probas = np.c_[LABd05[2], PRG1[2], PRG2[2], PRG3[2], PRG4[2]][0]
 
 	# Save the base and optimized probabilities
-	np.savetxt('/Users/daniel/Desktop/pyBIA_PLOTS/LoO_Confirmed_LAB', np.c_[five_names, five_LAB_base_probas, five_LAB_xgboost_8_probas, five_LAB_xgboost_45_probas], header="Names, Base_Model, xgboost_8_Model, xgboost_45_Model", fmt='%s')
-	np.savetxt('/Users/daniel/Desktop/pyBIA_PLOTS/LoO_LAB', np.c_[names, all_LAB_base_probas, all_LAB_xboost_8_probas, all_LAB_xboost_45_probas], header="Names, Base_Model, xgboost_8_Model, xgboost_45_Model", fmt='%s')
+	np.savetxt('LoO_Confirmed_LAB', np.c_[five_names, five_LAB_base_probas, five_LAB_xgboost_8_probas, five_LAB_xgboost_45_probas], header="Names, Base_Model, xgboost_8_Model, xgboost_45_Model", fmt='%s')
+	np.savetxt('LoO_LAB', np.c_[names, all_LAB_base_probas, all_LAB_xboost_8_probas, all_LAB_xboost_45_probas], header="Names, Base_Model, xgboost_8_Model, xgboost_45_Model", fmt='%s')
 
-	#
+	
 	# Repeat the same LoO process but evaluate the OTHER training for fair assessment of these objects
 	# Positive detections from this LoO will be added to the candidates catalog that was created above
-	#
 
 	# Remove one LAB object as this time the OTHER class will be cross-validated using LoO
 	other_training = df_filtered[df_filtered.flag == 0]
@@ -995,29 +995,29 @@ These two candidate catalogs are available for download:
 	#Leave-one-Out cross-validating the OTHER class
 	for i in range(len(other_training)):
 		print(f"{i+1} of {len(other_training)}")
-		#
+		
 		# This will be the individual OTHER sample to assess
 		leave_one = np.array(other_training[columns].iloc[i])
-		#
+		
 		# Removing this validation sample from the overall OTHER training bag
 		remaining = np.delete(np.array(other_training[columns]), i, axis=0)
-		#
+		
 		# Setting the new training data
 		data_x = np.r_[remaining, np.array(LAB_training[columns])]
 		data_y = np.r_[[0]*len(remaining), [1]*len(LAB_training)]
-		#
+		
 		# Training the new base model
 		new_base_model = base_model.model.fit(data_x, data_y)
-		#
+		
 		# Training the new optimized models
 		new_xgboost_8_model = xgboost_8_model.model.fit(data_x[:,xgboost_8_model.feats_to_use], data_y)
 		new_xgboost_45_model = xgboost_45_model.model.fit(data_x[:,xgboost_45_model.feats_to_use], data_y)
-		#
+		
 		# Assess the left-out OTHER sample using the base and optimized model
 		proba_base = new_base_model.predict_proba(leave_one.reshape(1,-1))
 		proba_new_xgboost_8 = new_xgboost_8_model.predict_proba(leave_one[xgboost_8_model.feats_to_use].reshape(1,-1))
 		proba_new_xgboost_45 = new_xgboost_45_model.predict_proba(leave_one[xgboost_45_model.feats_to_use].reshape(1,-1))
-		#
+		
 		# Save only the probability prediction that the object is LAB
 		other_base_probas.append(float(proba_base[:,1]))
 		other_xgboost_8_probas.append(float(proba_new_xgboost_8[:,1]))
@@ -1025,7 +1025,7 @@ These two candidate catalogs are available for download:
 		names.append(other_training.obj_name.iloc[i])
 
 	# Save the base and optimized probabilities
-	np.savetxt('/Users/daniel/Desktop/pyBIA_PLOTS/LoO_OTHER', np.c_[names, other_base_probas, other_xgboost_8_probas, other_xgboost_45_probas], header="Names, Base_Model, xgboost_8_Model, xgboost_45_Model", fmt='%s')
+	np.savetxt('LoO_OTHER', np.c_[names, other_base_probas, other_xgboost_8_probas, other_xgboost_45_probas], header="Names, Base_Model, xgboost_8_Model, xgboost_45_Model", fmt='%s')
 
 	# Find these OTHER objects that were classified as LAB (probas greater than or equal to 50%)
 	indices = []
@@ -1065,10 +1065,24 @@ These two candidate catalogs are available for download:
 	candidate_catalog_xgboost_45 = pd.concat([candidate_catalog_xgboost_45, df_filtered_xgboost_45], ignore_index=True)
 
 	# Save LAB candidate catalogs
-	candidate_catalog_base.to_csv('/Users/daniel/Desktop/pyBIA_PLOTS/candidate_catalog_base.csv')
-	candidate_catalog_xgboost_8.to_csv('/Users/daniel/Desktop/pyBIA_PLOTS/candidate_catalog_optimized_xgboost_8.csv')
-	candidate_catalog_xgboost_45.to_csv('/Users/daniel/Desktop/pyBIA_PLOTS/candidate_catalog_optimized_xgboost_45.csv')
+	candidate_catalog_base.to_csv('candidate_catalog_base.csv')
+	candidate_catalog_xgboost_8.to_csv('candidate_catalog_optimized_xgboost_8.csv')
+	candidate_catalog_xgboost_45.to_csv('candidate_catalog_optimized_xgboost_45.csv')
 
+
+
+The three LOO analysis files are available here: 
+
+- :download:`LoO_Confirmed_LAB <LoO_Confirmed_LAB>`
+- :download:`LoO_LAB <LoO_LAB>`
+- :download:`LoO_OTHER <LoO_OTHER>`
+
+
+
+These two candidate catalogs are available for download:
+
+- `candidate_catalog_base_xgb <https://drive.google.com/file/d/1IYbSql6xiTB-hGaM_bLp_ygCIKSyfOb_/view?usp=sharing>`_
+- `candidate_catalog_optimized_xgb <https://drive.google.com/file/d/13r0Qq7r4stemAtffEiEX8w-kQI_RjOKY/view?usp=sharing>`_
 
 
 We can now perform a probability prediction analysis, first with the baseline model (all features, not hyperparameter optimization):
@@ -1674,7 +1688,7 @@ Now we can create the area vs color plot, byt first a final candidate catalog is
 	# Save a dataframe with only the confirmed blobs, to be used for the color-color selection below
 	confirmed_set.to_csv('_Bw_final_confirmed_catalog.csv')
 
-Now we will extract the red-band magnitudes using the catalog module:
+Now we will extract the red-band magnitudes using the `Catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.Catalog>`_ class:
 
 .. code-block:: python
 

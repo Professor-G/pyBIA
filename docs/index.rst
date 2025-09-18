@@ -30,9 +30,9 @@ The program provides four core modules:
 
       **Catalog Generation**
 
-      .. image:: _static/Ensemble_Confusion_Matrix_base_xgboost.png
+      .. image:: _static/supervised_model_img_link
          :alt: Catalog Generation
-         :target: https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html
+         :target: https://pybia.readthedocs.io/en/latest/source/Catalog%20Generation.html
          :width: 200px
 
    .. grid-item-card::
@@ -40,9 +40,9 @@ The program provides four core modules:
 
       **Supervised Learning**
 
-      .. image:: _static/Ensemble_Confusion_Matrix_base_xgboost.png
+      .. image:: _static/catalog_img_link
          :alt: Supervised Learning
-         :target: https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html
+         :target: https://pybia.readthedocs.io/en/latest/source/Supervised%20Learning%20Algorithms.html
          :width: 200px
 
    .. grid-item-card::
@@ -50,9 +50,9 @@ The program provides four core modules:
 
       **Anomaly Detection**
 
-      .. image:: _static/Ensemble_Confusion_Matrix_base_xgboost.png
+      .. image:: _static/outlier_img_link
          :alt: Anomaly Detection
-         :target: https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/outlier_detection/index.html
+         :target: https://pybia.readthedocs.io/en/latest/source/Anomaly%20Detection.html
          :width: 200px
 
    .. grid-item-card::
@@ -60,9 +60,9 @@ The program provides four core modules:
 
       **Deep Learning Classification**
 
-      .. image:: _static/Ensemble_Confusion_Matrix_base_xgboost.png
+      .. image:: _static/cnn_model_img_link
          :alt: Deep Learning Classification
-         :target: https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/cnn_model/index.html
+         :target: https://pybia.readthedocs.io/en/latest/source/Deep%20Learning%20Algorithms.html
          :width: 200px
 
 

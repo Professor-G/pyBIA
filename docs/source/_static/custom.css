@@ -1,6 +1,6 @@
 /* Center logo and inject tagline under it */
 .wy-side-nav-search {
-    text-align: center; /* centers the pseudo-element by default */
+    text-align: center;
 }
 
 /* The link element under .wy-side-nav-search becomes empty if project='' */
@@ -9,25 +9,12 @@
     text-decoration: none;
 }
 
-/* Insert only tagline with two centered lines */
-/* First line */
+/* Insert only tagline */
 .wy-side-nav-search > a::after {
-    content: "Machine Learning";
+    content: "Machine Learning for Astronomical Discovery";
     display: block;
     font-size: 0.85em;
     margin-top: 0.3em;
-    color: black;
-    font-style: normal;
-    text-align: center;
-}
-
-/* Second line */
-.wy-side-nav-search > a::before {
-    content: "for Astronomical Discovery";
-    display: block;
-    font-size: 0.85em;
-    margin-top: 1.2em; /* adjust to match spacing under logo */
-    color: black;
-    font-style: normal;
-    text-align: center;
+    color: black; /* adjust color */
+    font-style: italic; /* optional */
 }

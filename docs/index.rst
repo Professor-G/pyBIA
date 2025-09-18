@@ -21,7 +21,7 @@ The program provides four core modules:
    :gutter: 2
 
    .. grid-item-card:: Catalog Generation
-      :link: source/Catalog Generation
+      :link: https://pybia.readthedocs.io/en/latest/source/Catalog%20Generation.html
       :text-align: center
 
       .. image:: _static/catalog_img_link.png
@@ -31,7 +31,7 @@ The program provides four core modules:
       Build a morphological catalog from imaging data using image segmentation.
 
    .. grid-item-card:: Supervised Learning
-      :link: source/Supervised Learning Algorithms
+      :link: https://pybia.readthedocs.io/en/latest/source/Supervised%20Learning%20Algorithms.html
       :text-align: center
 
       .. image:: _static/supervised_model_img_link.png
@@ -41,7 +41,7 @@ The program provides four core modules:
       Train and optimize supervised machine learning models for classification.
 
    .. grid-item-card:: Anomaly Detection
-      :link: source/Anomaly Detection
+      :link: https://pybia.readthedocs.io/en/latest/source/Anomaly%20Detection.html
       :text-align: center
 
       .. image:: _static/outlier_img_link.png
@@ -51,7 +51,7 @@ The program provides four core modules:
       Identify unusual sources with an unsupervised outlier-removal pipeline.
 
    .. grid-item-card:: Deep Learning Classification
-      :link: source/Deep Learning Algorithms
+      :link: https://pybia.readthedocs.io/en/latest/source/Deep%20Learning%20Algorithms.html
       :text-align: center
 
       .. image:: _static/cnn_model_img_link.png

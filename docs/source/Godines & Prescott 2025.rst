@@ -1102,7 +1102,7 @@ t-SNE Projections
 
 With the LOO CV results we can generate t-SNE projections and scale the points by the probability prediction. 
 
-First we generate the t-SNE projections and save the scatter point positions. This can be done using the built-in methods in the Classifier class.
+First we generate the t-SNE projections and save the scatter point positions. This can be done using the built-in methods in the `Classifier <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html#pyBIA.ensemble_model.Classifier>`_ class.
 
 .. code-block:: python
 
@@ -1960,5 +1960,234 @@ This catalog of non-LAB candidates (i.e., classified as OTHER) can be `downloade
 In conjunction with the candidate catalog saved before we can now assess how the feature values influces the XGBoost model classification.
 
 .. code-block:: python
+
+	import numpy as np
+	import pandas as pd
+	import matplotlib.pyplot as plt
+	import scienceplots  
+	plt.style.use("science")
+	plt.rcParams.update({"font.size": 21})
+
+	# Candidate probabilities (candidate catalog first)
+	initial_candidates1 = pd.read_csv('candidate_catalog_optimized_xgboost_8.csv')
+
+	# Non-candidate catalog, so invert probabilities since this contains probabiliy of being OTHER
+	initial_candidates2 = pd.read_csv('non_candidate_catalog_xgboost_8.csv')
+	initial_candidates2['proba'] = 1 - initial_candidates2['proba']
+
+	# Combine candidates and non-candidates
+	initial_candidates = pd.concat([initial_candidates1,initial_candidates2])
+
+	initial_candidates_names = np.array(initial_candidates.obj_name)
+	initial_candidates_probas = np.array(initial_candidates.proba)
+
+	initial_candidates_mag = np.array(initial_candidates.mag)
+	initial_candidates_gini = np.array(initial_candidates.gini)
+	initial_candidates_eigval1 = np.array(initial_candidates.covariance_eigval1)
+
+	# LAB candidate probabilities from LOOCV, only need the results from XGBoost-8 (third column)
+	confirmed = np.loadtxt('LoO_Confirmed_LAB', dtype=str)
+	confirmed_names_PRG = confirmed[:, 0]
+	confirmed_probas = confirmed[:, 2].astype(float)
+
+	other_LAB = np.loadtxt('LoO_LAB', dtype=str)
+	other_LAB_names = other_LAB[:,0]
+	other_LAB_probas = other_LAB[:, 2].astype(float)
+
+	# The confirmed LABs in our sample
+	confirmed_names = [
+	    'NDWFS_J143410.9+331730',
+	    'NDWFS_J143512.2+351108',
+	    'NDWFS_J142623.0+351422',
+	    'NDWFS_J143412.7+332939',
+	    'NDWFS_J142653.1+343856'
+	]
+
+	# Load the training data
+
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
+
+	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
+	df = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
+
+	indices_confirmed = []
+	for i in range(len(confirmed_names)):
+	    index = np.where(df.obj_name == confirmed_names[i])[0]
+	    indices_confirmed.append(index)
+
+	indices_confirmed = np.hstack(indices_confirmed)
+	confirmed_mag = np.array(df.mag.iloc[indices_confirmed])
+	confirmed_gini = np.array(df.gini.iloc[indices_confirmed])
+	confirmed_eigval1 = np.array(df.covariance_eigval1.iloc[indices_confirmed])
+
+	indices_LAB = []
+	for i in range(len(other_LAB_names)):
+	    index = np.where(df.obj_name == other_LAB_names[i])[0]
+	    indices_LAB.append(index)
+
+	indices_LAB = np.hstack(indices_LAB)
+	LAB_mag = np.array(df.mag.iloc[indices_LAB])
+	LAB_gini = np.array(df.gini.iloc[indices_LAB])
+	LAB_eigval1 = np.array(df.covariance_eigval1.iloc[indices_LAB])
+
+	# Both distributions will have same number of bins to ensure equal bin width
+	no_bins = int(np.sqrt(len(df))) 
+
+	for property_to_plot in ['mag', 'gini', 'covariance_eigval1']:
+
+	    pix_conversion = 3.8961 # NDWFS survey pixel-per-arcsecond 
+
+	    # Map the chosen property to the corresponding arrays
+	    if property_to_plot == 'mag':
+	        prop_init = initial_candidates_mag.copy()
+	        prop_LAB = LAB_mag.copy()
+	        prop_confirmed = confirmed_mag.copy()
+	    elif property_to_plot == 'gini':
+	        prop_init = initial_candidates_gini.copy()
+	        prop_LAB = LAB_gini.copy()
+	        prop_confirmed = confirmed_gini.copy()
+	    elif property_to_plot == 'covariance_eigval1':
+	        prop_init = initial_candidates_eigval1.copy() / pix_conversion**2
+	        prop_LAB = LAB_eigval1.copy() / pix_conversion**2
+	        prop_confirmed = confirmed_eigval1.copy() / pix_conversion**2
+
+	    # Figure showing histograms, only do it the first time in loop
+	    if property_to_plot == 'mag':
+	        fig_hist, ax_hist = plt.subplots(figsize=(8, 8))
+
+	        # Histogram for initial candidates on main y-axis
+	        bins_init = np.linspace(initial_candidates_probas.min(), initial_candidates_probas.max(), 50)
+	        weights_init = np.ones_like(initial_candidates_probas) / len(initial_candidates_probas)
+	        ax_hist.hist(initial_candidates_probas, bins=bins_init, weights=weights_init,
+	                     histtype='step', color='Magenta', linewidth=1.6,
+	                     label=f'Boötes Field Catalog ({len(initial_candidates_probas):,})')
+
+	        ax_hist.set_ylabel('Fraction of Objects')
+
+	        # Combine LAB and confirmed for LAB class histogram
+	        prob_lab = np.concatenate([other_LAB_probas, confirmed_probas])
+	        bins_lab = np.linspace(prob_lab.min(), prob_lab.max(), 50)
+	        weights_lab = np.ones_like(prob_lab) / len(prob_lab)
+
+	        ax_hist.hist(prob_lab, bins=bins_lab, weights=weights_lab,
+	                          histtype='step', color='k', linewidth=1.6,
+	                          label=f'LAB Class (n={len(prob_lab)})')
+
+	        special_colors = ['blue', 'green', 'cyan', 'purple', 'red']  
+	        special_markers = ['p', 'P', '>', "v", "^"]
+
+	        for i in range(len(confirmed_probas)):
+	            ax_hist.scatter(confirmed_probas[i], [0.01],
+	                           color=special_colors[i % len(special_colors)], facecolors='none',
+	                           s=250, label=np.array(confirmed_names_PRG)[i], linewidth=3.5, 
+	                           edgecolor=special_colors[i % len(special_colors)], alpha=0.8, marker=special_markers[i])
+
+	        ax_hist.axvline(x=0.9, color='grey', linestyle='--')
+
+	        # Vertical text with rightward arrow
+	        ax_hist.text(0.91, 0.43, r"Initial Candidates $\downarrow$", color='grey',
+	                rotation=90, verticalalignment='center', horizontalalignment='left')
+
+	        # Combine legends from both axes
+	        lines1, labels1 = ax_hist.get_legend_handles_labels()
+	        ax_hist.legend(lines1, labels1, loc='upper center', handlelength=0.7, frameon=True, fancybox=True)
+
+	        ax_hist.set_title('XGBoost-8 Classification Analysis')
+
+	        plt.tight_layout()
+	        plt.savefig('hist_xgb.png', dpi=300, bbox_inches='tight')
+	        plt.show()
+
+	    # Figure showing the binned averages with shaded std error
+	    fig_avg, ax_avg = plt.subplots(figsize=(8, 8))
+
+	    # The candidates and non-candidates
+	    bin_centers_init = (bins_init[:-1] + bins_init[1:]) / 2
+	    avg_prop_init = []
+	    std_prop_init = []
+	    for i in range(len(bins_init) - 1):
+
+	        mask_bin = (initial_candidates_probas >= bins_init[i]) & (initial_candidates_probas < bins_init[i+1])
+	        
+	        if np.sum(mask_bin) > 0:
+	            avg_prop_init.append(np.mean(prop_init[mask_bin]))
+	            std_prop_init.append(np.std(prop_init[mask_bin]))
+	        else:
+	            avg_prop_init.append(np.nan)
+	            std_prop_init.append(np.nan)
+
+	    avg_prop_init = np.array(avg_prop_init)
+	    std_prop_init = np.array(std_prop_init)
+
+	    ax_avg.plot(bin_centers_init, avg_prop_init, color='Magenta', lw=1.6, alpha=0.9, label=f'Boötes Field Catalog')
+	    ax_avg.fill_between(bin_centers_init,
+	                        avg_prop_init - std_prop_init,
+	                        avg_prop_init + std_prop_init,
+	                        color='Magenta', alpha=0.3)
+
+	    # For the LAB sample, plotting individual points as open circles
+	    ax_avg.scatter(other_LAB_probas, prop_LAB, color='k',
+	                   facecolors='none', edgecolors='k', alpha=0.3,
+	                   s=120, label=f'LAB Class')
+
+	    # Scatter plot for confirmed objects
+	    for i in range(len(confirmed_probas)):
+	        ax_avg.scatter(confirmed_probas[i], prop_confirmed[i],
+	                       color=special_colors[i % len(special_colors)], facecolors='none',
+	                       s=200, label=np.array(confirmed_names_PRG)[i], linewidth=3.5, 
+	                       edgecolor=special_colors[i % len(special_colors)], alpha=0.9, marker=special_markers[i])
+
+	    ax_avg.set_xlabel(r"$P(y =$ LAB $\mid \mathbf{X})$") if property_to_plot == 'covariance_eigval1' else None
+
+	    if property_to_plot == 'covariance_eigval1':
+	        ax_avg.set_ylabel(r'$\lambda_1$ ($\rm arcsec^2$)')
+	    elif property_to_plot == 'mag':
+	        ax_avg.set_ylabel(r'$B_W$ Mag')
+	    elif property_to_plot == 'gini':
+	        ax_avg.set_ylabel('Gini Index')
+
+	    ax_avg.axvline(x=0.9, color='grey', linestyle='--')
+
+	    # Invert axis for magnitudes
+	    if property_to_plot == 'mag':
+	        ax_avg.invert_yaxis()
+	        ax_avg.legend(loc='lower right', ncol=2, handlelength=0.7, frameon=True, fancybox=True)
+
+	    plt.savefig(f'{property_to_plot}.png', dpi=300, bbox_inches='tight')
+	    plt.show()
+
+.. figure:: _static/hist_xgb.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/mag.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/gini.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/covariance_eigval1.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+
+Image Extraction
+-----------
+
+To facilitate the training of the outlier detection algorithm as well as the CNN, we now extract the multi-band imaging of our candidates, which includes only those output with probability predictions greater than or equal to 0.9.
+
+
+
 
 

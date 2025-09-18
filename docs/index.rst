@@ -61,7 +61,7 @@ The program provides four core modules:
          :alt: Deep Learning Classification
          :width: 200px
 
-      Convolutional neural networks for single or multi-band imaging (up to 3 channels).
+      Train convolutional neural networks on single or multi-band imaging (up to 3 channels).
 
 
 Installation

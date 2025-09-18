@@ -22,6 +22,50 @@ The program provides four core modules:
 -  `Anomaly Detection <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/outlier_detection/index.html>`_ --- Training an unsupervised machine learning model for anomaly detection and outlier removal
 -  `Deep Learning Classification <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/cnn_model/index.html>`_ --- Training a convolutional neural network classifier on single or multi-band imaging (up to 3 channels)
 
+.. grid:: 2
+   :gutter: 2
+
+   .. grid-item-card::
+      :text-align: center
+
+      **Catalog Generation**
+
+      .. image:: _static/Ensemble_Confusion_Matrix_base_xgboost.png
+         :alt: Catalog Generation
+         :target: https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html
+         :width: 200px
+
+   .. grid-item-card::
+      :text-align: center
+
+      **Supervised Learning**
+
+      .. image:: _static/Ensemble_Confusion_Matrix_base_xgboost.png
+         :alt: Supervised Learning
+         :target: https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html
+         :width: 200px
+
+   .. grid-item-card::
+      :text-align: center
+
+      **Anomaly Detection**
+
+      .. image:: _static/Ensemble_Confusion_Matrix_base_xgboost.png
+         :alt: Anomaly Detection
+         :target: https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/outlier_detection/index.html
+         :width: 200px
+
+   .. grid-item-card::
+      :text-align: center
+
+      **Deep Learning Classification**
+
+      .. image:: _static/Ensemble_Confusion_Matrix_base_xgboost.png
+         :alt: Deep Learning Classification
+         :target: https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/cnn_model/index.html
+         :width: 200px
+
+
 Installation
 ==================
 

@@ -7,6 +7,8 @@ Godines et al. 2025
 
    This documentation is still being written and may change frequently!
 
+**NOTE:** All figures are formatted using the `scienceplots` Python package, available via pip.
+
 Image Segmentation
 -----------
 
@@ -296,7 +298,6 @@ The two files generated above can be downloaded:
 - :download:`non_detections_Bw <non_detections_Bw>`
 
 We can now plot the non-detections and performance as a function of detection threshold:
-**NOTE:** This uses scienceplots for image formatting (available via pip).
 
 .. code-block:: python
 
@@ -627,7 +628,7 @@ Below we plot the optimization results (feature selection results from the Borut
 
 	# Instantiate the classifier and load the saved model
 
-	# First load the model that was optimized using XGBoost-based feature selection (10 features selected)
+	# First load the model that was optimized using XGBoost-based feature selection (8 features selected)
 	xgboost8_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
 	xgboost8_model.load('ensemble_model_xgb_boruta_xgb')
 
@@ -699,7 +700,7 @@ Below we plot the optimization results (feature selection results from the Borut
 	ncol = 1 # No of columns in legend
 	savefig = True # Whether to save the figure (note that current version of program always saves with same figname so careful about overwrites)
 
-	# First plot the results from the XGBoost model trained with 10 features
+	# First plot the results from the XGBoost model trained with 8 features
 	title = 'Hyperparameter Optimization (8 Features)' # Fig title
 
 	xgboost8_model.plot_hyper_opt(
@@ -1096,7 +1097,7 @@ The three candidate catalogs are available for download:
 - `candidate_catalog_optimized_xgboost_45 <https://drive.google.com/file/d/17rYf_Mx-eFHWsHYtmeMUeh6wMZLRrd-P/view?usp=sharing>`_
 
 
-Probability-Scaled t-SNE Maps
+t-SNE Projections
 -----------
 
 With the LOO CV results we can generate t-SNE projections and scale the points by the probability prediction. 
@@ -1204,7 +1205,6 @@ The t-SNE projection data files are available here:
 
 
 Now we can plot the probability-scaled t-SNE projections.
-**NOTE:** This uses scienceplots for image formatting (available via pip).
 
 .. code-block:: python
 
@@ -1304,7 +1304,6 @@ Now we can plot the probability-scaled t-SNE projections.
 
 
 Next we re-do the t-SNE projections but now scale the points by the feature values, looking at the top three features. Each projection is accompanied by the Gaussian kernel density estimate (KDE) of that feature for LAB and OTHER, normalized to unit height, to summarize the class-wise distributions.
-**NOTE:** This uses scienceplots for image formatting (available via pip).
 
 .. code-block:: python
 
@@ -1521,7 +1520,6 @@ Next we re-do the t-SNE projections but now scale the points by the feature valu
 	    plt.clf()
 	    plt.close()
 
-
 .. figure:: _static/kde_tsne_new_8_mag.png
     :align: center
     :class: with-shadow with-border
@@ -1541,7 +1539,426 @@ Next we re-do the t-SNE projections but now scale the points by the feature valu
 |
 
 
+XGBoost Model Performance
+-----------
+
+We now assess the performance of the three XGBoost models. First we make a ROC Curve, assessed via 10-Fold CV.
+
+.. code-block:: python
+
+	import numpy as np
+	import pandas as pd
+	from sklearn.model_selection import StratifiedKFold
+	from sklearn.metrics import roc_curve, auc
+	from pyBIA import ensemble_model, data_processing
+	import matplotlib.pyplot as plt
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size': 21})
+
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
+
+	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
+	df = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
+	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
+
+	# Omit any non-detections
+	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']) & np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
+
+	# Balance both classes to be of same size
+	blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
+	other_index = np.where(df['flag'].iloc[mask] == 0)[0]
+	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
+
+	#These are the features to use, note that the catalog includes more than this!
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
+
+	df_names = np.array(df_filtered.obj_name)
+
+	# Training data arrays
+	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
+
+	# This is the base model, no hyperparameter optimization, uses all the features
+	clf = 'xgb' # The classification model that will be trined
+	impute = False # Whether to impute missing values (NaN)
+	base_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	base_model.create()
+	BASE_M = base_model.model
+
+	# This is the optimized model trained with 8 features
+	xgboost_8_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	xgboost_8_model.load('ensemble_model_xgb_boruta_xgb')
+	OPT_M1 = xgboost_8_model.model
+
+	# This is the optimized model trained with 45 features
+	xgboost_45_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	xgboost_45_model.load('ensemble_model_xgb_boruta_rf')
+	OPT_M2 = xgboost_45_model.model
+
+	# Plot ROC Curves with 10-fold cross-validation 
+
+	# Define a dictionary mapping model names to model objects.
+	models = {
+	    "Base XGBoost": BASE_M,
+	    "XGBoost-8": OPT_M1,
+	    "XGBoost-45": OPT_M2,
+	}
+
+	# Choose different colors and line styles for each model.
+	model_colors = {
+	    "Base XGBoost": "blue",
+	    "XGBoost-8": "green",
+	    "XGBoost-45": "orange",
+	}
+
+	model_linestyles = {
+	    "Base XGBoost": "-",
+	    "XGBoost-8": "--",
+	    "XGBoost-45": "-.",
+	}
+
+	# Set up 10-fold cross-validation
+	opt_cv = 10 # Will perform 10-fold cross validation
+	SEED_NO = 1909 # Random seed for the CV
+
+	cv = StratifiedKFold(n_splits=opt_cv, shuffle=True, random_state=SEED_NO)
+
+	# Define a common grid of false positive rates at which we will interpolate the TPR
+	mean_fpr = np.linspace(0, 1, 100)
+
+	plt.figure(figsize=(8, 8))
+
+	# Loop over the three models.
+	for model_name, model in models.items():
+	    
+	    # To store TPR and corresponding AUC
+	    tprs, aucs = [], []
+	    
+	    # Loop over the CV folds.
+	    for train_idx, test_idx in cv.split(data_x, data_y):
+
+	        # Fit the model on the training fold
+	        model.fit(data_x[train_idx], data_y[train_idx])
+	        
+	        # Get the predicted probabilities for the positive class on the test fold
+	        y_proba = model.predict_proba(data_x[test_idx])[:, 1]
+	        
+	        # Compute the ROC curve and AUC for this fold
+	        fpr, tpr, _ = roc_curve(data_y[test_idx], y_proba)
+	        fold_auc = auc(fpr, tpr)
+	        aucs.append(fold_auc)
+	        
+	        # Interpolate the TPR at the mean_fpr points
+	        interp_tpr = np.interp(mean_fpr, fpr, tpr)
+	        interp_tpr[0] = 0.0 # Ensure the curve starts at 0
+	        tprs.append(interp_tpr)
+	    
+	    # Compute the mean and std TPR values across folds.
+	    mean_tpr = np.mean(tprs, axis=0)
+	    mean_tpr[-1] = 1.0 # To ensure the curve ends at 1
+	    std_tpr = np.std(tprs, axis=0)
+
+	    # Compute the mean and std AUC.
+	    mean_auc = np.mean(aucs) # average of the per‑fold AUCs
+	    std_auc = np.std(aucs)
+	    
+	    # Plot the mean ROC curve for this model.
+	    plt.plot(
+	        mean_fpr,
+	        mean_tpr,
+	        color=model_colors[model_name],
+	        linestyle=model_linestyles[model_name],
+	        lw=1.6,
+	        label=fr"{model_name} (AUC = {mean_auc:0.4f} $\pm$ {std_auc:0.4f})"
+	    )
+
+	    # Plot the standard deviation shaded region
+	    tpr_upper = np.minimum(mean_tpr + std_tpr, 1)
+	    tpr_lower = np.maximum(mean_tpr - std_tpr, 0)
+	    plt.fill_between(mean_fpr, tpr_lower, tpr_upper, color=model_colors[model_name], alpha=0.2)
+
+	plt.xlim([0, 1]); plt.ylim([0, 1])
+	plt.xlabel("False Positive Rate")
+	plt.ylabel("True Positive Rate")
+	plt.title("XGBoost Model Comparison")
+	plt.legend(loc="center right", handlelength=1, frameon=True, fancybox=True)
+	plt.savefig('new_rocs.png', dpi=300, bbox_inches='tight')
+	plt.show()
+
+.. figure:: _static/new_rocs.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+Next we generate the eCDFs to assess how many positive detections each model yields as a function of probability prediction, both for the candidate catalogs (saved before, the positively classified objects in the NDWFS Bootes field) and the LAB training instances that were also positively classified.
+
+.. code-block:: python
+
+	import numpy as np
+	import pandas as pd
+	from pyBIA import data_processing
+	import matplotlib.pyplot as plt
+	import scienceplots
+	plt.style.use("science")
+	plt.rcParams.update({"font.size": 21})
+
+	# First load the master catalog and count how many objects there are (for normalization)
+	other_all = pd.read_csv('Other_Catalog_Master_0.32')
+
+	# Omit non-detections and record total number of detections 
+	mask = np.where((other_all['area'] != -999) & np.isfinite(other_all['mag']) & np.all(np.isfinite(other_all[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
+	total_no = len(mask)
+
+	def ecdf_common(data, x_grid):
+	    """Compute the eCDF evaluated on a common grid."""
+	    sorted_data = np.sort(data)
+	    # For each value in the common grid, count the fraction of data points <= x.
+	    counts = np.searchsorted(sorted_data, x_grid, side='right')
+	    return counts / len(sorted_data)
+
+	# Load the candidate catalogs and LOO analysis results saved before
+
+	# Model 1: Baseline XGBoost
+	# Candidate probabilities
+	df_model1 = pd.read_csv('candidate_catalog_base.csv')
+	probas_cand_m1 = np.array(df_model1.proba)
+
+	# Load results from Leave-one-Out analysis
+	LoO_LAB = np.loadtxt('LoO_LAB', dtype=str)
+	LoO_Confirmed_LAB = np.loadtxt('LoO_Confirmed_LAB', dtype=str)
+
+	# For Baseline XGBoost, probas saved in second column
+	train_m1 = np.r_[LoO_LAB[:, 1].astype(float), LoO_Confirmed_LAB[:, 1].astype(float)]
+
+	# Model 2: XGBoost-8
+	# Candidate probabilities
+	df_model2 = pd.read_csv('candidate_catalog_optimized_xgboost_8.csv')
+	probas_cand_m2 = np.array(df_model2.proba)
+
+	# For XGBoost-8, probas saved in third column
+	train_m2 = np.r_[LoO_LAB[:, 2].astype(float), LoO_Confirmed_LAB[:, 2].astype(float)]
+
+	# Model 3: XGBoost-45
+	# Candidate probabilities
+	df_model3 = pd.read_csv('candidate_catalog_optimized_xgboost_45.csv')
+	probas_cand_m3 = np.array(df_model3.proba)
+
+	# For XGBoost-45, probas saved in third column
+	train_m3 = np.r_[LoO_LAB[:, 3].astype(float), LoO_Confirmed_LAB[:, 3].astype(float)]
+
+	# Define a common x-grid (from 0.5 to 1.0) for all eCDF curves.
+	common_x = np.linspace(0.5, 1.0, 500)
+
+	# Compute eCDF for Candidates
+	ecdf_m1_cand = ecdf_common(probas_cand_m1, common_x)
+	ecdf_m2_cand = ecdf_common(probas_cand_m2, common_x)
+	ecdf_m3_cand = ecdf_common(probas_cand_m3, common_x)
+
+	# Compute eCDF for LAB training samples (which already include confirmed values)
+	ecdf_m1_lab = ecdf_common(train_m1, common_x)
+	ecdf_m2_lab = ecdf_common(train_m2, common_x)
+	ecdf_m3_lab = ecdf_common(train_m3, common_x)
+
+	# Set a common color for the curves
+	common_color =  ['blue', 'green', 'orange']
+
+	# Plot the Candidates eCDF
+	fig1, ax1 = plt.subplots(figsize=(8, 8))
+
+	# Plot using different line styles for clarity.
+	ax1.plot(common_x, ecdf_m1_cand, linestyle='-',  color=common_color[0], lw=1.6,
+	         label=f'Base XGBoost (n={len(probas_cand_m1):,}, {np.round(100*len(probas_cand_m1)/total_no,1)}\\%)')
+	ax1.plot(common_x, ecdf_m2_cand, linestyle='--', color=common_color[1], lw=1.6,
+	         label=f'XGBoost-8 (n={len(probas_cand_m2):,}, {np.round(100*len(probas_cand_m2)/total_no,1)}\\%)')
+	ax1.plot(common_x, ecdf_m3_cand, linestyle=':',  color=common_color[2], lw=1.6,
+	         label=f'XGBoost-45 (n={len(probas_cand_m3):,}, {np.round(100*len(probas_cand_m3)/total_no,1)}\\%)')
+
+	ax1.set_xlabel(r"$P(y =$ LAB $\mid \mathbf{{X}})$")
+	ax1.set_ylabel('Empirical Cumulative Distribution Function')# (ECDFs)')
+	ax1.set_title('Classification Results: Initial Candidates')
+	ax1.legend(loc='upper left', frameon=True, fancybox=True, handlelength=1.8)
+	plt.tight_layout()
+	plt.savefig('Candidates_eCDF.png', bbox_inches='tight', dpi=300)
+	plt.show()
+
+	# Plot the LAB eCDF
+	fig2, ax2 = plt.subplots(figsize=(8, 8))
+
+	# Plot the LAB eCDF curves for the three models.
+	ax2.plot(common_x, ecdf_m1_lab, linestyle='-',  color=common_color[0], lw=1.6,
+	         label=f'Base XGBoost (n={len(np.where(train_m1>=0.5)[0])}, {np.round(100*len(np.where(train_m1>=0.5)[0])/859,1)}\\%)')
+	ax2.plot(common_x, ecdf_m2_lab, linestyle='--', color=common_color[1], lw=1.6,
+	         label=f'XGBoost-8 (n={len(np.where(train_m2>=0.5)[0])}, {np.round(100*len(np.where(train_m2>=0.5)[0])/859,1)}\\%)')
+	ax2.plot(common_x, ecdf_m3_lab, linestyle=':',  color=common_color[2], lw=1.6,
+	         label=f'XGBoost-45 (n={len(np.where(train_m3>=0.5)[0])}, {np.round(100*len(np.where(train_m3>=0.5)[0])/859,1)}\\%)')
+
+	ax2.set_xlabel(r"$P(y =$ LAB $\mid \mathbf{X})$ (Leave-one-Out CV)")
+	ax2.set_ylabel('Empirical Cumulative Distribution Function')# (ECDFs)')
+	ax2.set_title('LAB Classification Analysis')
+	#ax2.set_xlim(0.5, 1.0)
+	ax2.legend(loc='upper left', frameon=True, fancybox=True, handlelength=1.8)
+	plt.tight_layout()
+	plt.savefig('LAB_eCDF.png', bbox_inches='tight', dpi=300)
+	plt.show()
+
+.. figure:: _static/LAB_eCDF.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/Candidates_eCDF.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
 
+XGBoost Classification Analysis
+-----------
+
+Now that we have determined that in this context an XGBoost model trained with 8 features performs best, we proceed with analysing what drives the predictions. Here we plot the classification output as a function of the top three features.
+
+Since the previous candidate catalogs only saved LAB objects, we need to re-run the classification to capture non-LAB objects. The original LOO analysis code missed these non-LAB sources from the ~2M original entries, so the new code reconstructs this catalog and concatenates at the end because the master catalog omits the negative training class.
+
+.. code-block:: python
+
+	# Only need to do this for the model we chose, XGBoost-8
+	import numpy as np
+	import pandas as pd
+	from pyBIA import ensemble_model, data_processing
+
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
+
+	# Load the original training data from the optimal nsig
+	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
+	df = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')                                                                                                                                                                                                                         
+
+	# Log-transform the Hu moments
+	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
+
+	# Omit any non-detections
+	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']) & np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
+
+	# Balance both classes to be of same size
+	blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
+	other_index = np.where(df['flag'].iloc[mask] == 0)[0]
+	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
+
+	#These are the features to use, note that the catalog includes more than this!
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
+
+	# Training data arrays
+	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
+
+	# This is the optimized model (XGBoost-8)
+	clf = 'xgb' # The classification model 
+	impute = False # Will not impute NaN values, as they should not be present after masking non-detections
+	optimized_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	optimized_model.load('ensemble_model_xgb_boruta_xgb')
+
+	# Load the catalog containing all 2 million other objects, extracted using sig=0.32
+	other_all = pd.read_csv('Other_Catalog_Master_0.32')
+
+	# Remove the 859 OTHER objects that are present in the training set, we will assess these individually using LoO
+	other_all = other_all[~other_all['obj_name'].isin(df_filtered['obj_name'])]
+
+	# Log transform the Hu moments
+	other_all[hu_cols] = other_all[hu_cols].apply(data_processing.signed_log_transform)
+
+	# Omit non-detections
+	mask = np.where((other_all['area'] != -999) & np.isfinite(other_all['mag']) & np.all(np.isfinite(other_all[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
+
+	other_all = other_all.iloc[mask]
+
+	# Create the data_x array
+	other_data_x = np.array(other_all[columns])
+
+	# Predict all samples to create a candidates catalog
+	predictions_optimized_model = optimized_model.predict(other_data_x)
+
+	# Select Non-LAB detections (flag = 0)
+	index_optimized = np.where(predictions_optimized_model[:,0] == 0)[0]
+
+	# Index the catalog to select only the positive detections
+	candidate_catalog_optimized = other_all.iloc[index_optimized]
+
+	# Save the probability predictions as a new columns (note these are probas that object is NOT an LAB)
+	candidate_catalog_optimized['proba'] = predictions_optimized_model[index_optimized][:,1]
+
+	# Repeat the same LoO process but evaluate the OTHER training for fair assessment of these objects
+	# Positive detections from this LoO will be added to the candidates catalog that was created above
+
+	# Remove one LAB object as this time the OTHER class will be cross-validated using LoO
+	other_training = df_filtered[df_filtered.flag == 0]
+	LAB_training =  df_filtered[df_filtered.flag == 1].iloc[1:]
+
+	# To store the probas of all LAB objects as well as their catalog names
+	other_optimized_probas, names = [],[] #other_base_probas
+
+	#Leave-one-Out cross-validating the OTHER class
+	for i in range(len(other_training)):
+		print(f"{i+1} of {len(other_training)}")
+		# This will be the individual OTHER sample to assess
+		leave_one = np.array(other_training[columns].iloc[i])
+		# Removing this validation sample from the overall OTHER training bag
+		remaining = np.delete(np.array(other_training[columns]), i, axis=0)
+		# Setting the new training data
+		data_x = np.r_[remaining, np.array(LAB_training[columns])]
+		data_y = np.r_[[0]*len(remaining), [1]*len(LAB_training)]
+		# Training the new optimized model
+		new_optimized_model = optimized_model.model.fit(data_x[:,optimized_model.feats_to_use], data_y)
+		# Assess the left-out OTHER sample using the base and optimized model
+		proba_optimized = new_optimized_model.predict_proba(leave_one[optimized_model.feats_to_use].reshape(1,-1))
+		# Save only the probability prediction that the object is LAB
+		other_optimized_probas.append(float(proba_optimized[:,1]))
+		names.append(other_training.obj_name.iloc[i])
+
+	indices = []
+
+	index = np.where(np.array(other_optimized_probas) < 0.5)[0] 
+	for name in np.array(names)[index]:
+		indices.append(np.where(other_training.obj_name == name)[0][0])
+
+	# Add to the master optimized candidate catalog
+	df_filtered_optimized = other_training.iloc[indices]
+	df_filtered_optimized['proba'] = 1 - np.array(other_optimized_probas)[index] # Inverse because this catalog contains the proba of it NOT being an LAB
+	candidate_catalog_optimized = pd.concat([candidate_catalog_optimized, df_filtered_optimized], ignore_index=True)
+
+	# Save candidate catalogs
+	candidate_catalog_optimized.to_csv('non_candidate_catalog_xgboost_8.csv')
+
+This catalog of non-LAB candidates (i.e., classified as OTHER) can be `downloaded here <https://drive.google.com/file/d/12d4ijXq55P6cVxFuoLXAlQDATUmZSRN_/view?usp=sharing>`_.
+
+In conjunction with the candidate catalog saved before we can now assess how the feature values influces the XGBoost model classification.
+
+.. code-block:: python
 
 

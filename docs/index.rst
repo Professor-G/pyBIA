@@ -14,7 +14,7 @@ pyBIA (Blob Identification Algorithm) is an open-source framework for machine le
 
 Although designed for astronomers, its modular architecture make it adaptable to any domain where large-scale image segmentation and/or classification are required. This documentation walks you through installation, data preparation, model training, and optimization so you can quickly build your own machine-learning classifiers with pyBIA.
 
-This software was created to conduct the research presented in Godines & Prescott 2025. If you use this code for publication, we would appreciate citations to the paper.
+This software was created to conduct the research presented in Godines & Prescott (2025). If you use this code for publication, we would appreciate citations to the paper.
 
 Functionality
 ==================
@@ -83,7 +83,7 @@ You can also clone the development version:
 
 **NOTE:** The program requires Python3.12+.
 
-To learn more about pyBIA's machine learning routines, consult the pages listed below. These pages provide high-level technical details on the program’s core functionality, as well as a dedicated section describing how Godines et al. (2025) was produced, including figure-by-figure generation details.
+To learn more about pyBIA's machine learning routines, consult the pages listed below. These pages provide high-level technical details on the program’s core functionality, as well as a dedicated section describing how Godines & Prescott (2025) was produced, including figure-by-figure generation details.
 
 Pages
 ==================
@@ -94,7 +94,7 @@ Pages
    source/Supervised Learning Algorithms
    source/Anomaly Detection
    source/Deep Learning Algorithms
-   source/Godines et al 2025
+   source/Godines & Prescott 2025
 
 Documentation
 ==================

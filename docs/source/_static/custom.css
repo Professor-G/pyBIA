@@ -10,13 +10,24 @@
 }
 
 /* Insert only tagline with two centered lines */
+/* First line */
 .wy-side-nav-search > a::after {
-    content: "Machine Learning\Afor Astronomical Discovery";
-    white-space: pre;          /* enables \A line break */
+    content: "Machine Learning";
     display: block;
     font-size: 0.85em;
     margin-top: 0.3em;
-    color: black;              /* black text */
-    font-style: italic;        /* no italic */
-    text-align: center;        /* explicitly center text */
+    color: black;
+    font-style: normal;
+    text-align: center;
+}
+
+/* Second line */
+.wy-side-nav-search > a::before {
+    content: "for Astronomical Discovery";
+    display: block;
+    font-size: 0.85em;
+    margin-top: 1.2em; /* adjust to match spacing under logo */
+    color: black;
+    font-style: normal;
+    text-align: center;
 }

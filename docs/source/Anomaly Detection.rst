@@ -1,6 +1,6 @@
 .. _unsupervised_models:
 
-Machine learning models
+Outlier Detection
 ===========
 
 .. admonition:: Under Construction (last updated 2025-09-16)

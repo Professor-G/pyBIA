@@ -23,7 +23,7 @@ The program provides four core modules:
    .. grid-item-card::
       :text-align: center
 
-      **Catalog Generation**
+      **`Catalog Generation <https://pybia.readthedocs.io/en/latest/source/Catalog%20Generation.html>`_**
 
       .. image:: _static/catalog_img_link.png
          :alt: Catalog Generation
@@ -35,7 +35,7 @@ The program provides four core modules:
    .. grid-item-card::
       :text-align: center
 
-      **Supervised Learning**
+      **`Supervised Learning <https://pybia.readthedocs.io/en/latest/source/Supervised%20Learning%20Algorithms.html>`_**
 
       .. image:: _static/supervised_model_img_link.png
          :alt: Supervised Learning
@@ -47,7 +47,7 @@ The program provides four core modules:
    .. grid-item-card::
       :text-align: center
 
-      **Anomaly Detection**
+      **`Anomaly Detection <https://pybia.readthedocs.io/en/latest/source/Anomaly%20Detection.html>`_**
 
       .. image:: _static/outlier_img_link.png
          :alt: Anomaly Detection
@@ -59,7 +59,7 @@ The program provides four core modules:
    .. grid-item-card::
       :text-align: center
 
-      **Deep Learning Classification**
+      **`Deep Learning Classification <https://pybia.readthedocs.io/en/latest/source/Deep%20Learning%20Algorithms.html>`_**
 
       .. image:: _static/cnn_model_img_link.png
          :alt: Deep Learning Classification

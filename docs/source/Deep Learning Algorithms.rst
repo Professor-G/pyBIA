@@ -1,6 +1,6 @@
 .. _cnn_models:
 
-Convolutional neural networks
+Convolutional Neural Networks
 ===========
 
 .. admonition:: Under Construction (last updated 2025-09-16)

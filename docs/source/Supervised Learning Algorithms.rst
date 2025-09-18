@@ -1,6 +1,6 @@
 .. _supervised_models:
 
-Machine learning models
+Supervised Machine Learning
 ===========
 
 UNDER CONSTRUCTION

@@ -296,6 +296,7 @@ The two files generated above can be downloaded:
 - :download:`non_detections_Bw <non_detections_Bw>`
 
 We can now plot the non-detections and performance as a function of detection threshold:
+**NOTE:** This uses scienceplots for image formatting (available via pip).
 
 .. code-block:: python
 
@@ -402,8 +403,11 @@ We now re-train the optimal model (XGBoost) and the optimal detection threshold 
 	import pandas as pd
 	from pyBIA import ensemble_model, data_processing
 
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
+
 	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
-	df = pd.read_csv(f'nsigs/_Bw_training_set_nsig_{sig}')
+	df = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
 
 	# Log-transform the Hu moments
 	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
@@ -475,8 +479,11 @@ We now proceed with the generated training set at the optimal detection threshol
 	import pandas as pd
 	from pyBIA import ensemble_model, data_processing
 
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
+
 	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
-	df = pd.read_csv(f'nsigs/_Bw_training_set_nsig_{sig}')
+	df = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
 	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
 	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
 
@@ -563,7 +570,7 @@ We now proceed with the generated training set at the optimal detection threshol
 	model.create()
 	model.save(dirname=f'ensemble_model_xgb_boruta_{boruta_model}')
 
-The XGBoost model optimized with RF-based feature importance (to compute the SHAP values) can be :download:`download hereed <ensemble_model_xgb_boruta_rf.zip>`.
+The XGBoost model optimized with RF-based feature importance (to compute the SHAP values) can be :download:`downloaded here <ensemble_model_xgb_boruta_rf.zip>`.
 
 The XGBoost model optimized with XGBoost-based feature importance (to compute the SHAP values) can be :download:`downloaded here <ensemble_model_xgb_boruta_xgb.zip>`.
 
@@ -577,8 +584,11 @@ Below we plot the optimization results (feature selection results from the Borut
 	from pyBIA import ensemble_model, data_processing
 	import pandas as pd
 
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
+
 	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
-	df = pd.read_csv('nsigs/_Bw_training_set_nsig_'+str(sig))
+	df = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
 
 	# Log-transform the Hu moments
 	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
@@ -815,7 +825,7 @@ This master catalog as genereated above is available for download `here <https:/
 Using this catalog, we can now load the optimal models to make the predictions. The predictions will be made using both the base and optimal models so as to compare the distribution of probability predictions. 
 
 
-Classifications & LOO CV
+Predictions & LOO CV
 -----------
 
 In the following script we perform the model predictions on the entire NDWFS Boötes field to generate the candidate catalogs (i.e., sources with probability predictions greater than 0.5). 
@@ -832,9 +842,12 @@ These candidate catalogs do not include the 866 LAB training objects as these we
 	# Load all 2 million catalog objects and create a sub-catalog of LAB candidates #
 	# LoO Analysis is performed on the training data in order to determine which of these sources would be considered new candidates
 
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
+
 	# First load the training data
 	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
-	df = pd.read_csv(f'/Users/daniel/Desktop/pyBIA_PLOTS/nsigs/_Bw_training_set_nsig_{sig}')
+	df = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
 
 	# Log-transform the Hu moments
 	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
@@ -1070,739 +1083,230 @@ These candidate catalogs do not include the 866 LAB training objects as these we
 	candidate_catalog_xgboost_45.to_csv('candidate_catalog_optimized_xgboost_45.csv')
 
 
-
 The three LOO analysis files are available here: 
 
 - :download:`LoO_Confirmed_LAB <LoO_Confirmed_LAB>`
 - :download:`LoO_LAB <LoO_LAB>`
 - :download:`LoO_OTHER <LoO_OTHER>`
 
+The three candidate catalogs are available for download:
+
+- `candidate_catalog_base <https://drive.google.com/file/d/12_uhZaF1cqeDpa_tQPvtmaXcxxFrHDhu/view?usp=sharing>`_
+- `candidate_catalog_optimized_xgboost_8 <https://drive.google.com/file/d/1q_1NbRcfi89iVUCXIcEff4UzDFfn5fdt/view?usp=sharing>`_
+- `candidate_catalog_optimized_xgboost_45 <https://drive.google.com/file/d/17rYf_Mx-eFHWsHYtmeMUeh6wMZLRrd-P/view?usp=sharing>`_
 
 
-These two candidate catalogs are available for download:
-
-- `candidate_catalog_base_xgb <https://drive.google.com/file/d/1IYbSql6xiTB-hGaM_bLp_ygCIKSyfOb_/view?usp=sharing>`_
-- `candidate_catalog_optimized_xgb <https://drive.google.com/file/d/13r0Qq7r4stemAtffEiEX8w-kQI_RjOKY/view?usp=sharing>`_
-
-
-We can now perform a probability prediction analysis, first with the baseline model (all features, not hyperparameter optimization):
-
-.. code-block:: python
-
-	# Figure 5 Left Panel -- Base Model #
-
-	# Confusion Matrix Plot
-
-	# Create label_y array for plotting purposes
-	y_labels = []
-	for flag in base_model.data_y:
-		y_labels.append('DIFFUSE') if flag == 1 else y_labels.append('OTHER')
-
-	# Assess the accuracies using 10-fold cross-validation and normalize the accuracies
-	base_model.plot_conf_matrix(data_y=y_labels, k_fold=10, normalize=True, title='Base Model')
-
-	# Histogram Plot
-	candidate_catalog_base = pd.read_csv('candidate_catalog_base_xgb.csv')
-	probas_candidates = np.array(candidate_catalog_base.proba)
-
-	# Load the saved LoO data 
-	confirmed_diffuse_probas = np.loadtxt('LoO_Confirmed_DIFFUSE_xgb', dtype=str)
-	all_diffuse_probas = np.loadtxt('LoO_DIFFUSE_xgb', dtype=str)
-
-	# The second column is the XGBoost baseline probas
-	five_diffuse_base_probas = confirmed_diffuse_probas[:,1].astype('float')
-	all_diffuse_base_probas = all_diffuse_probas[:,1].astype('float')
-
-	# Inspecting three thresholds, 0.7, 0.8 and 0.9
-	index_70, index_80, index_90 = np.where(probas_candidates >= 0.7)[0], np.where(probas_candidates >= 0.8)[0], np.where(probas_candidates >= 0.9)[0]
-
-	# Plot 
-	plt.hist(probas_candidates, bins=5, weights=np.ones(len(probas_candidates)) / len(probas_candidates), color='#377eb8', label='Candidates (n='+str(len(probas_candidates))+')')
-	plt.hist(all_diffuse_base_probas, bins=12, weights=np.ones(len(all_diffuse_base_probas)) / len(all_diffuse_base_probas), color='#ff7f00', alpha=0.6, label='DIFFUSE Training (n=865)')
-	plt.scatter(five_diffuse_base_probas, [0.0458]*len(five_diffuse_base_probas), marker='*', c='k', s=800, alpha=0.72, label=r'Confirmed Ly$\alpha$ (n=5)')
-
-	y=0.12 # Controls the position of the text
-
-	# 70th percentile
-	# Dashed vertical line
-	plt.axvline(x=0.7, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.105)
-	# Text showing number of objects above the threshold
-	plt.text(0.701, 0.27+y, s=r" n(P) $\geq$ 0.7", weight="bold")
-	plt.axhline(y=0.25+y, linestyle='-', linewidth=1.2, color='k', xmin=0.41, xmax=0.59)
-	plt.text(0.72, 0.2+y, s=str(len(index_70)), weight="bold")
-
-	# 80th percentile
-	# Dashed vertical line
-	plt.axvline(x=0.8, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.1415)
-	# Text showing number of objects above the threshold
-	plt.text(0.801, 0.55+y, s=r" n(P) $\geq$ 0.8", weight="bold")
-	plt.axhline(y=0.53+y, linestyle='-', linewidth=1.2, color='k', xmin=0.61, xmax=0.79)
-	plt.text(0.82, 0.48+y, s=str(len(index_80)), weight="bold")
-
-	# 90th percentile
-	# Dashed vertical line
-	plt.axvline(x=0.9, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.565)
-	# Text showing number of objects above the threshold
-	plt.text(0.903, 0.83+y, s=r" n(P) $\geq$ 0.9", weight="bold")
-	plt.axhline(y=0.81+y, linestyle='-', linewidth=1.2, color='k', xmin=0.81, xmax=0.99)
-	plt.text(0.925, 0.76+y, s=str(len(index_90)), weight="bold")
-
-	# Highlighting the lowest performing confirmed blob, PRG4
-	plt.text(0.7464, 0.1175, s="PRG4", weight="bold")
-
-	plt.title('XGBoost Classification Output', size=18); plt.xlabel('Probability Prediction', size=16); plt.ylabel('Normalized Counts', size=16)
-	plt.xticks(ticks=[0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.], 
-		labels=['0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'], size=14)
-	plt.yticks(ticks=[0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0], size=14, 
-		labels=['0','','0.1','','0.2','','0.3','','0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'])
-	plt.xlim((0.5,1.0)); plt.legend(prop={'size': 14}, loc='upper left')
-	plt.show()
-
-.. figure:: _static/Ensemble_Confusion_Matrix_Base.png
-    :align: center
-    :class: with-shadow with-border
-    :width: 600px
-|
-
-.. figure:: _static/Final_Histogram_Base.png
-    :align: center
-    :class: with-shadow with-border
-    :width: 600px
-|
-
-Now we compare with the optimized model:
-
-.. code-block:: python
-
-	# Figure 5 Right Panel Histogram -- Optimized Model #
-
-	# Confusion Matrix Plot
-	optimized_model.plot_conf_matrix(data_y=y_labels, k_fold=10, normalize=True, title='Optimized Model')
-
-	# Histogram Plot
-	candidate_catalog_optimized = pd.read_csv('candidate_catalog_optimized_xgb.csv')
-	probas_candidates = np.array(candidate_catalog_optimized.proba)
-
-	# The third column is the XGBoost optimized probas
-	five_diffuse_optimized_probas = confirmed_diffuse_probas[:,2].astype('float')
-	all_diffuse_optimized_probas = all_diffuse_probas[:,2].astype('float')
-
-	# Inspecting three thresholds, 0.7, 0.8 and 0.9
-	index_70, index_80, index_90 = np.where(probas_candidates >= 0.7)[0], np.where(probas_candidates >= 0.8)[0], np.where(probas_candidates >= 0.9)[0]
-
-	# Plot
-	plt.hist(probas_candidates, bins=5, weights=np.ones(len(probas_candidates)) / len(probas_candidates), color='#377eb8', label='Candidates (n='+str(len(probas_candidates))+')')
-	plt.hist(all_diffuse_optimized_probas, bins=12, weights=np.ones(len(all_diffuse_base_probas)) / len(all_diffuse_base_probas), color='#ff7f00', alpha=0.6, label='DIFFUSE Training (n=865)')
-	plt.scatter(five_diffuse_optimized_probas, [0.0458]*len(five_diffuse_base_probas), marker='*', c='k', s=800, alpha=0.72, label=r'Confirmed Ly$\alpha$ (n=5)')
-
-	y=0.12 # Controls the position of the text
-
-	# 70th percentile
-	# Dashed vertical line
-	plt.axvline(x=0.7, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.153)
-	# Text showing number of objects above the threshold
-	plt.text(0.701, 0.27+y, s=r" n(P) $\geq$ 0.7", weight="bold")
-	plt.axhline(y=0.25+y, linestyle='-', linewidth=1.2, color='k', xmin=0.41, xmax=0.59)
-	plt.text(0.72, 0.2+y, s=str(len(index_70)), weight="bold")
-
-	# 80th percentile
-	# Dashed vertical line
-	plt.axvline(x=0.8, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.193)
-	# Text showing number of objects above the threshold
-	plt.text(0.801, 0.55+y, s=r" n(P) $\geq$ 0.8", weight="bold")
-	plt.axhline(y=0.53+y, linestyle='-', linewidth=1.2, color='k', xmin=0.61, xmax=0.79)
-	plt.text(0.82, 0.48+y, s=str(len(index_80)), weight="bold")
-
-	# 90th percentile
-	# Dashed vertical line
-	plt.axvline(x=0.9, linestyle='--', linewidth=2, alpha=0.6, color='k', ymin=0.34)
-	# Text showing number of objects above the threshold
-	plt.text(0.903, 0.83+y, s=r" n(P) $\geq$ 0.9", weight="bold")
-	plt.axhline(y=0.81+y, linestyle='-', linewidth=1.2, color='k', xmin=0.81, xmax=0.99)
-	plt.text(0.931, 0.76+y, s=str(len(index_90)), weight="bold")
-
-	plt.text(0.6992, 0.1055, s="PRG4", weight="bold")
-
-	plt.title('XGBoost Classification Output', size=18); plt.xlabel('Probability Prediction', size=16); plt.ylabel('Normalized Counts', size=16)
-	plt.xticks(ticks=[0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.], 
-		labels=['0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'], size=14)
-	plt.yticks(ticks=[0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0], size=14, 
-		labels=['0','','0.1','','0.2','','0.3','','0.4','','0.5','','0.6','','0.7','','0.8','','0.9','','1.0'])
-	plt.xlim((0.5,1.0)); plt.legend(prop={'size': 14}, loc='upper left')
-	plt.savefig('/Users/daniel/Desktop/Final_Histogram_Optimized.png', bbox_inches='tight', dpi=300)
-	plt.show()
-
-.. figure:: _static/Ensemble_Confusion_Matrix_Optimized.png
-    :align: center
-    :class: with-shadow with-border
-    :width: 600px
-|
-
-.. figure:: _static/Final_Histogram_Optimized.png
-    :align: center
-    :class: with-shadow with-border
-    :width: 600px
-|
-
-
-Figure 6
+t-SNE Projections
 -----------
 
+With the LOO CV results we can generate t-SNE projections and scale the points by the probability prediction. 
+
+First we generate the t-SNE projections and save the scatter point positions. This can be done using the built-in methods in the Classifier class.
+
 .. code-block:: python
 
-	### Training the CNN ### 
-
-	# Extract Other Images #
-
-	import os 
 	import numpy as np
 	import pandas as pd
-	from astropy.io.fits import getdata
-	from astropy.stats import SigmaClip
-	from photutils.aperture import ApertureStats, CircularAnnulus
-	from pyBIA.data_processing import crop_image, concat_channels 
+	from pyBIA import ensemble_model, data_processing
 
-	# Where the images will be saved (as txt files)
-	bw_images_path = 'saved_images/OTHER/Bw/'
-	r_images_path = 'saved_images_cps/OTHER/R/'
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
 
-	# Load the candidate catalog according to the optimized model 
-	cat = pd.read_csv('candidate_catalog_optimized_xgb.csv')
+	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
+	df = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
 
-	# Select only the candidates with probability predictions greater than or equal to 70%
-	index = np.where(cat.proba >= 0.7)[0]
-	sample = cat.iloc[index]
+	# Log-transform the Hu moments
+	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
 
-	# Saving images as 120x120 pix
-	image_size = 120 
+	# Omit any non-detections
+	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']) & np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
 
-	# Setting the apertures for the background subtraction, approximated using the sigma-clipped median within annuli of 20 and 35 pixel radii
-	annulus_apertures = CircularAnnulus((int(image_size/2),int(image_size/2)), r_in=20, r_out=35)
+	# Balance both classes to be of same size
+	blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
+	other_index = np.where(df['flag'].iloc[mask] == 0)[0]
+	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
 
-	for field_name in np.unique(sample['field_name']):
-		# Load the B and R broadband data 
-		hdu_bw = fits.open('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/Bw_FITS/'+field_name+'_Bw_03_fix.fits')
-		hdu_r = fits.open('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/R_FITS/'+field_name+'_R_03_reg_fix.fits')
-		# Select only the objects in this subfield
-		subfield_index = np.where(sample['field_name'] == field_name)[0] 
-		# Loop through these objects, subtract the background using aperture photometry, and save as txt file
-		for i in range(len(subfield_index)):
-			# Select the object's pixel positions
-			xpix, ypix = sample[['xpix', 'ypix']].iloc[subfield_index[i]].values.T
-			# Bw first, crop the image from the entire subfield array, and calculate the background in this region
-			image = crop_image(hdu_bw[0].data, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
-			bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
-			# Subtract the background and then normalize by the exposure time to get counts/sec
-			image = (image - bkg_stats.median) / hdu_bw[0].header['EXPTIME']
-			np.savetxt(bw_images_path+sample.obj_name.iloc[subfield_index[i]], image)
-			# R next, crop the image from the entire subfield array, and calculate the background in this region
-			image = crop_image(hdu_r[0].data, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
-			bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
-			# Subtract the background and then normalize by the exposure time to get counts/sec
-			image = (image - bkg_stats.median) / hdu_r[0].header['EXPTIME']
-			np.savetxt(r_images_path+sample.obj_name.iloc[subfield_index[i]], image)
+	#These are the features to use, note that the catalog includes more than this!
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
 
+	# Training data arrays
+	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
+	df_names = np.array(df_filtered.obj_name)
 
-	# Load the object names that were saved
-	obj_names = [name for name in os.listdir(bw_images_path) if 'NDWFS' in name]
+	# Load the LoO Analysis results
+	loo_confirmed_lab = np.loadtxt('LoO_Confirmed_LAB', dtype=str)
+	loo_lab = np.loadtxt('LoO_LAB', dtype=str)
+	loo_other = np.loadtxt('LoO_OTHER', dtype=str)
 
-	# To store the images and save as a single binary file 
-	images = []
+	#The names of our confirmed LABs as they appaer in the NDWFS Catalog: 'LABd05', 'PRG1', 'PRG2', 'PRG3', 'PRG4'
+	confirmed_LAB_cat_names = ['NDWFS_J143410.9+331730','NDWFS_J143512.2+351108','NDWFS_J142623.0+351422','NDWFS_J143412.7+332939', 'NDWFS_J142653.1+343856']
 
-	# Load each saved file for each individual object and concat to create one single array object
-	for name in obj_names:
-		# Load each image individually, both filters
-		Bw, R = np.loadtxt(bw_images_path+name), np.loadtxt(r_images_path+name)
-		# Append as a 3D array, containing Bw-R as the third filter
-		images.append(concat_channels(Bw, R, Bw-R))
+	# Concat the data from all three models (base, xgboost-8, xgboost-45)
+	# The first column contains the na,es the second the baseline model data, 3rd column is xgboost-8, fourth is xgboost-45
+	names = np.r_[loo_lab[:,0], confirmed_LAB_cat_names, loo_other[:,0]]
+	probas_xgboost_8 = np.r_[loo_lab[:,2], loo_confirmed_lab[:,2], loo_other[:,2]]
+	probas_xgboost_45 = np.r_[loo_lab[:,3], loo_confirmed_lab[:,3], loo_other[:,3]]
 
-	# Save the images as a 4-D array for CNN input, as well as the corresponding names
-	np.save('/Users/daniel/Desktop/saved_images/xgb_output_images.npy', np.array(images))
-	np.savetxt('/Users/daniel/Desktop/saved_images/xgb_output_images_names.txt', obj_names, fmt='%s')
+	# Sort in order of the training data (df_filtered)
+	indices = []
+	for i in range(len(df_names)):
+	    indices.append(np.where(names == df_names[i])[0][0])
 
-The images as generated above as a binary file are available `here <https://drive.google.com/file/d/1D6TFRlyTWF4lUXJKiZWAcBqOY9qUw11e/view?usp=drive_link>`_. The object names in corresponding order can be :download:`download here. <xgb_output_images_names.txt>`
+	names = names[indices]
+	probas_xgboost_8, probas_xgboost_45 = probas_xgboost_8[indices].astype('float'), probas_xgboost_45[indices].astype('float')
 
-.. code-block:: python
+	# Load the models (saved in earlier code)
+	clf = 'xgb' # The classification model 
+	impute = False # Will not impute NaN values, as they should not be present after masking non-detections
+	xgboost_8_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	xgboost_8_model.load('ensemble_model_xgb_boruta_xgb')
 
-	# Extract the DIFFUSE Images #
+	xgboost_45_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
+	xgboost_45_model.load('ensemble_model_xgb_boruta_rf')
 
-	confirmed_diffuse_images_path_bw = '/Users/daniel/Desktop/saved_images/confirmed_diffuse/Bw/'
-	priority_diffuse_images_path_bw = '/Users/daniel/Desktop/saved_images/priority_diffuse/Bw/'
-	other_diffuse_images_path_bw = '/Users/daniel/Desktop/saved_images/other_diffuse/Bw/'
+	# For plotting purposes change the labels from numeric to text
+	y_labels = ['LAB' if flag == 1 else 'OTHER' for flag in data_y]
 
-	confirmed_diffuse_images_path_r = '/Users/daniel/Desktop/saved_images/confirmed_diffuse/R/'
-	priority_diffuse_images_path_r = '/Users/daniel/Desktop/saved_images/priority_diffuse/R/'
-	other_diffuse_images_path_r = '/Users/daniel/Desktop/saved_images/other_diffuse/R/'
+	# For plotting purposes, re-name the five confirmed blobs to Confirmed LyAlpha
+	confirmed_names = np.loadtxt('confirmed_LAB_names.txt', dtype=str)
 
-	# Load the data from the Leave-one-Out cross validation analysis
-	diffuse = np.loadtxt('/Users/daniel/Desktop/LoO_DIFFUSE_xgb', dtype=str)
-	optimized_probas = diffuse[:,2].astype('float')
+	# Identify the confirmed LABs and re-name 
+	for name in confirmed_names:
+	    index = np.where(df_filtered.obj_name == name)[0][0]
+	    y_labels[index] = r'Confirmed_Ly$\alpha$'
 
-	# Select only the DIFFUSE objects that were output with probability predictions greater than 85%, this list includes the 80 priority candidates
-	index = np.where(optimized_probas >= 0.85)[0]
-	names_to_save = diffuse[:,0][index] 
+	# The t-SNE projection with custom y_data labels, highlighting the scatter points for the confirmed blobs
+	# For now we only need to generate the t-SNE projection and save the scatter point positions
+	return_data = True # Whether to also return the x and y coordinates of the scatter points (will correspond to the order of the feature matrix (i.e., your labels in `data_y`))
 
-	# The training set file
-	sample = pandas.read_csv('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/nsigs/BW_NSIG/BW_training_set_nsig_0.31')
+	x_8, y_8 = xgboost_8_model.plot_tsne(data_y=y_labels, return_data=return_data)
+	x_45, y_45 = xgboost_45_model.plot_tsne(data_y=y_labels, return_data=return_data)
 
-	# Will identify the priority candidates as selected by Prescott et al. (2012), so as to save separately
-	obj_names_80 = np.loadtxt('/Users/daniel/Desktop/Folders/pyBIA/pyBIA/data/obj_name_80', dtype=str)
+	np.savetxt('tsne_scatter_data_8_feats.txt', np.c_[x_8, y_8, y_labels, names, probas_xgboost_8],fmt='%s',header='x, y, labels, names, probas')
+	np.savetxt('tsne_scatter_data_45_feats.txt', np.c_[x_45, y_45, y_labels, names, probas_xgboost_45],fmt='%s',header='x, y, labels, names, probas')
 
-	# Will also save the five confirmed blobs
-	obj_names_5 = np.loadtxt('/Users/daniel/Desktop/Folders/pyBIA/pyBIA/data/obj_name_5', dtype=str)
+The t-SNE projection data files are available here: 
 
-	# Saving images as 120x120 pix
-	image_size = 120 
-
-	# Setting the apertures for the background subtraction, approximated using the sigma-clipped median within annuli of 20 and 35 pixel radii
-	annulus_apertures = CircularAnnulus((int(image_size/2),int(image_size/2)), r_in=20, r_out=35)
-
-	for field_name in np.unique(sample['field_name']):
-		# Load the B and R broadband data
-		data_bw = getdata('/fs1/scratch/godines/NDWFS_Tiles/Bw/'+field_name+'_Bw_03_fix.fits')
-		data_r = getdata('/fs1/scratch/godines/NDWFS_Tiles/R/'+field_name+'_R_03_reg_fix.fits')
-		# Select only the objects in this subfield
-		subfield_index = np.where(sample['field_name'] == field_name)[0] 
-		# Loop through these objects, subtract the background using aperture photometry, and save as txt file
-		for i in range(len(subfield_index)):
-			if sample.obj_name.iloc[subfield_index[i]] in names_to_save or sample.obj_name.iloc[subfield_index[i]] in obj_names_5:
-				xpix, ypix = sample[['xpix', 'ypix']].iloc[subfield_index[i]].values.T
-				# Bw first, crop the image from the entire subfield array, and save the bkg subtracted sub-array
-				image = crop_image(data_bw, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
-				bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
-				if sample.obj_name.iloc[subfield_index[i]] in obj_names_80:
-					np.savetxt(priority_diffuse_images_path_bw+sample.obj_name.iloc[subfield_index[i]], image-bkg_stats.median)
-				elif sample.obj_name.iloc[subfield_index[i]] in obj_names_5:
-					np.savetxt(confirmed_diffuse_images_path_bw+sample.obj_name.iloc[subfield_index[i]], image-bkg_stats.median)
-				else:
-					np.savetxt(other_diffuse_images_path_bw+sample.obj_name.iloc[subfield_index[i]], image-bkg_stats.median)
-				# R next, crop the image from the entire subfield array, and save the bkg subtracted sub-array
-				image = crop_image(data_r, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
-				bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
-				if sample.obj_name.iloc[subfield_index[i]] in obj_names_80:
-					np.savetxt(priority_diffuse_images_path_r+sample.obj_name.iloc[subfield_index[i]], image-bkg_stats.median)
-				elif sample.obj_name.iloc[subfield_index[i]] in obj_names_5:
-					np.savetxt(confirmed_diffuse_images_path_r+sample.obj_name.iloc[subfield_index[i]], image-bkg_stats.median)
-				else:
-					np.savetxt(other_diffuse_images_path_r+sample.obj_name.iloc[subfield_index[i]], image-bkg_stats.median)
+- :download:`tsne_scatter_data_8_feats.txt <tsne_scatter_data_8_feats.txt>`
+- :download:`tsne_scatter_data_45_feats.txt <tsne_scatter_data_45_feats.txt>`
 
 
-	# Save the five confirmed diffuse as a single binary file #
-	obj_names_confirmed_diffuse = [name for name in os.listdir(confirmed_diffuse_images_path_bw) if 'NDWFS' in name]
-
-	images = []
-	for name in obj_names_confirmed_diffuse:
-		Bw, R = np.loadtxt(confirmed_diffuse_images_path_bw+name), np.loadtxt(confirmed_diffuse_images_path_r+name)
-		images.append(concat_channels(Bw, R, Bw-R))
-
-	np.save('/Users/daniel/Desktop/saved_images/confirmed_diffuse/confirmed_diffuse.npy', np.array(images))
-	np.savetxt('/Users/daniel/Desktop/saved_images/confirmed_diffuse/confirmed_diffuse_names.txt', obj_names_confirmed_diffuse, fmt='%s')
-
-	# Save the 80 priority diffuse candidates as a single binary file #
-	obj_names_priority_diffuse = [name for name in os.listdir(priority_diffuse_images_path_bw) if 'NDWFS' in name]
-
-	images = []
-	for name in obj_names_priority_diffuse:
-		Bw, R = np.loadtxt(priority_diffuse_images_path_bw+name), np.loadtxt(priority_diffuse_images_path_r+name)
-		images.append(concat_channels(Bw, R, Bw-R))
-
-	np.save('/Users/daniel/Desktop/saved_images/priority_diffuse/priority_diffuse.npy', np.array(images))
-	np.savetxt('/Users/daniel/Desktop/saved_images/priority_diffuse/priority_diffuse_names.txt', obj_names_priority_diffuse, fmt='%s')
-
-	# Save the other diffuse candidates as a single binary file #
-	obj_names_other_diffuse = [name for name in os.listdir(other_diffuse_images_path_bw) if 'NDWFS' in name]
-
-	images = []
-	for name in obj_names_other_diffuse:
-		Bw, R = np.loadtxt(other_diffuse_images_path_bw+name), np.loadtxt(other_diffuse_images_path_r+name)
-		images.append(concat_channels(Bw, R, Bw-R))
-
-	np.save('/Users/daniel/Desktop/saved_images/other_diffuse/other_diffuse.npy', np.array(images))
-	np.savetxt('/Users/daniel/Desktop/saved_images/other_diffuse/other_diffuse_names.txt', obj_names_other_diffuse, fmt='%s')
-
-The binary files containing these other diffuse images are available for download:
+Now we can plot the probability-scaled t-SNE projections.
+**NOTE:** This uses scienceplots for image formatting (available via pip).
 
 .. code-block:: python
-
-	# Optimize the CNN Model #
 
 	import numpy as np
-	from pyBIA import cnn_model
+	import matplotlib.pyplot as plt
+	import matplotlib as mpl
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size': 21})
 
-	blobs = np.load('/fs1/home/godines/final_npy/blobs_confirmed.npy') 
-	val_blobs = blobs[:1]
-	blobs = blobs[1:]
+	# Loop runs twice, once with model='xgboost_8' and the other with model='xgboost_45'
+	for model in ['xgboost_8', 'xgboost_45']:
 
-	other = np.load('/fs1/scratch/godines/xgb_output_images.npy')
-	other_test = other[:1000] # Optional test data, will be used to assess models created during the optimization routine
-	other = other[1000:2000] # This will be the negative class data
+		fname = 'tsne_scatter_data_8_feats.txt' if model == 'xgboost_8' else '/Users/daniel/Desktop/pyBIA_PLOTS/tsne_scatter_data_45_feats.txt'
 
-	# Model creation and optimization
+		# Load the t-SNE data saved in code above
+		xgb_results = np.loadtxt(fname, dtype=str)
+		x, y = xgb_results[:, 0].astype(float), xgb_results[:, 1].astype(float)
+		labels = xgb_results[:, 2]
+		names = xgb_results[:, 3]
+		probas = xgb_results[:, 4].astype(float)
 
-	clf='alexnet' # AlexNet CNN architecture will be used 
-	img_num_channels = 3 # Creating a 3-Channel model
-	normalize = True # Will min-max normalize the images so all pixels are between 0 and 1
+		marker_dict = {'LAB': 'o', 'OTHER': 's'}
+		cmap, norm = plt.get_cmap('magma'), mpl.colors.Normalize(0, 1)
 
-	optimize = True # Activating the optimization routine
-	n_iter = 250 # Will run the optimization routine for 250 trials 
-	batch_size_min, batch_size_max = 16, 64 # The training batch size will be optimized according to these bounds
+		# To track the confirmed LABs
+		special_objects = {
+		    'NDWFS_J143410.9+331730': 'LABd05',
+		    'NDWFS_J143512.2+351108': 'PRG1',
+		    'NDWFS_J142623.0+351422': 'PRG2',
+		    'NDWFS_J143412.7+332939': 'PRG3',
+		    'NDWFS_J142653.1+343856': 'PRG4'
+		}
 
-	opt_model = limit_search = True # Will also optimize the CNN model architecture but with limit search on, therefore only the pooling type is optimized
-	train_epochs = 10 # Each optimization trial will train a model up to 10 epochs
-	epochs = 0 # The final model will not be generated, will instead be trained post-processing
-	patience = 3 # The model patience which will be applied during optimization
-	opt_cv = 5 # Will cross-validate the positive class
+		special_colors  = ['blue', 'green', 'cyan', 'purple', 'red']
+		special_markers = ['p', 'P', '>', 'v', '^']
 
-	opt_aug = True # Will also optimize the data augmentation procedure (positive class only)
-	batch_min, batch_max = 10, 250 # The amount to augment EACH positive sample by
-	shift = 10 # Will randomly shift (horizontally & vertically) each augmented image between 0 and 10 pixels
-	rotation = horizontal = vertical = True # Will randomly apply rotations (0-360), and horizintal/vertical flips to each augmented image
-	zoom_range = (0.9,1.1) # Will randomly apply zooming in/out between plus and minus 10% to each augmented image
-	batch_other = 0 # The number of augmentations to perform to the negative class 
-	balance = True # Will balance the negative class according to how many positive samples were generated during augmentation
+		# PLOT
+		legend_space = 5.3
+		fig, ax = plt.subplots(figsize=(8, 8 + legend_space))
+		fig.subplots_adjust(bottom=legend_space / (8 + legend_space))
 
-	image_size_min, image_size_max = 50, 100 # Will try different image sizes within these bounds 
-	opt_max_min_pix, opt_max_max_pix = 10, 1500 # Will try different normalization values (the max pixel for the min-max normalization), one for each filter
+		# Don't plot the confirmed LABs these are done separately
+		for cls in np.unique(labels):
+		    # Skip the confirmed LABs
+		    if cls == 'Confirmed_Ly$\\alpha$': 
+		        continue  
 
-	metric = 'val_loss' # The optimzation routine will operate according to this metric's value at the end of each trial, which must also follow the patience criteria
-	average = True # Will average out the above metric across all training epochs, this will be the trial value at the end
+		    mask = labels == cls
+		    ax.scatter(x[mask], y[mask], c=probas[mask], cmap=cmap, norm=norm, marker=marker_dict[cls], s=120, edgecolor='black', linewidth=.5, alpha=.4)
 
-	metric2 = 'f1_score' # Optional metric that will stop trials if this doesn't improve according to the patience
-	metric3 = 'binary_accuracy' # Optional metric that will stop trials if this doesn't improve according to the patience
+		# Now include the confirmed LABs
+		for i, (name, short) in enumerate(special_objects.items()):
+		    mask = names == name
+		    ax.scatter(x[mask], y[mask], c=probas[mask], cmap=cmap, norm=norm, marker=special_markers[i], s=200, edgecolor=special_colors[i], linewidth=3.5, alpha=.9)
 
-	test_acc_threshold = 0.5 # Each created model must yield accuracies greater than or equal to this value, tested against the input test_negative and/or test_positive
-	post_metric = False # This test accuracy will not be used to drive the optimization 
+		sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+		sm.set_array([])
+		cbar = fig.colorbar(sm, ax=ax)#, extend='none')
+		cbar.set_label(r"$P(y=\mathrm{LAB}\mid\mathbf{X})$")
 
-	monitor1 = 'binary_accuracy' # Hard stop, trials will be terminated if this metric falls above the specified threshold
-	monitor1_thresh = 0.99+1e-6 # Specified threshold, in this case the optimization trial will termiante if the training accuracy falls above this limit
+		handles = [
+		    mpl.lines.Line2D([], [], marker='o', mfc='none', mec='black', markersize=9, linestyle='None', label=f"LAB [{probas[labels=='LAB'].mean():.2f}]"),
+		    mpl.lines.Line2D([], [], marker='s', mfc='none', mec='black', markersize=9, linestyle='None', label=f"OTHER [{probas[labels=='OTHER'].mean():.2f}]")
+		]
 
-	monitor2 = 'loss' # Hard stop, trials will be terminated if this metric falls below the specified threshold
-	monitor2_thresh = 0.01-1e-6 # Specified threshold, in this case the optimization trial will termiante if the training loss falls below this limit
+		for i, (name, short) in enumerate(special_objects.items()):
+		    p = probas[names == name][0]
+		    handles.append(mpl.lines.Line2D([], [], marker=special_markers[i], mfc='none', mec=special_colors[i], markeredgewidth=3., markersize=11, linestyle='None', label=f"{short} [{p:.2f}]"))
 
-	model = cnn_model.Classifier(positive_class=blobs, negative_class=other, val_positive=val_blobs, img_num_channels=img_num_channels, 
-		clf=clf, normalize=normalize, optimize=optimize, n_iter=n_iter, batch_size_min=batch_size_min, batch_size_max=batch_size_max, 
-		epochs=epochs, patience=patience, metric=metric, metric2=metric2, metric3=metric3, average=average, test_negative=other_test, 
-		test_acc_threshold=test_acc_threshold, post_metric=post_metric, opt_model=opt_model, train_epochs=train_epochs, opt_cv=opt_cv, 
-		opt_aug=opt_aug, batch_min=batch_min, batch_max=batch_max, batch_other=batch_other, balance=balance, image_size_min=image_size_min, 
-		image_size_max=image_size_max, shift=shift, opt_max_min_pix=opt_max_min_pix, opt_max_max_pix=opt_max_max_pix, rotation=rotation, 
-		horizontal=horizontal, vertical=vertical, zoom_range=zoom_range, limit_search=limit_search, monitor1=monitor1, monitor1_thresh=monitor1_thresh, 
-		monitor2=monitor2, monitor2_thresh=monitor2_thresh, use_gpu=True, verbose=1)
+		fig.legend(handles=handles, loc='lower center', bbox_to_anchor=(0.5, legend_space / 2 / (8 + legend_space)), ncol=3, frameon=True, fancybox=True, columnspacing=0.05, handletextpad=0, title=r'Class [$P(y=\mathrm{LAB}\mid\mathbf{X})$]')
 
-	model.create()
-	model.save(dirname='Optimized_CNN_Model_CV5')
+		if model == 'xgboost_8':
+		    ax.set_xlim(-20, 18.5); ax.set_ylim(-20.1, 20.1)
+		else:
+		    ax.set_xlim(-22.3, 22.1); ax.set_ylim(-22., 21.2)
 
-With our CNN model parameters, we will now appem to ly thtrain a final model
+		ax.set_title("Vector Space (8 Features)" if model == 'xgboost_8' else "Vector Space (45 Features)")
+		ax.set_xlabel("t-SNE Dimension 1")
+		ax.set_ylabel("t-SNE Dimension 2")
 
-.. code-block:: python
+		plt.savefig(f'tsne_new_{"45" if model == 'xgboost_45' else "8"}.png', dpi=300, bbox_inches='tight')
+		plt.show()
 
-	# Load the optimization results and create the final model #
 
-	import numpy as np
-	from pyBIA import cnn_model
+.. figure:: _static/tsne_new_8.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
-	blobs = np.load('/Users/daniel/Desktop/saved_images/confirmed_diffuse/confirmed_diffuse.npy') 
-	val_blobs = blobs[:1]
-	blobs = blobs[1:]
+.. figure:: _static/tsne_new_45.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
-	other = np.load('/Users/daniel/Desktop/saved_images/OTHER/xgb_output_images.npy')
-	other_test = other[:1000] # Optional test data, will be used to assess models created during the optimization routine
-	other = other[1000:2000] # This will be the negative class data
 
-	model = cnn_model.Classifier(blobs, other, val_blobs)
-	model.load('/Users/daniel/Desktop/200gpu')
-	model.epochs = 10 # Will train up to 10 epochs with the pre-loaded patience threshold
-	model.create()
-	model.save()
 
-While the performance plots can be plotted via the built-in class method, plot_performance, we will generate these manually instead so that the legend can be modified to highlight which individual sample from the confirmed blobs was being used for validation
 
-.. code-block:: python
 
-	# Plot model performance #
 
-	import matplotlib.pyplot as plt  
-	cnn_model._set_style_()
-
-	train_metrics = np.array(model.model_train_metrics)
-	val_metrics = np.array(model.model_val_metrics)
-	epochs = np.arange(1, model.epochs+1)
-
-	# Set up markers and colors for each line
-	markers = ['o', 's', 'D', 'v', '^']
-	colors = ['blue', 'green', 'red', 'purple', 'orange']
-	names = ['PRG1', 'PRG2', 'PRG3', 'PRG4', 'LABd05']
-
-	### Plot the f-1 score ###
-
-	column = 2 
-
-	# Plot the training scores
-	for i in range(len(train_metrics)):
-	    plt.plot(epochs, train_metrics[i][:,column], marker=markers[i], color=colors[i], label=f'Train {i+1}')
-
-	# Plot the validation scores
-	for i in range(len(val_metrics)):
-	    plt.plot(epochs, val_metrics[i][:,column], marker=markers[i], linestyle='dashed', color=colors[i], label=f'Val {i+1} ({names[i]})')
-
-	plt.xlabel('Epochs'); plt.ylabel('F1-Score')
-	plt.xlim((1,10));plt.ylim((-0.01,1.01))
-	plt.legend(loc='lower right', frameon=True, ncol=2)
-	plt.savefig('/Users/daniel/Desktop/f1_score.png', dpi=300, bbox_inches='tight')
-
-	### Plot the loss ###
-
-	column = 1 
-
-	# Plot the training scores
-	for i in range(len(train_metrics)):
-	    plt.plot(epochs, train_metrics[i][:,column], marker=markers[i], color=colors[i], label=f'Train {i+1}')
-
-	# Plot the validation scores
-	for i in range(len(val_metrics)):
-	    plt.plot(epochs, val_metrics[i][:,column], marker=markers[i], linestyle='dashed', color=colors[i], label=f'Val {i+1} ({names[i]})')
-
-	plt.xlabel('Epochs'); plt.ylabel('Loss')
-	plt.xlim((1,10)); plt.ylim((0.007,3.5)); plt.yscale('log')
-	plt.legend(loc='lower left', frameon=True, ncol=2)
-	plt.savefig('/Users/daniel/Desktop/loss.png', dpi=300, bbox_inches='tight')
-
-
-
-Figure 7
------------
-
-.. code-block:: python
-
-	# Do the CNN predictions #
-
-	# Note that the loaded objects below have already met the 85% proba prediction threshold as per the image saving procedure
-
-	# Priority candidates as selected by Prescott et al. 2012
-	priority_diffuse = np.load('/Users/daniel/Desktop/saved_images/priority_diffuse/priority_diffuse.npy')
-	priority_diffuse_names = np.loadtxt('/Users/daniel/Desktop/saved_images/priority_diffuse/priority_diffuse_names.txt', dtype=str)
-
-	# CNN prediction
-	priority_diffuse_predictions = model.predict(priority_diffuse, cv_model='all', return_proba=True)
-
-	#Save only the positive predictions from the CNN
-	index = np.where(priority_diffuse_predictions[:,0] == 'DIFFUSE')[0]
-	priority_diffuse = priority_diffuse[index]
-	priority_diffuse_names = priority_diffuse_names[index]
-
-	#Save in order of highests to lowest probability predictions
-	priority_diffuse_probas = priority_diffuse_predictions[:,1][index]
-	order = np.argsort(priority_diffuse_probas)[::-1]
-	np.save('priority_diffuse_final_candidates', priority_diffuse[order])
-	np.savetxt('priority_diffuse_final_candidates_names_probas', np.c_[priority_diffuse_names[order], priority_diffuse_probas[order]], fmt='%s')
-
-
-	# Other diffuse candidates as selected by Prescott et al. 2012
-	other_diffuse = np.load('/Users/daniel/Desktop/saved_images/other_diffuse/other_diffuse.npy') # 
-	other_diffuse_names = np.loadtxt('/Users/daniel/Desktop/saved_images/other_diffuse/other_diffuse_names.txt', dtype=str)
-
-	# CNN prediction
-	other_diffuse_predictions = model.predict(other_diffuse, cv_model='all', return_proba=True)
-
-	#Save only the positive predictions from the CNN
-	index = np.where(other_diffuse_predictions[:,0] == 'DIFFUSE')[0]
-	other_diffuse = other_diffuse[index]
-	other_diffuse_names = other_diffuse_names[index]
-
-	#Save in order of highests to lowest probability predictions
-	other_diffuse_probas = other_diffuse_predictions[:,1][index]
-	order = np.argsort(other_diffuse_probas)[::-1]
-	np.save('other_diffuse_final_candidates', other_diffuse[order])
-	np.savetxt('other_diffuse_final_candidates_names_probas', np.c_[other_diffuse_names[order], other_diffuse_probas[order]], fmt='%s')
-
-
-	# The OTHER candidates as selected by the XGBoost classifier
-	other_candidates = np.load('/Users/daniel/Desktop/saved_images/OTHER/xgb_output_images.npy')
-	other_candidates_names = np.loadtxt('/Users/daniel/Desktop/saved_images/OTHER/xgb_output_images_names.txt', dtype=str)
-
-	# CNN prediction
-	other_candidates_predictions = model.predict(other_candidates, cv_model='all', return_proba=True)
-
-	#Save only the positive predictions from the CNN
-	index = np.where(other_candidates_predictions[:,0] == 'DIFFUSE')[0]
-	other_candidates = other_candidates[index]
-	other_candidates_names = other_candidates_names[index]
-
-	#Save in order of highests to lowest probas
-	other_candidate_probas = other_candidates_predictions[:,1][index]
-	order = np.argsort(other_candidate_probas)[::-1]
-	np.save('OTHER_final_candidates', other_candidates[order])
-	np.savetxt('OTHER_final_candidates_names_probas', np.c_[other_candidates_names[order], other_candidate_probas[order]], fmt='%s')
-
-Now we can create the area vs color plot, byt first a final candidate catalog is created:
-
-.. code-block:: python
-
-	import pandas 
-	import numpy as np
-
-	# Load the candidate catalog (~54k objects)
-	csv_candidates = pandas.read_csv('/Users/daniel/Desktop/candidate_catalog_optimized_xgb.csv') 
-
-	# Load the names and probabilities of the candidates that were positively classified by the CNN
-	candidate_names_probas = np.loadtxt('OTHER_final_candidates_names_probas', dtype=str)
-
-	# Index the csv to only these positive candidates
-	candidates_indices = []
-	for i in range(len(csv_candidates)):
-		if csv_candidates.obj_name.iloc[i] in candidate_names_probas[:,0]:
-			candidates_indices.append(i)
-
-	csv_candidates = csv_candidates.iloc[candidates_indices]
-
-	# Load the diffuse training objects 
-	sig = 0.31                                                                                                                                                                                                                                
-	training_set = pandas.read_csv('/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/nsigs/BW_NSIG/BW_training_set_nsig_'+str(sig))
-	blob_index = np.where(training_set['flag'] == 1)[0] # Select only the diffuse objects
-	training_set = training_set.iloc[blob_index]
-
-	# Will load the names of the five confirmed blobs to create a subsample dataframe, will be used for color-color selection
-	confirmed_diffuse_names = np.loadtxt('/Users/daniel/Desktop/Folders/pyBIA/pyBIA/data/obj_name_5', dtype=str)
-
-	confirmed_diffuse_indices = []
-	for i in range(len(training_set)):
-		if training_set.obj_name.iloc[i] in confirmed_diffuse_names:
-			confirmed_diffuse_indices.append(i)
-
-	confirmed_set = training_set.iloc[confirmed_diffuse_indices]
-
-	# Now load the names of the diffuse training objects selected by the CNN, not including the confirmed blobs
-	priority_diffuse_names_probas = np.loadtxt('priority_diffuse_final_candidates_names_probas', dtype=str)
-	other_diffuse_names_probas = np.loadtxt('other_diffuse_final_candidates_names_probas', dtype=str)
-
-	diffuse_indices = []
-	for i in range(len(training_set)):
-		if training_set.obj_name.iloc[i] in np.r_[priority_diffuse_names_probas[:,0], other_diffuse_names_probas[:,0]]:
-			diffuse_indices.append(i)
-
-	training_set = training_set.iloc[diffuse_indices]
-
-	# Combine the two dataframes, this is the Bw band, doesn't include the five confirmed
-	final_candidate_catalog_bw = pandas.concat([csv_candidates, training_set], ignore_index=True)
-	final_candidate_catalog_bw.to_csv('_Bw_final_candidate_catalog.csv', chunksize=1000)
-
-	# Save a dataframe with only the confirmed blobs, to be used for the color-color selection below
-	confirmed_set.to_csv('_Bw_final_confirmed_catalog.csv')
-
-Now we will extract the red-band magnitudes using the `Catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.Catalog>`_ class:
-
-.. code-block:: python
-
-
-	# Create a new catalog in the R band for the final candidates
-	from pyBIA import catalog  
-	from astropy.io import fits 
-
-	data_path = '/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/R_FITS/'
-	data_error_path = '/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/rms_images/R/npy/'
-
-	sig = 0.31
-	frame = [] #To store all 27 subfields
-	for fieldname in np.unique(np.array(final_candidate_catalog_bw['field_name'])):
-		# Load the field data
-		data, error_map = fits.open(data_path+fieldname+'_R_03_reg_fix.fits'), np.load(data_error_path+fieldname+'_R_03_rms.npy')
-		# Extract the data and corresponding ZP
-		data_map, zeropoint = data[0].data, data[0].header['MAGZERO']
-		# Select only the samples from this subfield
-		subfield_index = np.where(final_candidate_catalog_bw['field_name']==fieldname)[0]
-		xpix, ypix = final_candidate_catalog_bw[['xpix', 'ypix']].iloc[subfield_index].values.T
-		objname, field, flag = final_candidate_catalog_bw[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
-		# Create the catalog object
-		cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
-		# Generate the catalog and append the ``cat`` attribute to the frame list
-		cat.create(save_file=False); frame.append(cat.cat)
-	# Combine all 27 sub-catalogs into one master frame and save
-	frame = pandas.concat(frame, axis=0, join='inner'); frame.to_csv('_R_final_candidate_catalog.csv', chunksize=1000)                                                
-
-	# Create a new catalog in the R band for the five confirmed blobs
-	from pyBIA import catalog  
-	from astropy.io import fits 
-
-	data_path = '/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/R_FITS/'
-	data_error_path = '/Users/daniel/Desktop/Folders/Lyalpha/pyBIA_Paper_1/data_files/NDWFS_Tiles/rms_images/R/npy/'
-
-	sig = 0.31
-	frame = [] #To store all 27 subfields
-	for fieldname in np.unique(np.array(confirmed_set['field_name'])):
-		# Load the field data
-		data, error_map = fits.open(data_path+fieldname+'_R_03_reg_fix.fits'), np.load(data_error_path+fieldname+'_R_03_rms.npy')
-		# Extract the data and corresponding ZP
-		data_map, zeropoint = data[0].data, data[0].header['MAGZERO']
-		# Select only the samples from this subfield
-		subfield_index = np.where(confirmed_set['field_name']==fieldname)[0]
-		xpix, ypix = confirmed_set[['xpix', 'ypix']].iloc[subfield_index].values.T
-		objname, field, flag = confirmed_set[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
-		# Create the catalog object
-		cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
-		# Generate the catalog and append the ``cat`` attribute to the frame list
-		cat.create(save_file=False); frame.append(cat.cat)
-	# Combine all 27 sub-catalogs into one master frame and save
-	frame = pandas.concat(frame, axis=0, join='inner'); frame.to_csv('_R_final_confirmed_catalog.csv')                                                
-
-Now we can create the area vs color plot:
-
-.. code-block:: python
-
-	# Plot #
-	import pandas as pd
-	import matplotlib.pyplot as plt  
-	from pyBIA.cnn_model import _set_style_
-
-	# Load the dataframes, note that the Bw and R csvs do not correspond 1-1, need to sort by obj_name
-	final_candidate_catalog_bw = pd.read_csv('_Bw_final_candidate_catalog.csv')
-	final_candidate_catalog_r = pd.read_csv('_R_final_candidate_catalog.csv')
-
-	# Sort both dataframes alphabetically by the 'obj_name' column
-	final_candidate_catalog_bw.sort_values('obj_name', inplace=True)
-	final_candidate_catalog_r.sort_values('obj_name', inplace=True)
-
-	# Reset the indices of both dataframes
-	final_candidate_catalog_bw.reset_index(drop=True, inplace=True)
-	final_candidate_catalog_r.reset_index(drop=True, inplace=True)
-
-	final_confirmed_catalog_bw = pd.read_csv('_Bw_final_confirmed_catalog.csv')
-	final_confirmed_catalog_r = pd.read_csv('_R_final_confirmed_catalog.csv')
-
-	# Sort both dataframes by the 'obj_name' column
-	final_confirmed_catalog_bw.sort_values('obj_name', inplace=True)
-	final_confirmed_catalog_r.sort_values('obj_name', inplace=True)
-
-	# Reset the indices of both dataframes
-	final_confirmed_catalog_bw.reset_index(drop=True, inplace=True)
-	final_confirmed_catalog_r.reset_index(drop=True, inplace=True)
-
-	_set_style_()
-
-	plt.scatter(final_confirmed_catalog_bw.mag - final_confirmed_catalog_r.mag, final_confirmed_catalog_bw.area, marker='*', c='red', edgecolors='black', s=300, alpha=0.95, label=r'Confirmed Ly$\alpha$')
-	plt.scatter(final_candidate_catalog_bw.mag - final_candidate_catalog_r.mag, final_candidate_catalog_bw.area, marker='.', c='black', s=25, alpha=0.06, label=r'Other Candidates')
-	plt.xlabel('BW - R', size=18)
-	plt.ylabel('Area', size=18)
-	plt.title('Color Cut Final Candidates (n=10299)', size=20)
-	#plt.ylim((400,2000)); plt.xlim((-0.6, 0.8))
-	#plt.xscale('log')
-	#plt.yscale('log')
-	plt.legend()
-
-	plt.show()
-
-
-	index_color = np.where( ((final_candidate_catalog_bw.mag - final_candidate_catalog_r.mag) <= 0.8) & ( (final_candidate_catalog_bw.mag - final_candidate_catalog_r.mag) >= -0.6))[0]
-	index_area = np.where( ((final_candidate_catalog_bw.area - final_candidate_catalog_r.area)[index_color] <= 2000) & ( (final_candidate_catalog_bw.area - final_candidate_catalog_r.area)[index_color] >= 400))[0]
-	index = index_color[index_area]
-
-	plt.scatter(final_confirmed_catalog_bw.mag - final_confirmed_catalog_r.mag, final_confirmed_catalog_bw.area, marker='*', c='red', edgecolors='black', s=300, alpha=0.95, label=r'Confirmed Ly$\alpha$')
-	plt.scatter(final_candidate_catalog_bw.mag.iloc[index] - final_candidate_catalog_r.mag.iloc[index], final_candidate_catalog_bw.area.iloc[index_color_and_area], marker='.', c='black', s=25, alpha=0.06, label=r'Other Candidates')
-	plt.xlabel('BW - R', size=18)
-	plt.ylabel('Area', size=18)
-	plt.title('Color Cut Selected (n=2034)', size=20)
-	#plt.xscale('log')
-	#plt.yscale('log')
-	plt.legend()
-	plt.show()
 
 
 

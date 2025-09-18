@@ -621,12 +621,9 @@ def lbp_feature_extraction(
     """
     Extract Local Binary Pattern (LBP) histograms per channel and concatenate.
 
-    For each image channel, canonical LBP codes are computed with
-    `skimage.feature.local_binary_pattern(method='default')` using `P`
-    sampling points on a circle of radius `R`. A histogram with `2**P`
-    bins (codes 0..2**P−1) is computed and L1-normalized (`density=True`).
-    Per-image feature vectors are formed by concatenating the channel
-    histograms.
+    For each image channel, compute standard LBP codes using ``P`` sampling points 
+    on a circle of radius ``R``. Then we build a histogram with ``2**P`` bins,
+    normalized to unit sum. Then concatenate the channel histograms to form one feature vector per image.
 
     Parameters
     ----------
@@ -679,10 +676,6 @@ def fft_energy_feature_extraction(
     ):
     """
     Compute 2D FFT radial-band energies per channel and concatenate.
-
-    For each image channel, compute standard LBP codes using ``P`` sampling points 
-    on a circle of radius ``R``. Then we build a histogram with ``2**P`` bins,
-    normalized to unit sum. Then concatenate the channel histograms to form one feature vector per image.
 
     Parameters
     ----------

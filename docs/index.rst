@@ -30,7 +30,7 @@ The program provides four core modules:
 
       **Catalog Generation**
 
-      .. image:: _static/supervised_model_img_link.png
+      .. image:: _static/catalog_img_link.png
          :alt: Catalog Generation
          :target: https://pybia.readthedocs.io/en/latest/source/Catalog%20Generation.html
          :width: 200px
@@ -40,7 +40,7 @@ The program provides four core modules:
 
       **Supervised Learning**
 
-      .. image:: _static/catalog_img_link.png
+      .. image:: _static/supervised_model_img_link.png
          :alt: Supervised Learning
          :target: https://pybia.readthedocs.io/en/latest/source/Supervised%20Learning%20Algorithms.html
          :width: 200px

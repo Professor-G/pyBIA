@@ -2417,11 +2417,13 @@ The candidate images in binary format (containing approximately 50k objects), as
 The LAB training set images in binary format, as well as their catalog names, are available for download below.
 
 Images:
+
 - :download:`confirmed_diffuse <confirmed_diffuse.npy>`.
 - `other_diffuse <https://drive.google.com/file/d/1iTIse_LYBEHhKq7oGBevjkiAVqONSQiE/view?usp=sharing>`_
 - `priority_diffuse <https://drive.google.com/file/d/1U9g6cx-fTZxgyfACoM6zoE-G31w6G6f4/view?usp=sharing>`_
 
 Corresponding names: 
+
 - :download:`confirmed_diffuse_names.txt <confirmed_diffuse_names.txt>`.
 - :download:`priority_diffuse_names.txt <priority_diffuse_names.txt>`.
 - :download:`other_diffuse_names.txt <other_diffuse_names.txt>`.
@@ -2875,6 +2877,301 @@ With the predictions and morphological values saved, we can now generate the fig
 CNN Training
 -----------
 
+Now that the majority of outliers have been removed from the candidate sample, we will now train the multi-band CNN to identify promising LAB candidates in this set. 
+
+We begin by extracting the training set images. The positive class will include the Prescott+12 priority candidates that were classified by our XGBoost model with a probability prediction of at least 0.9 (70 total). The other five confirmed LABs are reserved for testing. At the same time we will save the non-priority LAB from our training set so after CNN training we can select the ones that should be considered final candidates. For computational efficiency we will also extract 3800 random objects from our initial candidate sample, which will be used when generating the negative class.
+
+..code-block:: python 
+
+	import numpy as np
+	from pyBIA.data_processing import concat_channels
+
+	# Load the images provided during original image extraction
+	priority_lab_images = np.load('priority_diffuse.npy')
+	priority_lab_names = np.loadtxt('priority_diffuse_names.txt', dtype=str)
+
+	# Results for Leave-one-Out CV analysis
+	lab_loo = np.loadtxt('LoO_LAB', dtype=str)
+	lab_loo_names = lab_loo[:,0]
+	lab_loo_probas = lab_loo[:,2].astype('float') #xgboost-8 probas is the third column
+
+	names, probas = [],[]
+	for name in priority_lab_names:
+		index = np.where(lab_loo_names == name)[0]
+		names.append(name); probas.append(lab_loo_probas[index[0]])
+
+	# These are now aligned (i.e., names == priority_lab_names)
+	# Filter out those that did not have probability predictions of at least 0.9
+	index = np.where(np.array(probas) >= 0.9)[0]
+	priority_lab_images_final = priority_lab_images[index]
+	priority_lab_names_final = priority_lab_names[index]
+
+	np.save('priority_diffuse_final.npy', priority_lab_images_final)
+	np.savetxt('priority_diffuse_names_final.txt', priority_lab_names_final, fmt='%s')
+
+	# Now do the same for the non-priority LAB so after CNN training we can select the ones that are final candidates
+
+	# Load the images provided during original image extraction
+	other_lab_images = np.load('other_diffuse.npy')
+	other_lab_names = np.loadtxt('other_diffuse_names.txt', dtype=str)
+
+	# In this case not all the images have an associated proba, since there is one non-detection
+	# So have to loop over the names that have an xgboost-8 proba
+	names, probas = [],[]
+	for name in lab_loo_names:
+		index = np.where(other_lab_names == name)[0]
+		if len(index) == 0:
+			pass
+		else:
+			names.append(name); probas.append(lab_loo_probas[index[0]])
+
+	# Finally query the images
+	indices = []
+	for i in range(len(names)):
+		index = np.where(other_lab_names == names[i])[0]
+		indices.append(index[0])
+
+	other_lab_images_final = other_lab_images[indices]
+	other_lab_names_final = other_lab_names[indices]
+
+	# Only need those that passed our initial XGBoost-based filtering
+	index = np.where(np.array(probas) >= 0.9)[0]
+	other_lab_images_final = other_lab_images_final[index]
+	other_lab_names_final = other_lab_names_final[index]
+
+	np.save('other_diffuse_final.npy', other_lab_images_final)
+	np.savetxt('other_diffuse_names_final.txt', other_lab_names_final, fmt='%s')
+
+	# Now save the training set for the initial candidates, only saving 3800 for CNN training purposes
+
+	# First find which ones made it through the iForest-based filtering (i.e., which ones are inliners)
+	candidate_names = np.loadtxt('xgb_output_images_names.txt', dtype=str)
+	outlier_data = np.loadtxt('iforest_predictions.txt')
+
+	ypred = outlier_data[:,0] # The prediction, 1 is inliers, -1 is outliers
+
+	# Now load the full image arrays saved previously
+	cand_bw = np.load('xgb_output_images_bw.npy')
+	cand_r = np.load('xgb_output_images_R.npy')
+
+	index = np.where(ypred == 1)[0] #Inliers
+	cand_bw = cand_bw[index]
+	cand_r = cand_r[index]
+	candidate_names = candidate_names[index]
+
+	# Random seed for random selection of training set objects
+	rng = np.random.default_rng(seed=1909)
+	shuffled_indices = rng.permutation(len(cand_bw))
+	shuffled_indices = shuffled_indices[:3800]
+
+	# Select only these 3800
+	cand_bw = cand_bw[shuffled_indices]
+	cand_r = cand_r[shuffled_indices]
+	candidate_names = candidate_names[shuffled_indices]
+
+	# Combine the filters
+	training_other = concat_channels(cand_bw, cand_r)
+
+	np.save('cnn_training_other_3800.npy', training_other)
+	np.savetxt('cnn_training_other_3800_names.txt', candidate_names, fmt='%s')
+
+
+These files can be downloaded below.
+
+Images:
+
+- `priority_diffuse_final <https://drive.google.com/file/d/1zWIUitBjN9Hag204xN-NbGq7KWwyu1pr/view?usp=sharing>`.
+- `other_diffuse_final <https://drive.google.com/file/d/1pyodZkCcDWKqu7PDppLfTMsXJ4f_Mnzk/view?usp=sharing>`_
+- `cnn_training_other_3800 <https://drive.google.com/file/d/16QIYIWxiqEaYXg2_AA5VG_WSsXmsXNuF/view?usp=sharing>`_
+
+Corresponding names: 
+
+- :download:`priority_diffuse_names_final.txt <priority_diffuse_names_final.txt>`.
+- :download:`other_diffuse_names_final.txt <other_diffuse_names_final.txt>`.
+- :download:`cnn_training_other_3800_names.txt <cnn_training_other_3800_names.txt>`.
+
+With these images saved we can train our binary convolutional neural network classifier, using the `cnn_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/cnn_model/index.html>`_ module.
+
+
+..code-block:: python 
+
+	import numpy as np 
+	from pyBIA import cnn_model
+
+	# Load the negative class and add the third Bw-R difference channel
+	training_other = np.load('cnn_training_other_3800.npy')
+	training_bw_minus_r = training_other[:,:,:,0] / training_other[:,:,:,1]
+	training_bw_minus_r = np.expand_dims(training_bw_minus_r, axis=-1)
+	training_other = np.concatenate([training_other, training_bw_minus_r], axis=-1)
+
+	# 1000 used for testing filtering capabilities, the rest for training
+	testing_other = training_other[:1000]
+	training_other = training_other[1000:]
+
+	# Load the positive class and add the third Bw-R difference channel
+	train_lab_priority = np.load('priority_diffuse_final.npy')
+	lab_priority_bw_minus_r = train_lab_priority[:,:,:,0] / train_lab_priority[:,:,:,1]
+	lab_priority_bw_minus_r = np.expand_dims(lab_priority_bw_minus_r, axis=-1)
+	train_lab_priority = np.concatenate([train_lab_priority, lab_priority_bw_minus_r], axis=-1)
+
+	# Shuffle the training set before selecting valiation set just to be sure
+	rng = np.random.default_rng(seed=1909)
+	shuffled_indices = rng.permutation(len(train_lab_priority))
+	train_lab_priority = train_lab_priority[shuffled_indices]
+
+	# 56 positives used for training, 14 used for validation, so can do 5-fold CV
+	val_lab = train_lab_priority[:14]
+	train_lab = train_lab_priority[14:]
+
+	# Classifier class parameters
+	img_num_channels = 3 # Number of channels in our images
+	normalize = True # Whether to min-max normalize the pixels
+	min_pixel = 0 # Min pixel will be zero
+	max_pixel = [10,10,10] # Max pixel will be 10 for all three channels
+	clf = 'alexnet' # Architecture we will use
+	epochs = 6 # Number of epochs to train for
+	batch_size = 8 # Training batch size
+	opt_cv = 5 # Will do five-fold cross-validation
+	augment_data = True # Whether to apply data augmentation to the positive class
+	batch_positive = 24 # How many times to augment each positive instance
+	balance = True # Whether to downsample the negative class to match the positive
+	image_size = 70 # Will crop the images to be this size (applied to both classes post-data augmentation)
+	shift = 10 # The max allowed vertical/horizontal pixel shifts during data augmentation
+	rotation = horizontal = vertical = True # Whether to include rotations (0-360) and horizontal/vertical flips during data augmentation
+	activation_conv = 'relu' # Activation function for the Conv2D layers
+	activation_dense = 'tanh' # Activation function for the FC layers
+	model_reg = None # Regularized to use, options are 'local_response', 'batch_norm' or None
+	optimizer = 'adam' # Optimizer to use
+	lr = 0.00001 # Learning rate to use
+	amsgrad = True # Whether to enable the Adam AMSGrad variant
+	conv_init = 'he_normal' # Weight initilization scheme for the Conv2D layers
+	dense_init = 'glorot_uniform' # Weight initilization scheme for the FC layers
+
+	# Instantiate the classifier
+	model = cnn_model.Classifier(
+		train_lab, 
+		training_other, 
+		val_positive=val_lab, 
+		val_negative=None, 
+		img_num_channels=img_num_channels, 
+		normalize=normalize, 
+	    min_pixel=min_pixel, 
+	    max_pixel=max_pixel, 
+	    clf=clf,
+	    epochs=epochs, 
+	    batch_size=batch_size,
+	    opt_cv=opt_cv,
+	    augment_data=augment_data,
+	    batch_positive=batch_positive,
+	    balance=balance, 
+	    image_size=image_size,
+	    shift=shift,
+	    rotation=rotation,
+	    vertical=vertical,
+	    horizontal=horizontal,
+	    activation_conv=activation_conv,
+	    activation_dense=activation_dense,
+	    model_reg=model_reg,
+	    optimizer=optimizer,
+	    lr=lr,
+	    amsgrad=amsgrad, 
+		conv_init=conv_init,
+	    dense_init=dense_init)
+
+	# Create the model
+	model.create(overwrite_training=True)
+
+	# Save the pyBIA model
+	model.save(dirname='cnn_model')
+
+	# Test on the 1000 randomly selected
+	pred = model.predict(testing_other, target='LAB', return_proba=True, cv_model='all')
+	print('Fraction of sources classified as OTHER', len(np.where(pred[:,0]=='OTHER')[0])/len(pred))
+
+The saved pyBIA model can be `downloaded here <https://drive.google.com/file/d/178EVTz-VztlDcQOEh_Uzv1GUTQGYN4Ay/view?usp=sharing>`_.
+
+We can load this model and visualize the per-epoch performance
+
+..code-block:: python 
+
+	import numpy as np
+	from pyBIA import cnn_model
+	import matplotlib.pyplot as plt  
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size': 21})
+
+	model = cnn_model.Classifier()
+	model.load(f'cnn_model')
+
+	# Training metrics are saved in the following class attributes, shape is (num_folds, num_epochs, num_metrics)
+	train_metrics = np.array(model.model_train_metrics)
+	val_metrics = np.array(model.model_val_metrics)
+	epochs = np.arange(1, model.epochs + 1)
+
+	# Toggle this flag to switch between standard deviation and full range
+	use_full_range = False  
+
+	def compute_range(metrics, use_full_range):
+	    # Compute mean with either standard deviation or full min-max range
+	    mean = np.mean(metrics, axis=0)
+	    if use_full_range:
+	        lower = np.min(metrics, axis=0) # Minimum across folds
+	        upper = np.max(metrics, axis=0) # Maximum across folds
+	    else:
+	        std = np.std(metrics, axis=0)
+	        lower = mean - std
+	        upper = mean + std
+	    return mean, lower, upper
+
+	# Plot the F1 score on top and Loss on bottom
+	fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 16), sharex=True)
+	fig.subplots_adjust(top=0.9, hspace=0.02)
+
+	column = 2 # F1 score in third column
+	train_mean, train_lower, train_upper = compute_range(train_metrics[:, :, column], use_full_range)
+	val_mean, val_lower, val_upper = compute_range(val_metrics[:, :, column], use_full_range)
+
+	ax1.plot(epochs, train_mean, marker='o', color='blue', label='Training (F1 Score)')
+	ax1.fill_between(epochs, train_lower, train_upper, color='blue', alpha=0.3)
+	ax1.plot(epochs, val_mean, marker='s', linestyle='dashed', color='red', label='Validation (LAB Recall)')
+	ax1.fill_between(epochs, val_lower, val_upper, color='red', alpha=0.3)
+
+	ax1.set_ylabel('Score')
+	ax1.set_title('CNN Model Training Results (5-Fold CV)', y=1.095)
+
+	column = 1 # Loss in second column
+	train_mean, train_lower, train_upper = compute_range(train_metrics[:, :, column], use_full_range)
+	val_mean, val_lower, val_upper = compute_range(val_metrics[:, :, column], use_full_range)
+
+	ax2.plot(epochs, train_mean, marker='o', color='blue', label='Training Set')
+	ax2.fill_between(epochs, train_lower, train_upper, color='blue', alpha=0.3)
+	ax2.plot(epochs, val_mean, marker='s', linestyle='dashed', color='red', label='Validation Set')
+	ax2.fill_between(epochs, val_lower, val_upper, color='red', alpha=0.3)
+
+	ax2.set_ylabel('Loss')
+	ax2.set_xlabel('Epochs')
+
+	legend_title = r'5-Fold CV (Full Range)' if use_full_range else r'5-Fold CV ($\pm \sigma$)'
+	handles, labels = ax1.get_legend_handles_labels()
+	fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.945), ncol=2,
+	           frameon=True, fancybox=True, handlelength=1.2,
+	           columnspacing=0.7, handletextpad=0.5)
+
+	plt.savefig('cnn_f1_loss_combined.png', dpi=300, bbox_inches='tight')
+	plt.show()
+
+.. figure:: _static/cnn_f1_loss_combined.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+
+CNN Classification
+-----------
+
+We now proceed by classifying the LAB training set objects that made it through our initial XGBoost classification step, as well as the approximately 48 thousand initial candidates that were output as inliers by the iForest model. This CNN-filtered set is saved for final analysis and prioritization. 
 
 
 

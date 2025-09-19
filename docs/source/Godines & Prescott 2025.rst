@@ -3,7 +3,7 @@
 Godines & Prescott (2025)
 ===========
 
-.. admonition:: Under Construction (last updated 2025-09-17)
+.. admonition:: Under Construction (last updated 2025-09-18)
 
    This documentation is still being written and may change frequently!
 
@@ -2187,7 +2187,244 @@ Image Extraction
 
 To facilitate the training of the outlier detection algorithm as well as the CNN, we now extract the multi-band imaging of our candidates, which includes only those output with probability predictions greater than or equal to 0.9.
 
+For this we need a few files, including the catalog names of the 80 priority candidates in our training sample (from Prescott+12), and the names of the training set LABs with bad R-band imaging, as these are not useful for either outlier detection or CNN training. These two files can be downloaded below.
+
+- :download:`obj_name_80 <obj_name_80>`.
+- :download:`bad_r_names_866.txt <bad_r_names_866.txt>`.
 
 
+.. code-block:: python
+
+	import os 
+	import numpy as np
+	import pandas as pd
+	from astropy.io import fits 
+	from astropy.stats import SigmaClip
+	from photutils.aperture import ApertureStats, CircularAnnulus
+	from pyBIA.data_processing import crop_image, concat_channels 
+
+	# Extract Other Images First #
+
+	# First the images are saved as individual files (for ease of processing, not needed and not provided in this documentation)
+	# Then these are loaded and compiled to form a single binary file (this is what is needed, and provided in this documentation)
+
+	# Where the images will be saved (as txt files)
+	bw_images_path = 'OTHER/Bw/'
+	r_images_path = 'OTHER/R/'
+
+	# The path to the NDWFS data files
+	data_path_bw = 'NDWFS/fits_images/Bw_FITS/'
+	data_path_r = 'NDWFS/fits_images/R_FITS/'
+
+	# Load the candidate catalog according to the optimized model 
+	cat = pd.read_csv('candidate_catalog_optimized_xgboost_8.csv')
+
+	# Select only the candidates with probability predictions greater than or equal to 90%
+	index = np.where(cat.proba >= 0.90)[0]
+	sample = cat.iloc[index]
+
+	# Saving images as 250x250 pix
+	image_size = 250 
+
+	# Setting the apertures for the background subtraction, approximated using the sigma-clipped median within annuli of 20 and 35 pixel radii
+	annulus_apertures = CircularAnnulus((int(image_size/2), int(image_size/2)), r_in=20, r_out=35)
+
+	# Extract the images one field at a time, normalizing by the exposure time to convert to counts per second
+	counter = 0
+	for field_name in np.unique(sample['field_name']):
+		
+		# Load the Bw and R broadband data 
+		hdu_bw = fits.open(data_path_bw+field_name+'_Bw_03_fix.fits')
+		hdu_r = fits.open(data_path_r+field_name+'_R_03_reg_fix.fits')
+		
+		# Select only the objects in this subfield
+		subfield_index = np.where(sample['field_name'] == field_name)[0] 
+		
+		# Loop through these objects, subtract the background using aperture photometry, and save as txt file
+		for i in range(len(subfield_index)):
+
+			counter += 1
+			print(counter)
+			
+			# Select the object's pixel positions
+			xpix, ypix = sample[['xpix', 'ypix']].iloc[subfield_index[i]].values.T
+			
+			# Bw first, crop the image from the entire subfield array, and calculate the background in this region
+			image = crop_image(hdu_bw[0].data, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
+			bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
+			
+			# Subtract the background and then normalize by the exposure time to get counts/sec
+			image = (image - bkg_stats.median) / hdu_bw[0].header['EXPTIME']
+			np.savetxt(bw_images_path+sample.obj_name.iloc[subfield_index[i]], image)
+			
+			# R next, crop the image from the entire subfield array, and calculate the background in this region
+			image = crop_image(hdu_r[0].data, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
+			bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
+			
+			# Subtract the background and then normalize by the exposure time to get counts/sec
+			image = (image - bkg_stats.median) / hdu_r[0].header['EXPTIME']
+			np.savetxt(r_images_path+sample.obj_name.iloc[subfield_index[i]], image)
+
+	# Load the object names that were saved
+	obj_names = [name for name in os.listdir(bw_images_path) if 'NDWFS' in name]
+
+	# To store the Bw images and save as a single binary file 
+	images = []
+	for name in obj_names:
+		Bw = np.loadtxt(bw_images_path+name)
+		images.append(Bw)
+
+	# Save the Bw images, this is what we provide in this documentation
+	np.save('xgb_output_images_bw.npy', np.array(images))
+
+	# To store the R images and save as a single binary file 
+	images = []
+	for name in obj_names:
+		R = np.loadtxt(r_images_path+name)
+		images.append(R)
+
+	# Save the R images, this is what we provide in this documentation
+	np.save('xgb_output_images_R.npy', np.array(images))
+
+	# Save the corresponding names
+	np.savetxt('xgb_output_images_names.txt', obj_names, fmt='%s')
+
+
+	### Now extract the training set LAB Images ###
+
+
+	#Note: All 860 are saved which includes the singular non-detection as this is still useful for outlier detection 
+
+	# Where the images will be saved (as txt files, for ease of processing, not needed and not provided in this documentation)
+	confirmed_diffuse_images_path_bw = 'LAB_images/confirmed_diffuse/Bw/'
+	priority_diffuse_images_path_bw = 'LAB_images/priority_diffuse/Bw/'
+	other_diffuse_images_path_bw = 'LAB_images/other_diffuse/Bw/'
+
+	confirmed_diffuse_images_path_r = 'LAB_images/confirmed_diffuse/R/'
+	priority_diffuse_images_path_r = 'LAB_images/priority_diffuse/R/'
+	other_diffuse_images_path_r = 'LAB_images/other_diffuse/R/'
+
+	# Where the training set files were saved
+	nsig_path = 'nsigs/'
+
+	# The training set file
+	sig = 0.32 #The optimal sig threshold to apply as per Figure 2
+	sample = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
+
+	# Identify the diffuse objects from the training set
+	diffuse_index = np.where(sample.flag == 1)[0] #Includes all 860 objects therefore includes the singular non-detection
+	names_to_save = np.array(sample.obj_name.iloc[diffuse_index])
+
+	# The names of the objects for which there is no R-band data or the data quality in this filter is bad
+	bad_r_names = np.loadtxt('bad_r_names_866.txt', dtype=str)
+
+	names_to_save = [i for i in names_to_save if i not in bad_r_names]
+
+	# Will identify the priority candidates as selected by Prescott et al. (2012), so as to save separately
+	obj_names_80 = np.loadtxt('obj_name_80', dtype=str)
+
+	# Will also save the five confirmed blobs separately
+	obj_names_5 = np.loadtxt('confirmed_LAB_names.txt', dtype=str)
+
+	# Saving images as 250x250 pix
+	image_size = 250
+
+	# Setting the apertures for the background subtraction, approximated using the sigma-clipped median within annuli of 20 and 35 pixel radii
+	annulus_apertures = CircularAnnulus((int(image_size/2), int(image_size/2)), r_in=20, r_out=35)
+
+	for field_name in np.unique(sample['field_name']):
+
+		# Load the B and R broadband data 
+		hdu_bw = fits.open(data_path_bw+field_name+'_Bw_03_fix.fits')
+		hdu_r = fits.open(data_path_r+field_name+'_R_03_reg_fix.fits')
+
+		# Select only the objects in this subfield
+		subfield_index = np.where(sample['field_name'] == field_name)[0]
+
+		# Loop through these objects, subtract the background using aperture photometry, and save as txt file
+		for i in range(len(subfield_index)):
+			
+			if sample.obj_name.iloc[subfield_index[i]] in names_to_save:
+				
+				xpix, ypix = sample[['xpix', 'ypix']].iloc[subfield_index[i]].values.T
+				
+				# Bw first, crop the image from the entire subfield array, and save the bkg subtracted sub-array
+				image = crop_image(hdu_bw[0].data, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
+				bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
+				
+				# Subtract the background and then normalize by the exposure time to get counts/sec
+				image = (image - bkg_stats.median) / hdu_bw[0].header['EXPTIME']
+				
+				if sample.obj_name.iloc[subfield_index[i]] in obj_names_80:
+					np.savetxt(priority_diffuse_images_path_bw+sample.obj_name.iloc[subfield_index[i]], image)
+				elif sample.obj_name.iloc[subfield_index[i]] in obj_names_5:
+					np.savetxt(confirmed_diffuse_images_path_bw+sample.obj_name.iloc[subfield_index[i]], image)
+				else:
+					np.savetxt(other_diffuse_images_path_bw+sample.obj_name.iloc[subfield_index[i]], image)
+				
+				# R next, crop the image from the entire subfield array, and save the bkg subtracted sub-array
+				image = crop_image(hdu_r[0].data, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
+				bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
+				
+				# Subtract the background and then normalize by the exposure time to get counts/sec
+				image = (image - bkg_stats.median) / hdu_r[0].header['EXPTIME']
+				if sample.obj_name.iloc[subfield_index[i]] in obj_names_80:
+					np.savetxt(priority_diffuse_images_path_r+sample.obj_name.iloc[subfield_index[i]], image)
+				elif sample.obj_name.iloc[subfield_index[i]] in obj_names_5:
+					np.savetxt(confirmed_diffuse_images_path_r+sample.obj_name.iloc[subfield_index[i]], image)
+				else:
+					np.savetxt(other_diffuse_images_path_r+sample.obj_name.iloc[subfield_index[i]], image)
+
+	# Save the five confirmed diffuse as a single binary file (this is what we provide in this documentation)
+	obj_names_confirmed_diffuse = [name for name in os.listdir(confirmed_diffuse_images_path_bw) if 'NDWFS' in name]
+
+	images = []
+	for name in obj_names_confirmed_diffuse:
+		Bw, R = np.loadtxt(confirmed_diffuse_images_path_bw+name), np.loadtxt(confirmed_diffuse_images_path_r+name)
+		images.append(concat_channels(Bw, R))
+
+	np.save('confirmed_diffuse.npy', np.array(images))
+	np.savetxt('confirmed_diffuse_names.txt', obj_names_confirmed_diffuse, fmt='%s')
+
+	# Save the 80 priority diffuse candidates as a single binary file (this is what we provide in this documentation)
+	obj_names_priority_diffuse = [name for name in os.listdir(priority_diffuse_images_path_bw) if 'NDWFS' in name]
+
+	images = []
+	for name in obj_names_priority_diffuse:
+		Bw, R = np.loadtxt(priority_diffuse_images_path_bw+name), np.loadtxt(priority_diffuse_images_path_r+name)
+		images.append(concat_channels(Bw, R))
+
+	np.save('priority_diffuse.npy', np.array(images))
+	np.savetxt('priority_diffuse_names.txt', obj_names_priority_diffuse, fmt='%s')
+
+	# Save the other diffuse candidates as a single binary file (this is what we provide in this documentation)
+	obj_names_other_diffuse = [name for name in os.listdir(other_diffuse_images_path_bw) if 'NDWFS' in name]
+
+	images = []
+	for name in obj_names_other_diffuse:
+		Bw, R = np.loadtxt(other_diffuse_images_path_bw+name), np.loadtxt(other_diffuse_images_path_r+name)
+		images.append(concat_channels(Bw, R))
+
+	np.save('other_diffuse.npy', np.array(images))
+	np.savetxt('other_diffuse_names.txt', obj_names_other_diffuse, fmt='%s')
+
+
+The candidate images in binary format (containing approximately 50k objects), as well as their catalog names, are available for download below.
+
+- `xgb_output_images_bw <https://drive.google.com/file/d/1vcXOxusGkBpCwBOBbqHk0wWtd5M93b7T/view?usp=sharing>`_
+- `xgb_output_images_R <https://drive.google.com/file/d/132HyBA_FNJaL0NyQEPL9aBoRPxEA1cGW/view?usp=sharing>`_ 
+- :download:`xgb_output_images_names.txt <xgb_output_images_names.txt>`.
+
+The LAB training set images in binary format, as well as their catalog names, are available for download below.
+
+Images:
+- :download:`confirmed_diffuse <confirmed_diffuse.npy>`.
+- `other_diffuse <https://drive.google.com/file/d/1iTIse_LYBEHhKq7oGBevjkiAVqONSQiE/view?usp=sharing>`_
+- `priority_diffuse <https://drive.google.com/file/d/1U9g6cx-fTZxgyfACoM6zoE-G31w6G6f4/view?usp=sharing>`_
+
+Corresponding names: 
+- :download:`confirmed_diffuse_names.txt <confirmed_diffuse_names.txt>`.
+- :download:`priority_diffuse_names.txt <priority_diffuse_names.txt>`.
+- :download:`other_diffuse_names.txt <other_diffuse_names.txt>`.
 
 

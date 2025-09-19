@@ -2192,7 +2192,6 @@ For this we need a few files, including the catalog names of the 80 priority can
 - :download:`obj_name_80 <obj_name_80>`.
 - :download:`bad_r_names_866.txt <bad_r_names_866.txt>`.
 
-
 .. code-block:: python
 
 	import os 
@@ -2426,5 +2425,462 @@ Corresponding names:
 - :download:`confirmed_diffuse_names.txt <confirmed_diffuse_names.txt>`.
 - :download:`priority_diffuse_names.txt <priority_diffuse_names.txt>`.
 - :download:`other_diffuse_names.txt <other_diffuse_names.txt>`.
+
+
+Outlier Removal
+-----------
+
+We find that a subset of classified objects are outliers (e.g., edge effects, bright halos near the source contaminating the pixel distribution, bleed trails from nearby stars). We visually inspect a subset of candidates to manually select 1000 candidates that are outliers in either band. These are available for download as a binary file here as well as the corresponding catalog names.
+
+- `outlier_sample_visually_inspected <https://drive.google.com/file/d/1MlE-9JXsEsq308ssXSTKqaog-UZ5tf5h/view?usp=sharing>`_
+- :download:`outlier_sample_visually_inspected_names.txt <outlier_sample_visually_inspected_names.txt>`.
+
+We first begin my plotting four of these outliers using the plot_images_grid_2x2 function provided in the Catalog module. 
+
+.. code-block:: python
+
+	import numpy as np
+	from pyBIA import catalog
+
+	images = np.load('outlier_sample_visually_inspected.npy')
+	images = images[:,:,:,0] # Only show the Bw
+
+	pix_conversion = 3.8961 # NDWFS survey pixel-per-arcsecond (for setting the axes)
+	size = 250 # Will crop the image to be of this size, otherwise set to None
+	xpix = ypix = images.shape[1] // 2 # Cropped image will be centered about these coords, if not cropping set to None
+	suptitle = r'Example Outliers ($B_W$)'
+
+	# Plot the first three images and the tenth one for variety
+	savepath = f'example_outliers.png'
+	catalog.plot_images_grid_2x2(
+		images[0], 
+		images[1], 
+		images[2], 
+		images[10], 
+		pix_conversion=pix_conversion, 
+		suptitle=suptitle, 
+		xpix=xpix, 
+		ypix=ypix, 
+		size=size,
+		savepath=savepath
+		)
+
+.. figure:: _static/example_outliers.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+
+To detect such outliers, we train a multi-band iForest model on the LAB class. We reserve 100 LABs for testing and evaluate performance by measuring its ability to correctly classify these 100 as inliers while simultaneously identifying the 1,000 outliers provided above. In this work, we test five distinct feature sets for iForest training and also vary the image size to determine the optimal cutout dimensions for model performance. 
+
+For this analysis we use the `outlier_detection <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/outlier_detection/index.html>`_ module.
+
+.. code-block:: python 
+
+	import numpy as np
+	from pyBIA.data_augmentation import resize 
+	from pyBIA import outlier_detection
+
+	# We experiment with square image sizes with lengths between 50 and 250 pixels
+	image_sizes = np.arange(50, 251, 1)
+
+	normalize = True # Whether to min-max normalize the images
+	min_pixel = 0 # Min pixel for min-max normalization
+	max_pixel = 10 # Max pixel for min-max normalization
+	img_num_channels = 2 # Number of channels 
+	clf = 'iforest' # Model to use, code only supports iForest at the moment
+	impute = True # Whether to impute missing data 
+	imp_method = 'median' # Imputation method
+	SEED_NO = 1909 # Random seed for training the iForest model
+
+	# Extract the features for the positive class (all DIFFUSE training objects) 
+	for image_size in image_sizes:
+
+		print(image_size)
+		
+		# Load the LAB training set images saved during image extraction
+		confirmed_LAB = np.load('confirmed_diffuse.npy') # 5 confirmed
+		priority_LAB = np.load('priority_diffuse.npy') # 80 priority
+		other_LAB =  np.load('other_diffuse.npy') #760 other diffuse
+
+		# Combine and resize
+		all_LAB = np.vstack((confirmed_LAB, priority_LAB, other_LAB))
+		all_LAB = resize(all_LAB, image_size)
+		
+		# Set the data used for training and testing, shuffle first since theyre ordered according to priority
+		rng = np.random.default_rng(seed=SEED_NO)
+		shuffled_indices = rng.permutation(len(all_LAB))
+		all_LAB = all_LAB[shuffled_indices]
+		LAB_train = all_LAB[:745]
+		LAB_test = all_LAB[745:]
+		
+		# Load the outliers we will use to test the performance
+		selected_outliers = np.load('outlier_sample_visually_inspected.npy')
+		selected_outliers = selected_outliers
+		selected_outliers = resize(selected_outliers, image_size)
+		
+		# Loop through the different feature sets and save the results in a dir called Outlier_Detection
+		for feat_set in ['hog', 'wavelet', 'stats', 'lbp', 'fft']:
+
+			# Instantiate the classifier
+			model = outlier_detection.Classifier(
+				data=LAB_train,
+				normalize=normalize,
+				min_pixel=min_pixel,
+				max_pixel=max_pixel,
+				img_num_channels=img_num_channels,
+				feat_set=feat_set,
+				clf=clf,
+				impute=impute,
+				imp_method=imp_method,
+				SEED_NO=SEED_NO
+				)
+			
+			# Train the classifier
+			model.create()
+			
+			# Predict on the test sets 
+			predictions_LAB_test = model.predict(LAB_test)
+			predictions_outliers = model.predict(selected_outliers)
+			
+			# Save test set prediction results 
+			np.savetxt(f'Outlier_Detection/LAB/{feat_set.upper()}/pred_LAB_{image_size}pix.txt', predictions_LAB_test, header='predictions, decision_function_scores, raw_anomaly_scores')
+			np.savetxt(f'Detection/outliers/{feat_set.upper()}/pred_outliers_{image_size}pix.txt', predictions_outliers, header='predictions, decision_function_scores, raw_anomaly_scores')
+
+The directory containing the test set results as a function of image size and feature set can be `downloaded here <https://drive.google.com/file/d/1FIAQMWdHPLs5veB5wyjEd-ZSxLBnhQx2/view?usp=sharing>`_
+
+We now proceed by plotting the performance as a function of image size and feature set. 
+
+.. code-block:: python 
+
+	import numpy as np
+	import matplotlib.pyplot as plt
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size': 21, 'lines.linewidth': 1.5})
+
+	pix_conversion = 3.8961 # NDWFS pix-to-arcsec conversion factor
+	image_sizes = np.arange(50, 251, 1) # Image sizes we tested
+
+	# Convert to physical units
+	image_sizes_arcsec = image_sizes / pix_conversion
+
+	# The five feature sets used in analysis
+	feature_sets = ['HOG', 'WAVELET', 'LBP', 'FFT', 'STATS']
+
+	# Legend label mapping
+	feature_label_map = {
+	    'HOG': 'HOG',
+	    'WAVELET': 'Wavelet',
+	    'STATS': 'Stats',
+	    'LBP': 'LBP',
+	    'FFT': 'FFT'
+	}
+
+	colors = plt.cm.tab10.colors
+	linestyles = ['-', '--', '-.', ':', (0, (4, 2, 1, 2, 1, 2))]
+
+	# Load outlier detection rates, from directory provided above
+	detection_rates = {feat: [] for feat in feature_sets}
+	base_path_out = 'Outlier_Detection/outliers'
+
+	for feat in feature_sets:
+	    for size in image_sizes:
+	        preds = np.loadtxt(f'{base_path_out}/{feat}/pred_outliers_{size}pix.txt')[:, 0]
+	        rate = np.mean(preds == -1)
+	        detection_rates[feat].append(rate)
+
+	# Find optimal
+	max_val = -1
+	max_feat = None
+	max_size = None
+	for feat in feature_sets:
+	    for size, val in zip(image_sizes, detection_rates[feat]):
+	        if val > max_val:
+	            max_val = val
+	            max_feat = feat
+	            max_size = size
+
+	max_arcsec = max_size / pix_conversion
+
+	# Load inlier detection rates, from directory provided above
+	retention_rates = {feat: [] for feat in feature_sets}
+	base_path_in = 'Outlier_Detection/LAB'
+
+	for feat in feature_sets:
+	    for size in image_sizes:
+	        preds = np.loadtxt(f'{base_path_in}/{feat}/pred_LAB_{size}pix.txt')[:, 0]
+	        rate = np.mean(preds == 1)
+	        retention_rates[feat].append(rate)
+
+	# Plot
+	fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 16), sharex=True)
+	fig.subplots_adjust(top=0.9, hspace=0.02)  # reduced space between plots
+
+	# Plot the outlier detection rates
+	for i, feat in enumerate(feature_sets):
+	    ax1.plot(image_sizes_arcsec, detection_rates[feat], label=feature_label_map[feat],
+	             linewidth=2.5, color=colors[i % 10], linestyle=linestyles[i % len(linestyles)])
+
+	ax1.axvline(max_arcsec, linestyle=(0, (2, 2)), alpha=0.7, color='gray')
+	ax1.annotate(
+	    f"Optimal\n(HOG)",
+	    xy=(max_arcsec, max_val),
+	    xytext=(-17.4, -340),
+	    textcoords="offset points",
+	    ha="right", va="top", color="gray",
+	    rotation=90, rotation_mode="anchor", fontsize=18,
+	)
+	ax1.set_ylabel('Outlier Detection Rate')
+	ax1.set_xlim((image_sizes_arcsec.min(), image_sizes_arcsec.max()))
+	ax1.set_title('iForest Performance', y=1.15)
+
+	# Plot the inlier detection rates
+	for i, feat in enumerate(feature_sets):
+	    ax2.plot(image_sizes_arcsec, retention_rates[feat],
+	             linewidth=2.5, color=colors[i % 10], linestyle=linestyles[i % len(linestyles)])
+
+	ax2.axvline(max_arcsec, linestyle=(0, (2, 2)), alpha=0.7, color='gray')
+	ax2.set_ylabel('Inlier Detection Rate')
+	ax2.set_xlabel('Image Size (arcsec)')
+
+	handles, labels = ax1.get_legend_handles_labels()
+	fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.968), ncol=5,
+	           title='Feature Set', frameon=True, fancybox=True, handlelength=1.2,
+	           columnspacing=0.7, handletextpad=0.5)
+
+	plt.savefig('combined_outlier_inlier_vs_size_arcsec.png', dpi=300, bbox_inches='tight')
+	plt.show()
+
+.. figure:: _static/combined_outlier_inlier_vs_size_arcsec.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+After determining the best feature set to use (HOG features) and the optimal image size (241x241 pixels), we proceed by 
+
+For this we will load the xgb_output_images_bw.npy and xgb_output_images_R.npy binary files saved before, which contain all candidate objects (approximately 53 thousand).
+
+.. code-block:: python 
+
+	import numpy as np
+	import pandas as pd
+	from pyBIA import outlier_detection
+	from pyBIA.data_processing import concat_channels
+	from pyBIA.data_augmentation import resize 
+
+	image_size = 241 # Optimal image size to use
+	normalize = True # Whether to min-max normalize the images
+	min_pixel = 0 # Min pixel for min-max normalization
+	max_pixel = 10 # Max pixel for min-max normalization
+	img_num_channels = 2 # Number of channels 
+	feat_set = 'hog' # Optimal feature set to use
+	clf = 'iforest' # Model to use, code only supports iForest at the moment
+	impute = True # Whether to impute missing data
+	imp_method = 'median' # Imputation method
+	SEED_NO = 1909 # Random seed for training the iForest model
+
+	# Train and save the optimal model now that we know best feature set and image size to use
+	confirmed_LAB = np.load('confirmed_diffuse.npy') # 5 confirmed
+	priority_LAB = np.load('priority_diffuse.npy') # 80 priority
+	other_LAB =  np.load('other_diffuse.npy') #760 other diffuse
+
+	# Combine and resize
+	all_LAB = np.vstack((confirmed_LAB, priority_LAB, other_LAB))
+	all_LAB = resize(all_LAB, image_size)
+
+	# Same shuffling and test partitioning as during the previous analysis
+	rng = np.random.default_rng(seed=SEED_NO)
+	shuffled_indices = rng.permutation(len(all_LAB))
+	all_LAB = all_LAB[shuffled_indices]
+	LAB_train = all_LAB[:745]
+
+	# Instantiate the classifier
+	model = outlier_detection.Classifier(
+		data=LAB_train,
+		normalize=normalize,
+		min_pixel=min_pixel,
+		max_pixel=max_pixel,
+		img_num_channels=img_num_channels,
+		feat_set=feat_set,
+		clf=clf,
+		impute=impute,
+		imp_method=imp_method,
+		SEED_NO=SEED_NO
+		)
+
+	# Create and save the model inside a folder called anomaly_detection_model
+	model.create()
+	model.save(dirname='anomaly_detection_model')
+
+	# CLASSIFY ALL THE CANDIDATES TO IDENTIFY THE OUTLIERS #
+
+	# We do this in several batches for ease of processing
+	prediction_candidates = []
+	for i in range(4):
+
+		other_bw = np.load('xgb_output_images_bw.npy')
+		other_r = np.load('xgb_output_images_R.npy')
+		
+		#Index 15k at a time
+		other_bw = other_bw[i*15000:(i+1)*15000] #15k at a time
+		other_r = other_r[i*15000:(i+1)*15000]
+
+		# Combine and resize
+		other = concat_channels(other_bw, other_r)
+		other = resize(other, image_size)
+		
+		# Make the predictions and append
+		iforest_predictions = model.predict(other)
+		prediction_candidates.append(iforest_predictions)
+
+	# NOW STORE THE AREAS/COVAREIGVAL OF THE DETECTED OUTLIERS FOR ANALYSIS #
+
+	# Load the data we just saved (the Classifier class outputs three values per preditiction, classification + decision function score + anomaly score)
+	iforest_preds = np.vstack(prediction_candidates)
+	preds, decision_scores, anomaly_scores = iforest_preds[:,0], iforest_preds[:,1], iforest_preds[:,2]
+
+	# Load the names of the initial candidates
+	candidate_names = np.loadtxt('xgb_output_images_names.txt', dtype=str)
+
+	#Load the candidate catalog
+	cat = pd.read_csv('candidate_catalog_optimized_xgboost_8.csv')
+
+	# Find the areas and first eigenvalue of the covariance matrix
+	areas, lambda_1 = [], []
+
+	for i in range(len(candidate_names)):
+		index = np.where(cat.obj_name == candidate_names[i])[0]
+		areas.append(cat.area.iloc[int(index)])
+		lambda_1.append(cat.covariance_eigval1.iloc[int(index)])
+		
+	np.savetxt('outlier_scores_and_areas.txt', np.c_[candidate_names, preds, decision_scores, anomaly_scores, areas, lambda_1], header='candidate_names, preds, decision_scores, anomaly_scores, areas, lambda_1', fmt='%s')
+
+
+The pyBIA iForest model can be `downloaded here <https://drive.google.com/file/d/1Gla7wR-PF52PgxA0QBrmOMwBej3J-2VA/view?usp=sharing>`_.
+
+The saved predictions for the candidate objects and the corresponding area and first eigenvalue of the covariance matrix can be :download:`downloaded here <outlier_scores_and_areas.txt>`.
+
+With the predictions and morphological values saved, we can now generate the figure presenting the iForest score distributions and the correlation between the score and the extent of image segmentation patch.
+
+.. code-block:: python
+
+	import numpy as np
+	import matplotlib.pyplot as plt
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size': 21, 'lines.linewidth': 1.5})
+
+	image_size = 241 # Optimal image size
+
+	# Load inlier and outlier decision scores from previous analysis (see saved directory above)
+	outlier_scores = np.loadtxt(f'Outlier_Detection/outliers/HOG/pred_outliers_{image_size}pix.txt')
+	outlier_anomaly_scores = outlier_scores[:, 1]
+
+	inlier_scores = np.loadtxt(f'Outlier_Detection/LAB/HOG/pred_LAB_{image_size}pix.txt')
+	inlier_anomaly_scores = inlier_scores[:, 1]
+
+	# Load Initial Candidates
+	data = np.loadtxt('outlier_scores_and_areas.txt', dtype=str)
+	initial_scores = data[:, 2].astype(float)
+
+	pix_conversion = 3.8961 # NDWFS Bootes field pix-to-arcsec conversion
+
+	# Common bins
+	all_scores = np.concatenate([outlier_anomaly_scores, inlier_anomaly_scores, initial_scores])
+	num_bins = 30
+	bins = np.linspace(all_scores.min(), all_scores.max(), num_bins + 1)
+	bin_centers = 0.5 * (bins[:-1] + bins[1:])
+
+	# Histograms
+	hist_out, _ = np.histogram(outlier_anomaly_scores, bins=bins)
+	hist_in, _ = np.histogram(inlier_anomaly_scores, bins=bins)
+	hist_init, _ = np.histogram(initial_scores, bins=bins)
+
+	frac_out = hist_out / np.sum(hist_out)
+	frac_in = hist_in / np.sum(hist_in)
+	frac_init = hist_init / np.sum(hist_init)
+
+	# Morphological attributes
+	feat_to_plot = 'area'
+	second_feat = 'covariance_eigval1'
+	scores, areas, lambda_1 = data[:, 2].astype(float), data[:, 4].astype(float), data[:, 5].astype(float)
+
+	def get_feat(name):
+	    # Convert to physical units
+	    if name == 'area':
+	        return np.array(areas) / pix_conversion**2, r'$B_W$ Area (arcsec$^2$)'
+	    elif name == 'covariance_eigval1':
+	        return np.array(lambda_1) / pix_conversion**2, r'$\lambda_1$ (arcsec$^2$)'
+
+	feat, ylabel = get_feat(feat_to_plot)
+	if second_feat:
+	    second, ylabel2 = get_feat(second_feat)
+
+	bin_indices = np.digitize(scores, bins) - 1
+	mean_feat = np.array([np.nanmean(feat[bin_indices == i]) if np.any(bin_indices == i) else np.nan for i in range(len(bins)-1)])
+	std_feat = np.array([np.nanstd(feat[bin_indices == i]) if np.any(bin_indices == i) else np.nan for i in range(len(bins)-1)])
+
+	if second_feat:
+	    mean_second = np.array([np.nanmean(second[bin_indices == i]) if np.any(bin_indices == i) else np.nan for i in range(len(bins)-1)])
+	    std_second = np.array([np.nanstd(second[bin_indices == i]) if np.any(bin_indices == i) else np.nan for i in range(len(bins)-1)])
+
+	# Plot
+	fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 16), sharex=True, gridspec_kw={'hspace': 0.022})
+
+	# Top panel
+	ax1.step(bin_centers, frac_in, where='mid', linestyle='-', label=f'Inliers (n={len(inlier_anomaly_scores)})', linewidth=2.5)
+	ax1.step(bin_centers, frac_out, where='mid', linestyle='--', label=f'Outliers (n={len(outlier_anomaly_scores)})', linewidth=2.5)
+	ax1.step(bin_centers, frac_init, where='mid', linestyle='-.', label=f'Initial Candidates (n={len(initial_scores):,})', linewidth=2.5, color='magenta')
+	ax1.set_ylabel('Fraction of Objects')
+	ax1.set_title('Optimal iForest Model')
+	ax1.legend(frameon=True, fancybox=True)
+	ax1.set_xlim(bin_centers[0], bin_centers[-1])
+	ax1.set_ylim(0)
+	ax1.axvline(0.0, linestyle=(0, (2, 2)), alpha=0.7, color='gray')
+	ax1.annotate(r'Outliers $\uparrow$', xy=(0.0, 0.11), xytext=(-18, 0),
+	             textcoords='offset points', ha='left', va='bottom', color='gray', rotation=90)
+
+	# Lower panel
+	line1 = ax2.plot(bin_centers, mean_feat, linestyle='-', linewidth=2.5, color='tab:blue', label=r'$\lambda_1$')
+	ax2.fill_between(bin_centers, mean_feat - std_feat, mean_feat + std_feat, color='tab:blue', alpha=0.3)
+	ax2.set_xlabel('Score')
+	ax2.set_ylabel(ylabel)
+
+	if second_feat:
+	    ax2b = ax2.twinx()
+	    line2 = ax2b.plot(bin_centers, mean_second, linestyle='--', linewidth=2.5, color='tab:red', label='Area')
+	    ax2b.fill_between(bin_centers, mean_second - std_second, mean_second + std_second, color='tab:red', alpha=0.2)
+	    ax2b.set_ylabel(ylabel2)
+	    lines = line2 + line1
+	    labels = [l.get_label() for l in lines]
+	    ax2.legend(lines, labels, frameon=True, fancybox=True)
+
+	ax2.set_xlim(bin_centers[0], bin_centers[-1])
+	ax2.set_ylim(0)
+	ax2.axvline(0.0, linestyle=(0, (2, 2)), alpha=0.7, color='gray')
+
+	plt.savefig('iforest_scores.png', dpi=300, bbox_inches='tight')
+	plt.show()
+
+.. figure:: _static/iforest_scores.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+
+CNN Training
+-----------
+
+
+
+
+
+
+
+
 
 

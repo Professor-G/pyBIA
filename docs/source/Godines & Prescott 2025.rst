@@ -2881,7 +2881,7 @@ Now that the majority of outliers have been removed from the candidate sample, w
 
 We begin by extracting the training set images. The positive class will include the Prescott+12 priority candidates that were classified by our XGBoost model with a probability prediction of at least 0.9 (70 total). The other five confirmed LABs are reserved for testing. At the same time we will save the non-priority LAB from our training set so after CNN training we can select the ones that should be considered final candidates. For computational efficiency we will also extract 3800 random objects from our initial candidate sample, which will be used when generating the negative class.
 
-..code-block:: python 
+.. code-block:: python 
 
 	import numpy as np
 	from pyBIA.data_processing import concat_channels
@@ -2993,7 +2993,7 @@ Corresponding names:
 With these images saved we can train our binary convolutional neural network classifier, using the `cnn_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/cnn_model/index.html>`_ module.
 
 
-..code-block:: python 
+.. code-block:: python 
 
 	import numpy as np 
 	from pyBIA import cnn_model
@@ -3092,7 +3092,7 @@ The saved pyBIA model can be `downloaded here <https://drive.google.com/file/d/1
 
 We can load this model and visualize the per-epoch performance
 
-..code-block:: python 
+.. code-block:: python 
 
 	import numpy as np
 	from pyBIA import cnn_model
@@ -3173,9 +3173,8 @@ CNN Classification
 
 We now proceed by classifying the LAB training set objects that made it through our initial XGBoost classification step, as well as the approximately 48 thousand initial candidates that were output as inliers by the iForest model. This CNN-filtered set is saved for final analysis and prioritization. 
 
-..code-block:: python
+.. code-block:: python 
 
-	# Do the CNN predictions #
 	import numpy as np
 	from pyBIA import cnn_model
 	from pyBIA.data_processing import concat_channels
@@ -3288,78 +3287,79 @@ Corresponding names:
 
 Now we can visualize the probability prediction distributions for both the LABs used to train the CNN (as per the five-fold CV results) and the approximately 48 thousand initial candidates that were output as inliers by the iForest model.
 
-..code-block:: python 
+.. code-block:: python 
 
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd 
-import scienceplots
-plt.style.use('science')
-plt.rcParams.update({'font.size': 21, 'lines.linewidth': 1.5})
+	import numpy as np
+	import matplotlib.pyplot as plt
+	import pandas as pd 
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size': 21, 'lines.linewidth': 1.5})
 
-# Load the CNN predictions on the initial candidates
-candidates = np.loadtxt('OTHER_final_CNN_candidates_names_probas.txt', dtype=str)
-candidates_names, candidates_cnn_probas = candidates[:,0], candidates[:,1].astype('float')
+	# Load the CNN predictions on the initial candidates
+	candidates = np.loadtxt('OTHER_final_CNN_candidates_names_probas.txt', dtype=str)
+	candidates_names, candidates_cnn_probas = candidates[:,0], candidates[:,1].astype('float')
 
-# The positive CNN training set data as per the validation results
-lab_validation = np.loadtxt('priority_diffuse_final_CNN_candidates_names_probas.txt', dtype=str)
-lab_validation_names, lab_validation_cnn_probas = lab_validation[:,0], lab_validation[:,1].astype('float')
+	# The positive CNN training set data as per the validation results
+	lab_validation = np.loadtxt('priority_diffuse_final_CNN_candidates_names_probas.txt', dtype=str)
+	lab_validation_names, lab_validation_cnn_probas = lab_validation[:,0], lab_validation[:,1].astype('float')
 
-n_bins = 8
-bins = np.linspace(0, 1, n_bins + 1) # Common bin edges for both histograms
+	n_bins = 8
+	bins = np.linspace(0, 1, n_bins + 1) # Common bin edges for both histograms
 
-# Plot the histograms
-fig, ax = plt.subplots(figsize=(8, 8))
+	# Plot the histograms
+	fig, ax = plt.subplots(figsize=(8, 8))
 
-ax.hist(candidates_cnn_probas, bins=bins,
-        weights=np.ones_like(candidates_cnn_probas) / len(candidates_cnn_probas),
-        histtype='step', color='blue', linewidth=1.5, linestyle='-',
-        label='Initial Candidates')
+	ax.hist(candidates_cnn_probas, bins=bins,
+	        weights=np.ones_like(candidates_cnn_probas) / len(candidates_cnn_probas),
+	        histtype='step', color='blue', linewidth=1.5, linestyle='-',
+	        label='Initial Candidates')
 
-ax.hist(lab_validation_cnn_probas, bins=bins,
-        weights=np.ones_like(lab_validation_cnn_probas) / len(lab_validation_cnn_probas),
-        histtype='step', color='green', linewidth=1.5, linestyle='--',
-        label='Training LAB')
+	ax.hist(lab_validation_cnn_probas, bins=bins,
+	        weights=np.ones_like(lab_validation_cnn_probas) / len(lab_validation_cnn_probas),
+	        histtype='step', color='green', linewidth=1.5, linestyle='--',
+	        label='Training LAB')
 
-# Load the data for the confirmed LABs
-confirmed_probas = np.loadtxt('confirmed_candidates_final_CNN_names_probas.txt', dtype=str)
-confirmed_probas = confirmed_probas[:,1].astype('float')
+	# Load the data for the confirmed LABs
+	confirmed_probas = np.loadtxt('confirmed_candidates_final_CNN_names_probas.txt', dtype=str)
+	confirmed_probas = confirmed_probas[:,1].astype('float')
 
-# Confirmed LAB markers and colors
-# Saved in the following order: 'PRG4, LABd05, PRG3, PRG2, PRG1'
-special_items = {
-    'LABd05': confirmed_probas[1],
-    'PRG1': confirmed_probas[4],
-    'PRG2': confirmed_probas[3],
-    'PRG3': confirmed_probas[2],
-    'PRG4': confirmed_probas[0]
-}
+	# Confirmed LAB markers and colors
+	# Saved in the following order: 'PRG4, LABd05, PRG3, PRG2, PRG1'
+	special_items = {
+	    'LABd05': confirmed_probas[1],
+	    'PRG1': confirmed_probas[4],
+	    'PRG2': confirmed_probas[3],
+	    'PRG3': confirmed_probas[2],
+	    'PRG4': confirmed_probas[0]
+	}
 
-special_colors = ['blue', 'green', 'cyan', 'purple', 'red']
-special_markers = ['p', 'P', '>', "v", "^"]
+	special_colors = ['blue', 'green', 'cyan', 'purple', 'red']
+	special_markers = ['p', 'P', '>', "v", "^"]
 
-# Add stars for the confirmed LABs
-for (label, prob), color, marker in zip(special_items.items(), special_colors, special_markers):
-    ax.scatter(prob, 0.0044, color=color, marker=marker, s=200, lw=3.5, alpha=0.9, label=label, edgecolor=color, facecolors='none')
+	# Add stars for the confirmed LABs
+	for (label, prob), color, marker in zip(special_items.items(), special_colors, special_markers):
+	    ax.scatter(prob, 0.0044, color=color, marker=marker, s=200, lw=3.5, alpha=0.9, label=label, edgecolor=color, facecolors='none')
 
-ax.set_xlabel(r"$P\left(y = \mathrm{LAB} \mid \mathbf{X} \right)$")
-ax.set_ylabel("Fraction of Objects")
-ax.set_title('CNN Classification Results')
-ax.legend(handletextpad=0.5, loc='upper left')
+	ax.set_xlabel(r"$P\left(y = \mathrm{LAB} \mid \mathbf{X} \right)$")
+	ax.set_ylabel("Fraction of Objects")
+	ax.set_title('CNN Classification Results')
+	ax.legend(handletextpad=0.5, loc='upper left')
 
-ax.axvline(0.6, linestyle=(0, (2, 2)), alpha=0.7, color='gray')
-ax.annotate(r'Final Candidates $\downarrow$', xy=(0.64, 0.16), xytext=(-18, 0),
-             textcoords='offset points', ha='right', va='bottom', color='gray', rotation=90)
+	ax.axvline(0.6, linestyle=(0, (2, 2)), alpha=0.7, color='gray')
+	ax.annotate(r'Final Candidates $\downarrow$', xy=(0.64, 0.16), xytext=(-18, 0),
+	             textcoords='offset points', ha='right', va='bottom', color='gray', rotation=90)
 
-plt.ylim((0,0.3))
-plt.savefig('probability_hists.png', dpi=300, bbox_inches='tight')
-plt.show()
+	plt.ylim((0,0.3))
+	plt.savefig('probability_hists.png', dpi=300, bbox_inches='tight')
+	plt.show()
 
 .. figure:: _static/probability_hists.png
     :align: center
     :class: with-shadow with-border
     :width: 600px
 |
+
 
 
 

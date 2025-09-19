@@ -2980,7 +2980,7 @@ These files can be downloaded below.
 
 Images:
 
-- `priority_diffuse_final <https://drive.google.com/file/d/1zWIUitBjN9Hag204xN-NbGq7KWwyu1pr/view?usp=sharing>`.
+- `priority_diffuse_final <https://drive.google.com/file/d/1zWIUitBjN9Hag204xN-NbGq7KWwyu1pr/view?usp=sharing>`_.
 - `other_diffuse_final <https://drive.google.com/file/d/1pyodZkCcDWKqu7PDppLfTMsXJ4f_Mnzk/view?usp=sharing>`_
 - `cnn_training_other_3800 <https://drive.google.com/file/d/16QIYIWxiqEaYXg2_AA5VG_WSsXmsXNuF/view?usp=sharing>`_
 
@@ -3173,7 +3173,193 @@ CNN Classification
 
 We now proceed by classifying the LAB training set objects that made it through our initial XGBoost classification step, as well as the approximately 48 thousand initial candidates that were output as inliers by the iForest model. This CNN-filtered set is saved for final analysis and prioritization. 
 
+..code-block:: python
 
+	# Do the CNN predictions #
+	import numpy as np
+	from pyBIA import cnn_model
+	from pyBIA.data_processing import concat_channels
+	from pyBIA.data_augmentation import resize
+
+	# Load the saved CNN model
+	model = cnn_model.Classifier()
+	model.load('cnn_model')
+
+	# Filter those with XGB probas greater than 0.9
+	priority_diffuse = np.load('priority_diffuse_final.npy')
+	priority_diffuse_names = np.loadtxt('priority_diffuse_names_final.txt', dtype=str)
+
+	# Need the difference image channel
+	bw_minus_r = priority_diffuse[:,:,:,0] / priority_diffuse[:,:,:,1]
+	bw_minus_r = np.expand_dims(bw_minus_r, axis=-1)
+	priority_diffuse = np.concatenate([priority_diffuse, bw_minus_r], axis=-1)
+
+	# Iterate through the five folds and classify only the training set instances that were in that validation fold
+	# Note that the built-in predict method handles this for us via the cv_model input (determines which model in the ensemble to use)
+	priority_diffuse_predictions = []
+	for i in range(5): 
+	    sample = priority_diffuse[14*i:14*(i+1)]
+	    priority_diffuse_predictions.append(model.predict(sample, cv_model=i, return_proba=True))
+
+	priority_diffuse_predictions = np.vstack(priority_diffuse_predictions)
+	priority_diffuse_probas = priority_diffuse_predictions[:,1].astype('float')#[index]
+	order = np.argsort(priority_diffuse_probas)[::-1]
+
+	np.save('priority_diffuse_final_CNN_candidates.npy', priority_diffuse[order])
+	np.savetxt('priority_diffuse_final_CNN_candidates_names_probas.txt', np.c_[priority_diffuse_names[order], priority_diffuse_probas[order]], fmt='%s')
+
+	# Other diffuse candidates as selected by Prescott et al. 2012
+	# Note: These files include the singular non-detection hence need to remove it to avoid indexing issues later on!!!!
+
+	other_diffuse = np.load('other_diffuse_final.npy')
+	other_diffuse_names = np.loadtxt('other_diffuse_names_final.txt', dtype=str)
+
+	# Need the difference image channel
+	bw_minus_r = other_diffuse[:,:,:,0] / other_diffuse[:,:,:,1]
+	bw_minus_r = np.expand_dims(bw_minus_r, axis=-1)
+	other_diffuse = np.concatenate([other_diffuse, bw_minus_r], axis=-1)
+
+	# CNN prediction
+	other_diffuse_predictions = model.predict(other_diffuse, cv_model='all', return_proba=True)
+
+	#Save in order of highests to lowest probability predictions
+	other_diffuse_probas = other_diffuse_predictions[:,1].astype('float')#[index]
+	order = np.argsort(other_diffuse_probas)[::-1]
+	np.save('other_diffuse_final_CNN_candidates.npy', other_diffuse[order])
+	np.savetxt('other_diffuse_final_CNN_candidates_names_probas.txt', np.c_[other_diffuse_names[order], other_diffuse_probas[order]], fmt='%s')
+
+	# The initial candidates as selected by the XGBoost classifier
+
+	other_candidates_names = np.loadtxt('xgb_output_images_names.txt', dtype=str)
+	other_bw = np.load('xgb_output_images_bw.npy')
+	other_r = np.load('xgb_output_images_R.npy')
+
+	# Only need the inliers
+	iforest_preds = np.loadtxt('iforest_predictions.txt')
+	iforest_ypred = iforest_preds[:,0]
+	inlier_index = np.where(iforest_ypred == 1)[0]
+
+	# Resize and concat the images for classification, the predict method automatically resizes for us but here we do manually for faster processing
+	other_candidates_names = other_candidates_names[inlier_index]
+	other_bw = resize(other_bw[inlier_index], 70)
+	other_r = resize(other_r[inlier_index], 70)
+	other_candidates = concat_channels(other_bw, other_r)
+
+	# Need the difference image channel
+	bw_minus_r = other_candidates[:,:,:,0] / other_candidates[:,:,:,1]
+	bw_minus_r = np.expand_dims(bw_minus_r, axis=-1)
+	other_candidates = np.concatenate([other_candidates, bw_minus_r], axis=-1)
+
+	# CNN prediction
+	other_candidates_predictions = model.predict(other_candidates, cv_model='all', return_proba=True)
+
+	#Save in order of highests to lowest probas
+	other_candidate_probas = other_candidates_predictions[:,1].astype('float')#[index]
+	order = np.argsort(other_candidate_probas)[::-1]
+	np.save('OTHER_final_CNN_candidates.npy', other_candidates[order])
+	np.savetxt('OTHER_final_CNN_candidates_names_probas.txt', np.c_[other_candidates_names[order], other_candidate_probas[order]], fmt='%s')
+
+	## Now the five confirmed LABs
+	confirmed_diffuse_names = np.loadtxt('confirmed_diffuse_names.txt', dtype=str)
+	confirmed_diffuse = np.load('confirmed_diffuse.npy')
+
+	bw_minus_r = confirmed_diffuse[:,:,:,0] / confirmed_diffuse[:,:,:,1]
+	bw_minus_r = np.expand_dims(bw_minus_r, axis=-1)
+	confirmed_diffuse = np.concatenate([confirmed_diffuse, bw_minus_r], axis=-1)
+
+	# CNN prediction
+	confirmed_diffuse_predictions = model.predict(confirmed_diffuse, cv_model='all', return_proba=True)
+
+	np.savetxt('confirmed_candidates_final_CNN_names_probas.txt', np.c_[confirmed_diffuse_names, confirmed_diffuse_predictions[:,1]], fmt='%s')
+
+These final candidate files can be downloaded below.
+
+Images:
+
+- `priority_diffuse_final_CNN_candidates <https://drive.google.com/file/d/1LEiyLQWMOwlzE4qjuGxo10cKb-yLOOHI/view?usp=sharing>`_
+- `other_diffuse_final_CNN_candidates <https://drive.google.com/file/d/1We9DncIn-piph2iyvGNsdHz3AuSToPpK/view?usp=sharing>`_
+- `OTHER_final_CNN_candidates <>`_
+
+Corresponding names: 
+
+- :download:`priority_diffuse_final_CNN_candidates_names_probas.txt <priority_diffuse_final_CNN_candidates_names_probas.txt>`.
+- :download:`other_diffuse_final_CNN_candidates_names_probas.txt <other_diffuse_final_CNN_candidates_names_probas.txt>`.
+- :download:`OTHER_final_CNN_candidates_names_probas.txt <OTHER_final_CNN_candidates_names_probas.txt>`.
+
+Now we can visualize the probability prediction distributions for both the LABs used to train the CNN (as per the five-fold CV results) and the approximately 48 thousand initial candidates that were output as inliers by the iForest model.
+
+..code-block:: python 
+
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd 
+import scienceplots
+plt.style.use('science')
+plt.rcParams.update({'font.size': 21, 'lines.linewidth': 1.5})
+
+# Load the CNN predictions on the initial candidates
+candidates = np.loadtxt('OTHER_final_CNN_candidates_names_probas.txt', dtype=str)
+candidates_names, candidates_cnn_probas = candidates[:,0], candidates[:,1].astype('float')
+
+# The positive CNN training set data as per the validation results
+lab_validation = np.loadtxt('priority_diffuse_final_CNN_candidates_names_probas.txt', dtype=str)
+lab_validation_names, lab_validation_cnn_probas = lab_validation[:,0], lab_validation[:,1].astype('float')
+
+n_bins = 8
+bins = np.linspace(0, 1, n_bins + 1) # Common bin edges for both histograms
+
+# Plot the histograms
+fig, ax = plt.subplots(figsize=(8, 8))
+
+ax.hist(candidates_cnn_probas, bins=bins,
+        weights=np.ones_like(candidates_cnn_probas) / len(candidates_cnn_probas),
+        histtype='step', color='blue', linewidth=1.5, linestyle='-',
+        label='Initial Candidates')
+
+ax.hist(lab_validation_cnn_probas, bins=bins,
+        weights=np.ones_like(lab_validation_cnn_probas) / len(lab_validation_cnn_probas),
+        histtype='step', color='green', linewidth=1.5, linestyle='--',
+        label='Training LAB')
+
+# Load the data for the confirmed LABs
+confirmed_probas = np.loadtxt('confirmed_candidates_final_CNN_names_probas.txt', dtype=str)
+confirmed_probas = confirmed_probas[:,1].astype('float')
+
+# Confirmed LAB markers and colors
+# Saved in the following order: 'PRG4, LABd05, PRG3, PRG2, PRG1'
+special_items = {
+    'LABd05': confirmed_probas[1],
+    'PRG1': confirmed_probas[4],
+    'PRG2': confirmed_probas[3],
+    'PRG3': confirmed_probas[2],
+    'PRG4': confirmed_probas[0]
+}
+
+special_colors = ['blue', 'green', 'cyan', 'purple', 'red']
+special_markers = ['p', 'P', '>', "v", "^"]
+
+# Add stars for the confirmed LABs
+for (label, prob), color, marker in zip(special_items.items(), special_colors, special_markers):
+    ax.scatter(prob, 0.0044, color=color, marker=marker, s=200, lw=3.5, alpha=0.9, label=label, edgecolor=color, facecolors='none')
+
+ax.set_xlabel(r"$P\left(y = \mathrm{LAB} \mid \mathbf{X} \right)$")
+ax.set_ylabel("Fraction of Objects")
+ax.set_title('CNN Classification Results')
+ax.legend(handletextpad=0.5, loc='upper left')
+
+ax.axvline(0.6, linestyle=(0, (2, 2)), alpha=0.7, color='gray')
+ax.annotate(r'Final Candidates $\downarrow$', xy=(0.64, 0.16), xytext=(-18, 0),
+             textcoords='offset points', ha='right', va='bottom', color='gray', rotation=90)
+
+plt.ylim((0,0.3))
+plt.savefig('probability_hists.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+.. figure:: _static/probability_hists.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
 
 

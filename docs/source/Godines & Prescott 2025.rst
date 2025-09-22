@@ -3,7 +3,7 @@
 Godines & Prescott (2025)
 ===========
 
-.. admonition:: Under Construction (last updated 2025-09-18)
+.. admonition:: Under Construction (last updated 2025-09-22)
 
    This documentation is still being written and may change frequently!
 
@@ -3277,7 +3277,7 @@ Images:
 
 - `priority_diffuse_final_CNN_candidates <https://drive.google.com/file/d/1LEiyLQWMOwlzE4qjuGxo10cKb-yLOOHI/view?usp=sharing>`_
 - `other_diffuse_final_CNN_candidates <https://drive.google.com/file/d/1We9DncIn-piph2iyvGNsdHz3AuSToPpK/view?usp=sharing>`_
-- `OTHER_final_CNN_candidates <>`_
+- `OTHER_final_CNN_candidates <https://drive.google.com/file/d/1u3_knLQBGERMhMKInKNPDTk21G6dzJbp/view?usp=sharing>`_
 
 Corresponding names: 
 
@@ -3355,6 +3355,189 @@ Now we can visualize the probability prediction distributions for both the LABs 
 	plt.show()
 
 .. figure:: _static/probability_hists.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+
+Now we plot the bin average of these probability predictions for the inital candidates as a function of the top three features used to train the XGBoost model
+
+.. code-block:: python 
+
+	import pandas as pd
+	import numpy as np
+	import matplotlib.pyplot as plt
+	import matplotlib as mpl
+	import scienceplots
+
+	plt.style.use('science')
+	plt.rcParams.update({'font.size': 21, 'lines.linewidth': 1.5})
+
+	error_mode = 'std' # Error bar options, we include 'std' or 'sem'
+	display_mode = 'quantiles' #  If std error mode can set this to 'errorbars' or 'shaded', otherwise 'quantiles'
+	pix_conversion = 3.8961 # NDWFS pix-to-arcsec
+	n_bins_other = 40 # No bins for histogram
+
+	# Data
+	priority_70 = np.loadtxt('priority_diffuse_final_CNN_candidates_names_probas.txt', dtype=str)
+	names_70 = priority_70[:, 0]
+	probas_70 = priority_70[:, 1].astype(float)
+
+	# Load the training data
+	# Where the training set files will be saved
+	nsig_path = 'nsigs/'
+
+	sig = 0.32 #Optimal sig from Fig. 2
+	df_diffuse_full = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
+
+	# Find the priority LABs we used to train the CNN 
+	indices_70 = np.hstack([np.where(df_diffuse_full.obj_name == nm)[0] for nm in names_70])
+	df_diffuse = df_diffuse_full.iloc[indices_70].reset_index(drop=True)
+
+	# Load 
+	all_xgb_probas = pd.read_csv("candidate_catalog_optimized_xgboost_8.csv")
+	candidates = np.loadtxt('OTHER_final_CNN_candidates_names_probas.txt', dtype=str)
+	candidates_names = candidates[:, 0]
+	candidates_cnn_probas = candidates[:, 1].astype(float)
+
+	# Compute indices to index the candidate catalog
+	indices_ = []
+	for _name_ in candidates_names:
+	    print('Computing indices...')
+	    index = np.where(all_xgb_probas.obj_name == _name_)[0]
+	    indices_.append(index[0])
+
+	# Hard-coding the probability prediction of the confirmed LABs
+	lab_info = {
+	    'NDWFS_J143410.9+331730': {'label': 'LABd05', 'cnn': 0.61917084},
+	    'NDWFS_J143512.2+351108': {'label': 'PRG1',  'cnn': 0.68620145},
+	    'NDWFS_J142623.0+351422': {'label': 'PRG2',  'cnn': 0.72969264},
+	    'NDWFS_J143412.7+332939': {'label': 'PRG3',  'cnn': 0.51314485},
+	    'NDWFS_J142653.1+343856': {'label': 'PRG4',  'cnn': 0.80759037}
+	}
+	special_colors  = ['blue', 'green', 'cyan', 'purple', 'red']
+	special_markers = ['p', 'P', '>', 'v', '^']
+
+	def get_feature_array(feature):
+	    # Return array for a feature over initial candidates, also logs lambda_1 and converts to arcsec
+	    if feature == 'mag':
+	        arr = np.array(all_xgb_probas.mag.iloc[indices_])
+	    elif feature == 'gini':
+	        arr = np.array(all_xgb_probas.gini.iloc[indices_])
+	    elif feature == 'covariance_eigval1':
+	        arr = np.array(all_xgb_probas.covariance_eigval1.iloc[indices_]) / (pix_conversion**2)
+	        arr = np.log10(arr)  # always log lambda1 (arcsec^2)
+	    else:
+	        raise ValueError("Unsupported feature")
+	    return arr
+
+	def get_feature_value_row(row, feature):
+	    # Return a single-row feature value (similar to above function but to be used by the single confirmed LAB instances)
+	    val = float(row[feature])
+	    if feature == 'covariance_eigval1':
+	        val = val / (pix_conversion**2)
+	        val = np.log10(val)  # always log lambda1 (arcsec^2)
+	    return val
+
+	def binned_stats(x, y, bins, error_mode='sem', display_mode='errorbars', pct1=25, pct2=75):
+	    # Compute binned centers and summary stats (median plus/minus error or quantiles)
+	    inds = np.digitize(x, bins)
+	    centers = (bins[:-1] + bins[1:]) / 2.0
+	    means, q25s, q75s, errors = [], [], [], []
+	    for i in range(1, len(bins)):
+	        mask = inds == i
+	        if np.any(mask):
+	            data_i = y[mask]
+	            means.append(np.percentile(data_i, 50))
+	            if display_mode == 'quantiles':
+	                q25s.append(np.percentile(data_i, pct1))
+	                q75s.append(np.percentile(data_i, pct2))
+	            else:
+	                err = np.std(data_i) / np.sqrt(np.sum(mask)) if error_mode == 'sem' else np.std(data_i)
+	                errors.append(err)
+	        else:
+	            means.append(np.nan)
+	            (q25s.append(np.nan), q75s.append(np.nan)) if display_mode == 'quantiles' else errors.append(np.nan)
+	    if display_mode == 'quantiles':
+	        return centers, np.array(means), np.array(q25s), np.array(q75s)
+	    return centers, np.array(means), np.array(errors)
+
+	def feature_title(feature):
+	    # Map feature key to a short LaTeX axis label
+	    if feature == 'mag': return r'$B_W$ Mag'
+	    if feature == 'gini': return r'Gini Index'
+	    if feature == 'covariance_eigval1': return r'$\log_{10}(\lambda_1)\ (\mathrm{arcsec}^2)$'
+	    return feature
+
+	def plot_feature_panel(ax, feature):
+	    # Plot feature vs. CNN probability with binned summary and annotations."""
+	    y_data = get_feature_array(feature)
+	    bins_other = np.linspace(0, 1, n_bins_other + 1)
+
+	    if display_mode == 'quantiles':
+	        centers, means, q25s, q75s = binned_stats(candidates_cnn_probas, y_data, bins_other, display_mode='quantiles')
+	        ax.plot(centers, means, color='black', label=r'Initial Candidates (n=47,829)')
+	        ax.fill_between(centers, q25s, q75s, color='gray', alpha=0.3)
+	    elif display_mode == 'errorbars':
+	        centers, means, errors = binned_stats(candidates_cnn_probas, y_data, bins_other, error_mode=error_mode, display_mode='errorbars')
+	        ax.errorbar(centers, means, yerr=errors, fmt='-', color='black', capsize=5, label=r'Initial Candidates (n=51,398)')
+	    else:
+	        centers, means, errors = binned_stats(candidates_cnn_probas, y_data, bins_other, error_mode=error_mode, display_mode='errorbars')
+	        ax.plot(centers, means, color='black', label=r'Initial Candidates (n=51,398)')
+	        ax.fill_between(centers, means - errors, means + errors, color='gray', alpha=0.3)
+
+	    for j in range(len(names_70)):
+	        fval = get_feature_value_row(df_diffuse.iloc[j], feature)
+	        lbl = "Training LAB (n=70)" if j == 0 else None
+	        ax.scatter(probas_70[j], fval, marker='o', s=200, facecolors='none', edgecolors='magenta',
+	                   linewidth=3.5, alpha=0.9, label=lbl)
+
+	    for i, (obj_name, info) in enumerate(lab_info.items()):
+	        lab_rows = df_diffuse_full[df_diffuse_full['obj_name'] == obj_name]
+	        if not lab_rows.empty:
+	            lab_val = get_feature_value_row(lab_rows.iloc[0], feature)
+	            ax.scatter(info['cnn'], lab_val, marker=special_markers[i], s=200,
+	                       facecolors='none', edgecolors=special_colors[i],
+	                       linewidth=3.5, alpha=0.9, label=info['label'])
+
+	    ax.set_ylabel(feature_title(feature))
+	    if feature == 'mag':
+	        ax.set_ylim((22.4, 24.2))
+	        ax.invert_yaxis()
+
+	    handles, labels = ax.get_legend_handles_labels()
+	    uniq = dict(zip(labels, handles))
+	    ax.legend([], [])
+	    return uniq
+
+	features = ['mag', 'gini', 'covariance_eigval1']
+
+	fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(24, 8), sharey=False)
+	fig.subplots_adjust(top=0.85, wspace=0.15)
+
+	uniq1 = plot_feature_panel(ax1, features[0])
+	plot_feature_panel(ax2, features[1])
+	plot_feature_panel(ax3, features[2])
+
+	ax2.set_title('CNN Model Performance Analysis', y=1.1)
+	for ax in (ax1, ax2, ax3):
+	    ax.set_xlabel(r"$P\left(y = \mathrm{LAB} \mid \mathbf{X} \right)$")
+
+	handles1, labels1 = [], []
+	for lbl, h in uniq1.items():
+	    if lbl is not None:
+	        labels1.append(lbl)
+	        handles1.append(h)
+
+	fig.legend(handles1, labels1, loc='upper center', bbox_to_anchor=(0.5, 0.94), ncol=7,
+	           frameon=True, fancybox=True, handlelength=1)
+
+	plt.savefig('three_panel_feature_vs_prob_columns.png', dpi=300, bbox_inches='tight')
+	plt.show()
+
+
+.. figure:: _static/three_panel_feature_vs_prob_columns.png
     :align: center
     :class: with-shadow with-border
     :width: 600px

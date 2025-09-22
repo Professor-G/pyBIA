@@ -888,13 +888,13 @@ These candidate catalogs do not include the 866 LAB training objects as these we
 
 	# These are the optimized models
 	xgboost_8_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
-	xgboost_8_model.load('/Users/daniel/Desktop/pyBIA_PLOTS/ensemble_model_xgb_boruta_xgb')
+	xgboost_8_model.load('ensemble_model_xgb_boruta_xgb')
 
 	xgboost_45_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
-	xgboost_45_model.load('/Users/daniel/Desktop/pyBIA_PLOTS/ensemble_model_xgb_boruta_rf')
+	xgboost_45_model.load('ensemble_model_xgb_boruta_rf')
 
 	# Load the catalog containing all 2 million other objects, extracted using sig=0.32
-	other_all = pd.read_csv('/Users/daniel/Desktop/pyBIA_PLOTS/Other_Catalog_Master_0.32')
+	other_all = pd.read_csv('Other_Catalog_Master_0.32')
 
 	# Remove the 859 OTHER objects that are present in the training set, we will assess these individually using LoO
 	other_all = other_all[~other_all['obj_name'].isin(df_filtered['obj_name'])]
@@ -1218,7 +1218,7 @@ Now we can plot the probability-scaled t-SNE projections.
 	# Loop runs twice, once with model='xgboost_8' and the other with model='xgboost_45'
 	for model in ['xgboost_8', 'xgboost_45']:
 
-		fname = 'tsne_scatter_data_8_feats.txt' if model == 'xgboost_8' else '/Users/daniel/Desktop/pyBIA_PLOTS/tsne_scatter_data_45_feats.txt'
+		fname = 'tsne_scatter_data_8_feats.txt' if model == 'xgboost_8' else 'tsne_scatter_data_45_feats.txt'
 
 		# Load the t-SNE data saved in code above
 		xgb_results = np.loadtxt(fname, dtype=str)
@@ -3544,8 +3544,414 @@ Now we plot the bin average of these probability predictions for the inital cand
 |
 
 
+Candidate Prioritization
+-----------
+
+We now proceed by prioritizing the final candidates for spectroscopic follow-up based on their similarities to the known LABs.
+
+Priority candidates are selected according to their Bw area, Bw-R color, and Bw-based Gini. To perform a color-selection we need the R-band magnitudes, which we compute using the Catalog module. 
+
+.. code-block:: python 
+
+	import numpy as np
+	import pandas as pd
+	from pyBIA import catalog  
+	from astropy.io import fits 
+
+	# Load the original XGB candidate catalog (~234k objects)
+	csv_candidates = pd.read_csv('candidate_catalog_optimized_xgboost_8.csv')
+
+	# Load the names and probabilities of the candidates that were positively classified by the CNN
+	candidate_names_probas = np.loadtxt('OTHER_final_CNN_candidates_names_probas.txt', dtype=str)
+	index = np.where(candidate_names_probas[:,1].astype('float') >= 0.5)[0]
+	candidate_names_probas = candidate_names_probas[index]
+
+	# Index the csv to only these positive candidates
+	candidates_indices = []
+	for i in range(len(csv_candidates)):
+	    if csv_candidates.obj_name.iloc[i] in candidate_names_probas[:,0]:
+	        candidates_indices.append(i)
+
+	csv_candidates = csv_candidates.iloc[candidates_indices]
+
+	# Load the diffuse training objects 
+	# Where the training set files will be saved
+	nsig_path = 'nsigs/'
+	sig = 0.32 #Optimal sig from Fig. 2
+	training_set = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
+
+	blob_index = np.where(training_set['flag'] == 1)[0] # Select only the diffuse objects
+	training_set = training_set.iloc[blob_index]
+
+	# Will load the names of the five confirmed blobs to create a subsample dataframe, will be used for color-color selection
+	confirmed_diffuse_names = np.loadtxt('confirmed_LAB_names.txt', dtype=str)
+
+	confirmed_diffuse_indices = []
+	for i in range(len(training_set)):
+	    if training_set.obj_name.iloc[i] in confirmed_diffuse_names:
+	        confirmed_diffuse_indices.append(i)
+
+	confirmed_set = training_set.iloc[confirmed_diffuse_indices]
+
+	# Now load the names of the diffuse training objects selected by the CNN, not including the confirmed blobs
+	priority_diffuse_names_probas = np.loadtxt('priority_diffuse_final_CNN_candidates_names_probas.txt', dtype=str)
+	index = np.where(priority_diffuse_names_probas[:,1].astype('float') >= 0.5)[0]
+	priority_diffuse_names_probas = priority_diffuse_names_probas[index]
+
+	other_diffuse_names_probas = np.loadtxt('other_diffuse_final_CNN_candidates_names_probas.txt', dtype=str)
+	index = np.where(other_diffuse_names_probas[:,1].astype('float') >= 0.5)[0]
+	other_diffuse_names_probas = other_diffuse_names_probas[index]
+
+	diffuse_indices = []
+	for i in range(len(training_set)):
+	    if training_set.obj_name.iloc[i] in np.r_[priority_diffuse_names_probas[:,0], other_diffuse_names_probas[:,0]]:
+	        diffuse_indices.append(i)
+
+	training_set = training_set.iloc[diffuse_indices]
+
+	# Combine the two dataframes, this is the Bw band, doesn't include the five confirmed
+	final_candidate_catalog_bw = pd.concat([csv_candidates, training_set], ignore_index=True)
+	final_candidate_catalog_bw.to_csv('_Bw_FINAL_candidate_catalog.csv', chunksize=1000)
+
+	# Save a dataframe with only the confirmed blobs, to be used for the color-color selection below
+	confirmed_set.to_csv('_Bw_FINAL_confirmed_catalog.csv')
 
 
+	# Create a new catalog in the R band for the final candidates (see above, includes both new others and original training set)
+
+	data_path = 'NDWFS/fits_images/R_FITS/'
+	data_error_path = 'NDWFS/fits_images/rms_images/R/npy/'
+
+	frame = [] #To store all 27 subfields
+	for fieldname in np.unique(np.array(final_candidate_catalog_bw['field_name'])):
+	    print(fieldname)
+	    # Load the field data
+	    data_hdu, error_map = fits.open(data_path+fieldname+'_R_03_reg_fix.fits'), np.load(data_error_path+fieldname+'_R_03_rms.npy')
+	    # Extract the data and corresponding ZP
+	    data_map, zeropoint, exptime = data_hdu[0].data, data_hdu[0].header['MAGZERO'], data_hdu[0].header['EXPTIME']
+	    # Select only the samples from this subfield
+	    subfield_index = np.where(final_candidate_catalog_bw['field_name']==fieldname)[0]
+	    xpix, ypix = final_candidate_catalog_bw[['xpix', 'ypix']].iloc[subfield_index].values.T
+	    objname, field, flag = final_candidate_catalog_bw[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
+	    # Create the catalog object
+	    cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, exptime=exptime, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
+	    # Generate the catalog and append the ``cat`` attribute to the frame list
+	    cat.create(save_file=False); frame.append(cat.cat)
+	# Combine all 27 sub-catalogs into one master frame and save
+	frame = pd.concat(frame, axis=0, join='inner'); frame.to_csv('_R_FINAL_candidate_catalog.csv', chunksize=1000)                                                
+
+	# Create a new catalog in the R band for the five confirmed blobs
+	data_path = 'NDWFS/fits_images/R_FITS/'
+	data_error_path = 'NDWFS/fits_images/rms_images/R/npy/'
+
+	frame = [] #To store all 27 subfields
+	for fieldname in np.unique(np.array(confirmed_set['field_name'])):
+	    # Load the field data
+	    data_hdu, error_map = fits.open(data_path+fieldname+'_R_03_reg_fix.fits'), np.load(data_error_path+fieldname+'_R_03_rms.npy')
+	    # Extract the data and corresponding ZP and exposure time
+	    data_map, zeropoint, exptime = data_hdu[0].data, data_hdu[0].header['MAGZERO'], data_hdu[0].header['EXPTIME']
+	    # Select only the samples from this subfield
+	    subfield_index = np.where(confirmed_set['field_name']==fieldname)[0]
+	    xpix, ypix = confirmed_set[['xpix', 'ypix']].iloc[subfield_index].values.T
+	    objname, field, flag = confirmed_set[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
+	    # Create the catalog object
+	    cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, exptime=exptime, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
+	    # Generate the catalog and append the ``cat`` attribute to the frame list
+	    cat.create(save_file=False); frame.append(cat.cat)
+	# Combine all 27 sub-catalogs into one master frame and save
+	frame = pd.concat(frame, axis=0, join='inner'); frame.to_csv('_R_FINAL_confirmed_catalog.csv')                                                
+
+Now we can do the plot, filtering from the top-down
+
+.. code-block:: python 
+
+	import numpy as np
+	import pandas as pd
+	import matplotlib.pyplot as plt
+	from matplotlib.lines import Line2D
+	import scienceplots
+
+	plt.style.use("science")
+	plt.rcParams.update({"font.size": 21, "lines.linewidth": 1.5})
+
+	pix_conversion = 3.8961  # NDWFS survey pixel-per-arcsecond
+
+	# Load the final candidates and confirmed catalogs we generated for both Bw and R bands
+	final_candidate_catalog_bw = pd.read_csv('_Bw_FINAL_candidate_catalog.csv').sort_values('obj_name').reset_index(drop=True)
+	final_candidate_catalog_r = pd.read_csv('_R_FINAL_candidate_catalog.csv').sort_values('obj_name').reset_index(drop=True)
+
+	final_confirmed_catalog_bw = pd.read_csv('_Bw_FINAL_confirmed_catalog.csv').sort_values('obj_name').reset_index(drop=True)
+	final_confirmed_catalog_r = pd.read_csv('_R_FINAL_confirmed_catalog.csv').sort_values('obj_name').reset_index(drop=True)
+
+	confirmed_color_diff = final_confirmed_catalog_bw.mag - final_confirmed_catalog_r.mag
+	final_candidate_color_diff = final_candidate_catalog_bw.mag - final_candidate_catalog_r.mag
+
+	# Set the Bw-R color and Bw-based area selection thresholds
+	color_thresh, area_thresh, upper_area_thresh = 0.8, 850, 2000
+	idx_priority = np.where((final_candidate_color_diff <= color_thresh) &
+	                        (final_candidate_catalog_bw.area >= area_thresh) &
+	                        (final_candidate_catalog_bw.area <= upper_area_thresh))[0]
+
+	idx_non_priority = [i for i in range(len(final_candidate_color_diff)) if i not in idx_priority]
+
+	# Load the CNN probability predictions 
+	other_names = np.loadtxt('OTHER_final_CNN_candidates_names_probas.txt', dtype=str)
+	diffuse_other = np.loadtxt('other_diffuse_final_CNN_candidates_names_probas.txt', dtype=str)
+	diffuse_priority = np.loadtxt('priority_diffuse_final_CNN_candidates_names_probas.txt', dtype=str)
+
+	candidate_names = np.r_[other_names[:, 0], diffuse_other[:, 0], diffuse_priority[:, 0]]
+	candidate_probas = np.r_[other_names[:, 1], diffuse_other[:, 1], diffuse_priority[:, 1]].astype(float)
+
+	# Need to reorder probas to match the order as they appear in the Bw-based catalog
+	order_idx = [np.where(candidate_names == n)[0][0] for n in final_candidate_catalog_bw.obj_name]
+	candidate_probas = candidate_probas[order_idx]
+
+	#  Create the full arrays
+	def subset(catalog, idx): return catalog.iloc[idx]
+
+	Final_Candidates_Color = subset(final_candidate_color_diff, idx_priority)
+	Final_Candidates_Area = subset(final_candidate_catalog_bw.area, idx_priority)
+	Final_Candidates_Gini = subset(final_candidate_catalog_bw.gini, idx_priority)
+	Final_Candidates_Probas = candidate_probas[idx_priority]
+
+	Final_Candidates_Color_N = subset(final_candidate_color_diff, idx_non_priority)
+	Final_Candidates_Area_N = subset(final_candidate_catalog_bw.area, idx_non_priority)
+	Final_Candidates_Gini_N = subset(final_candidate_catalog_bw.gini, idx_non_priority)
+	Final_Candidates_Probas_N = candidate_probas[idx_non_priority]
+
+	ALL_COLOR_0 = np.r_[Final_Candidates_Color, Final_Candidates_Color_N]
+	ALL_AREA_0 = np.r_[Final_Candidates_Area, Final_Candidates_Area_N]
+	ALL_GINI_0 = np.r_[Final_Candidates_Gini, Final_Candidates_Gini_N]
+	ALL_PROBAS_0 = np.r_[Final_Candidates_Probas, Final_Candidates_Probas_N]
+
+	#  The five confirmed LABs
+	conf_names = np.loadtxt('confirmed_candidates_final_CNN_names_probas.txt', dtype=str,  usecols=0)
+	conf_probas = np.loadtxt('confirmed_candidates_final_CNN_names_probas.txt', dtype=float, usecols=1)
+	conf_idx = [np.where(conf_names == n)[0][0] for n in final_confirmed_catalog_bw.obj_name]
+
+	Confirmed_Color = confirmed_color_diff.iloc[::-1]
+	Confirmed_Area = final_confirmed_catalog_bw.area.iloc[::-1]
+	Confirmed_Gini = final_confirmed_catalog_bw.gini.iloc[::-1]
+	Confirmed_Probas = conf_probas[conf_idx][::-1]
+	names_lab = ['PRG2', 'PRG4', 'LABd05', 'PRG3', 'PRG1'][::-1]
+
+	special_colors  = ['cyan', 'red', 'blue', 'purple', 'green'][::-1]
+	special_markers = ['>', '^', 'p', 'v', 'P'][::-1]
+
+	def finite_pair(x, y):
+	    # Return x,y filtered to finite pairs only (i.e., no NaN/Inf)
+	    x = np.asarray(x, dtype=float)
+	    y = np.asarray(y, dtype=float)
+	    m = np.isfinite(x) & np.isfinite(y)
+	    return x[m], y[m]
+
+	def sanitize_1d(arr):
+	    # Filter a single array to finite values only
+	    arr = np.asarray(arr, dtype=float)
+	    return arr[np.isfinite(arr)]
+
+	# Function to plot the panels
+	def plot_histogram_with_avg_proba_axes(
+	        ax1, x, probas, xlabel, ylabel_hist, ylabel_avg, *,
+	        bins=12, xlim=None, ylim=None,
+	        vline_vals=None, arrow_dirs=None,
+	        shaded_regions=None,
+	        confirmed_points=None, confirmed_marker_colors=None,
+	        confirmed_names=None, confirmed_marker_style=None,
+	        confirmed_points_ymin=0.004):
+
+	    x, probas = finite_pair(x, probas)
+	    if x.size == 0:
+	        raise ValueError(f"No finite data to plot for {xlabel}")
+
+	    # histogram (fraction of objects)
+	    weights = np.ones_like(x) / len(x)
+	    n, edges, _ = ax1.hist(x, bins=bins, weights=weights, histtype='step',
+	                           color='b', alpha=0.6, label='Initial Candidates')
+	    ax1.set_xlabel(xlabel)
+	    ax1.set_ylabel(ylabel_hist)
+	    if xlim: ax1.set_xlim(xlim)
+	    if ylim: ax1.set_ylim(ylim)
+
+	    # shaded regions
+	    if shaded_regions:
+	        for x0, x1 in shaded_regions:
+	            ax1.axvspan(x0, x1, color='gray', alpha=0.25, zorder=-5)
+
+	    # probability curve + std-dev band
+	    centers = (edges[:-1] + edges[1:]) / 2
+	    means = []
+	    stds  = []
+	    for i in range(len(edges) - 1):
+	        mask = (x >= edges[i]) & (x < edges[i+1] if i < len(edges)-2 else x <= edges[i+1])
+	        if np.any(mask):
+	            means.append(np.mean(probas[mask]))
+	            stds.append(np.std (probas[mask]))
+	        else:
+	            means.append(np.nan)
+	            stds.append(np.nan)
+
+	    ax2 = ax1.twinx()
+	    ax2.plot(centers, means, color='red', label=r'$\langle P(y=\mathrm{LAB}\mid\mathbf{X}) \rangle$')
+	    ax2.fill_between(centers, np.array(means)-np.array(stds),
+	                     np.array(means)+np.array(stds),
+	                     color='red', alpha=0.30)
+	    ax2.set_ylabel(ylabel_avg)
+
+	    # confirmed LAB markers along the baseline
+	    if confirmed_points is not None:
+	        confirmed_points = sanitize_1d(confirmed_points)
+	        if confirmed_marker_colors is None or confirmed_marker_style is None or confirmed_names is None:
+	            pass  # nothing to draw
+	        else:
+	            n_confirmed = min(len(confirmed_points), len(confirmed_marker_colors), len(confirmed_marker_style), len(confirmed_names))
+	            for pt, col, mk, nm in zip(confirmed_points[:n_confirmed],
+	                                       confirmed_marker_colors[:n_confirmed],
+	                                       confirmed_marker_style[:n_confirmed],
+	                                       confirmed_names[:n_confirmed]):
+	                if np.isfinite(pt):
+	                    ax1.scatter(pt, confirmed_points_ymin, marker=mk, s=400,
+	                                facecolors='none', edgecolors=col, linewidth=3.5, label=nm)
+
+	    # green v-lines + arrows
+	    if vline_vals:
+	        arrow_dirs = arrow_dirs or ['left'] * len(vline_vals)
+	        x_min, x_max = ax1.get_xlim()
+	        offset = 0.1 * (x_max - x_min)
+	        y_min, y_max = ax1.get_ylim()
+	        y_arrow = y_min + 0.98 * (y_max - y_min)
+	        for v, direction in zip(vline_vals, arrow_dirs):
+	            if np.isfinite(v):
+	                ax1.axvline(v, color='green', linestyle='--')
+	                if direction == 'left':
+	                    ax1.annotate('', xy=(v, y_arrow), xytext=(v + offset, y_arrow),
+	                                 arrowprops=dict(arrowstyle="->", color='green'))
+	                else:
+	                    ax1.annotate('', xy=(v, y_arrow), xytext=(v - offset, y_arrow),
+	                                 arrowprops=dict(arrowstyle="->", color='green'))
+
+
+	# Do the prioritization, first those that made it through the CNN with proba >= 0.6, then the area, color and Gini
+	# FILTER 1 — PROBA ≥ 0.6
+	sel1 = (ALL_PROBAS_0 >= 0.6)
+	ALL_COLOR_1 = ALL_COLOR_0[sel1]
+	ALL_AREA_1 = ALL_AREA_0[sel1]
+	ALL_GINI_1 = ALL_GINI_0[sel1]
+	ALL_PROBAS_1 = ALL_PROBAS_0[sel1]
+
+	# FILTER 2 — AREA BETWEEN THRESHOLDS
+	sel2 = (ALL_AREA_1 >= area_thresh) & (ALL_AREA_1 <= upper_area_thresh)
+	ALL_COLOR_2 = ALL_COLOR_1[sel2]
+	ALL_AREA_2 = ALL_AREA_1[sel2]
+	ALL_GINI_2 = ALL_GINI_1[sel2]
+	ALL_PROBAS_2 = ALL_PROBAS_1[sel2]
+
+	# FILTER 3 — COLOR <= THRESHOLD 
+	sel3 = np.isfinite(ALL_COLOR_2) & (ALL_COLOR_2 <= color_thresh)
+	ALL_COLOR_3 = ALL_COLOR_2[sel3]
+	ALL_AREA_3 = ALL_AREA_2[sel3]
+	ALL_GINI_3 = ALL_GINI_2[sel3]
+	ALL_PROBAS_3 = ALL_PROBAS_2[sel3]
+
+	# Plot
+	fig, (ax_area, ax_color, ax_gini) = plt.subplots(3, 1, figsize=(8, 24), sharex=False)
+	fig.subplots_adjust(top=0.9, hspace=0.15)
+
+	# PANEL 1 — AREA
+	area_low  = area_thresh / pix_conversion**2
+	area_high = upper_area_thresh / pix_conversion**2
+	plot_histogram_with_avg_proba_axes(
+	    ax_area,
+	    ALL_AREA_1 / pix_conversion**2, ALL_PROBAS_1,
+	    xlabel=r"$B_W$ Area ($\rm arcsec^2$)",
+	    ylabel_hist=f"Fraction of Objects (n={len(ALL_AREA_1):,})",
+	    ylabel_avg='CNN Probability Prediction',
+	    bins=25, xlim=(0, 460),
+	    vline_vals=[area_low, area_high],
+	    arrow_dirs=["right", "left"],
+	    shaded_regions=[(0, area_low), (area_high, 460)],
+	    confirmed_points=Confirmed_Area / pix_conversion**2,
+	    confirmed_marker_colors=special_colors,
+	    confirmed_names=names_lab,
+	    confirmed_marker_style=special_markers,
+	    confirmed_points_ymin=0.0056
+	    )
+
+	# PANEL 2 — COLOR
+	plot_histogram_with_avg_proba_axes(
+	    ax_color,
+	    ALL_COLOR_2, ALL_PROBAS_2,
+	    xlabel=r"$B_W - R$",
+	    ylabel_hist=f"Fraction of Objects (n={len(ALL_COLOR_2):,})",
+	    ylabel_avg='CNN Probability Prediction',
+	    bins=25, xlim=(-3, 3.4),
+	    vline_vals=[color_thresh],
+	    arrow_dirs=["left"],
+	    shaded_regions=[(color_thresh, 3.4)],
+	    confirmed_points=Confirmed_Color,
+	    confirmed_marker_colors=special_colors,
+	    confirmed_names=names_lab,
+	    confirmed_marker_style=special_markers,
+	    confirmed_points_ymin=0.0102
+	    )
+
+	# PANEL 3 — GINI
+	gini_cut = 0.49
+	plot_histogram_with_avg_proba_axes(
+	    ax_gini,
+	    ALL_GINI_3, ALL_PROBAS_3,
+	    xlabel="Gini Index",
+	    ylabel_hist = f"Fraction of Objects (n={len(ALL_GINI_3):,})",
+	    ylabel_avg='CNN Probability Prediction',
+	    bins=25, xlim=(0.35, 0.95),
+	    vline_vals=[gini_cut],
+	    arrow_dirs=["left"],
+	    shaded_regions=[(gini_cut, 1.0)],
+	    confirmed_points=Confirmed_Gini,
+	    confirmed_marker_colors=special_colors,
+	    confirmed_names=names_lab,
+	    confirmed_marker_style=special_markers,
+	    confirmed_points_ymin=0.005
+	    )
+
+	# Top title
+	ax_area.set_title('Priority Candidate Selection', y=1.18)
+
+	# Legend in order for asthetics
+	legend_elements = [
+	    Line2D([0],[0], color='b', lw=1.5, label='Initial Candidates'),
+	    Line2D([0],[0], color='red', lw=1.5, label=r'$\langle P(y=\mathrm{LAB}\mid\mathbf{X}) \rangle$'),
+	    Line2D([0],[0], marker='p', markersize=16, markerfacecolor='none',
+	           markeredgewidth=3.5, markeredgecolor='blue', linestyle='None', label='LABd05'),
+	    Line2D([0],[0], marker='v', markersize=16, markerfacecolor='none',
+	           markeredgewidth=3.5, markeredgecolor='purple', linestyle='None', label='PRG3'),
+	    Line2D([0],[0], marker='P', markersize=16, markerfacecolor='none',
+	           markeredgewidth=3.5, markeredgecolor='green', linestyle='None', label='PRG1'),
+	    Line2D([0],[0], marker='^', markersize=16, markerfacecolor='none',
+	           markeredgewidth=3.5, markeredgecolor='red', linestyle='None', label='PRG4'),
+	    Line2D([0],[0], marker='>', markersize=16, markerfacecolor='none',
+	           markeredgewidth=3.5, markeredgecolor='cyan', linestyle='None', label='PRG2'),
+	]
+
+	fig.legend(legend_elements,
+	           [h.get_label() for h in legend_elements],
+	           loc='upper center', bbox_to_anchor=(0.5, 0.947), ncol=4,
+	           frameon=True, fancybox=True, handlelength=0.9,
+	           columnspacing=0.9, handletextpad=0.5)
+
+	plt.savefig('priority_selection_three_panel.png',
+	            dpi=300, bbox_inches='tight')
+	plt.show()
+
+.. figure:: _static/priority_selection_three_panel.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+
+Final Catalogs
+-----------
 
 
 

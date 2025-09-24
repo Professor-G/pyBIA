@@ -9,6 +9,12 @@ Godines & Prescott (2025)
 
 **NOTE:** All figures are formatted using the `scienceplots` Python package, available via pip.
 
+Out complete catalog of the Bootes field (~2.4M sources) including the probability prediction scores from the three machine learning models as well as the morphological features computed from the Bw imaging is available for `download here <https://drive.google.com/file/d/1nshifEK3pIeILg0m7Wf4kmJE5hotoOZ8/view?usp=sharing>`_. 
+
+A sub-catalog containing the ~100 priority candidates has also been made available `here <https://drive.google.com/file/d/15Z7yPMplVdz51CmUD6yKl67dEQxCHNaM/view?usp=sharing>`_, as well as the corresponding Bw and R-band imaging data which is available for download as a binary file `here <https://drive.google.com/file/d/1bgoOmlghqnb_ioZW0ZTRkWHBnJ8UyFuW/view?usp=sharing>`_.
+
+
+
 Image Segmentation
 -----------
 
@@ -95,7 +101,7 @@ To visualize the affect the sigma detection threshold has on the image segmentat
 Training Morphological Catalog
 -----------
 
-To download the images used in this study please visit the `NoirLab <https://noirlab.edu/science/data-services/other/ndwfs>`_ website. We utilized the Bootes field data, from which there are 27 total subfields to download, in addition to the corresponding error maps. The data avaialable are in .fits format.
+To download the images used in this study please visit the `NoirLab <https://noirlab.edu/science/data-services/other/ndwfs>`_ website. We utilized the Bootes field catalog and imaging datasets, from which there are 27 total subfields. The imaging data necessary to follow our complete analysis has been made available for `download here <https://drive.google.com/file/d/17F4e9CaDsyvusrTHKzSk8VQ8Nbz7MD87/view?usp=sharing>`_.
 
 The training set objects used in our study can be :download:`downloaded here <training_set.csv>`_. This dataframe contains catalog information on the 866 LAB candidates compiled by `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_, as well as 3200 randomly selected OTHER sources from the same dataset. 
 
@@ -3952,6 +3958,260 @@ Now we can do the plot, filtering from the top-down
 
 Final Catalogs
 -----------
+
+We can now compile a complete catalog of all the cataloged sources in NDWFS Boötes, which will include the iForest and CNN probability scores. As the catalogs used thus far have omitted the RA and DEC, in this code we compile a final complete catalog with all the scores and segmentation-based features after which we add the RA and DEC positions, which are available in this file: `ndwfs_bootes_extracted_from_DW <https://drive.google.com/file/d/1KEje_5UdmDeBuM5XXLQ63tv05qKsGUzX/view?usp=sharing>`_.
+
+.. code-block:: python 
+
+	import numpy as np
+	import pandas as pd  
+	from pyBIA import data_processing
+
+	candidate_catalog = pd.read_csv('candidate_catalog_optimized_xgboost_8.csv')
+	non_candidate_catalog = pd.read_csv('non_candidate_catalog_xgboost_8.csv')
+
+	# Remember the OTHER were already included in the above catalogs according to the LoO
+	# Where the training set files will be saved
+	nsig_path = 'nsigs/'
+
+	sig = 0.32 #Optimal sig from Fig. 2
+
+	training_set = pd.read_csv(f'{nsig_path}_Bw_training_set_nsig_{sig}')
+	index = np.where(training_set.flag == 1)[0]
+	training_set = training_set.iloc[index]
+
+	loo_lab = np.loadtxt('LoO_LAB', dtype=str)
+	lab_names = loo_lab[:,0]
+	lab_probas = loo_lab[:,2].astype('float')
+
+	loo_confirmed = np.loadtxt('LoO_Confirmed_LAB', dtype=str)
+	confirmed_names = ['NDWFS_J143410.9+331730', 'NDWFS_J143512.2+351108', 'NDWFS_J142623.0+351422', 'NDWFS_J143412.7+332939', 'NDWFS_J142653.1+343856'] #loo_confirmed[:,0]
+	confirmed_probas = loo_confirmed[:,2].astype('float')
+
+	all_lab_names = np.r_[lab_names, confirmed_names]
+	all_lab_probas = np.r_[lab_probas, confirmed_probas]
+
+	training_set['proba'] = np.zeros(len(training_set))
+	for i in range(len(training_set)):
+		index = np.where(all_lab_names == training_set.obj_name.iloc[i])[0]
+		training_set['proba'].iloc[i] = all_lab_probas[index] if len(index) == 1 else np.nan
+
+	# To make a master catalog first revert the non_candidate_catalog probabilities since these are the probas of not being LAB
+	non_candidate_catalog.proba = 1 - non_candidate_catalog.proba
+
+	# Now all three catalogs have an appropriate proba column
+	combined_df = pd.concat([training_set, candidate_catalog, non_candidate_catalog])
+	combined_df = combined_df.drop(['Unnamed: 0.1', 'Unnamed: 0'], axis=1)
+
+	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+
+	# The above combined_df does not contain the non-detections (except for the single LAB training class LAB)
+	original_master = pd.read_csv('Other_Catalog_Master_0.32')
+
+	non_detections = np.where((original_master.area == -999) | (~np.isfinite(original_master.mag)) | (~np.isfinite(original_master[hu_cols]).all(axis=1)))[0]
+	original_master = original_master.iloc[non_detections]
+	original_master['proba'] = [np.nan] * len(original_master)
+
+	final_master = pd.concat([combined_df, original_master])
+	final_master = final_master.drop(['Unnamed: 0'], axis=1)
+	final_master.rename(columns={'proba': 'XGBoost8_Proba'}, inplace=True)
+
+	# Now add the outlier scores (NOTE THAT THE LAB CLASS DOES NOT HAVE OUTLIER SCORES SINCE THESE WERE USED TO TRAIN THE IFOREST!)
+	iforest_results = np.loadtxt('outlier_scores_and_areas.txt', dtype=str)
+	iforest_names = iforest_results[:,0]
+	iforest_scores = iforest_results[:,2].astype('float')
+
+	final_master['iForest_scores'] = [np.nan] * len(final_master)
+
+	for i in range(len(iforest_names)):
+		index = np.where(final_master.obj_name == iforest_names[i])[0]
+		final_master['iForest_scores'].iloc[index] = iforest_scores[i] if len(index) == 1 else np.nan
+
+	# Now the CNN probas
+	other_cnn = np.loadtxt('OTHER_final_CNN_candidates_names_probas.txt', dtype=str)
+	lab_cnn = np.loadtxt('other_diffuse_final_CNN_candidates_names_probas.txt', dtype=str)
+	lab_priority_cnn = np.loadtxt('priority_diffuse_final_CNN_candidates_names_probas.txt', dtype=str)
+	lab_confirmed_cnn = np.loadtxt('confirmed_candidates_final_CNN_names_probas.txt', dtype=str)
+
+	all_names = np.r_[other_cnn[:,0], lab_cnn[:,0], lab_priority_cnn[:,0], lab_confirmed_cnn[:,0]]
+	all_cnn_probas = np.r_[other_cnn[:,1], lab_cnn[:,1], lab_priority_cnn[:,1], lab_confirmed_cnn[:,1]]
+	all_cnn_probas = all_cnn_probas.astype('float')
+
+	final_master['CNN_proba'] = [np.nan] * len(final_master)
+	for i in range(len(all_names)):
+		index = np.where(final_master.obj_name == all_names[i])[0]
+		final_master['CNN_proba'].iloc[index] = all_cnn_probas[i] if len(index) == 1 else np.nan
+
+	# Now add the color 
+	final_candidate_catalog_bw = pd.read_csv('_Bw_FINAL_candidate_catalog.csv').sort_values('obj_name').reset_index(drop=True)
+	final_candidate_catalog_r = pd.read_csv('_R_FINAL_candidate_catalog.csv').sort_values('obj_name').reset_index(drop=True)
+
+	final_confirmed_catalog_bw = pd.read_csv('_Bw_FINAL_confirmed_catalog.csv').sort_values('obj_name').reset_index(drop=True)
+	final_confirmed_catalog_r = pd.read_csv('_R_FINAL_confirmed_catalog.csv').sort_values('obj_name').reset_index(drop=True)
+
+	confirmed_color_diff = final_confirmed_catalog_bw.mag - final_confirmed_catalog_r.mag
+	final_candidate_color_diff = final_candidate_catalog_bw.mag - final_candidate_catalog_r.mag
+
+	final_master['Color'] = [np.nan] * len(final_master)
+
+	for i in range(len(final_confirmed_catalog_bw)):
+		index = np.where(final_master.obj_name == final_confirmed_catalog_bw.obj_name.iloc[i])[0]
+		final_master['Color'].iloc[index] = confirmed_color_diff.iloc[i] if len(index) == 1 else np.nan
+
+	for i in range(len(final_candidate_catalog_bw)):
+		index = np.where(final_master.obj_name == final_candidate_catalog_bw.obj_name.iloc[i])[0]
+		final_master['Color'].iloc[index] = final_candidate_color_diff.iloc[i] if len(index) == 1 else np.nan
+
+	# Finally save the ra and dec which up until now have been stored here
+	survey_objects = pd.read_csv('ndwfs_bootes_extracted_from_DW')
+
+	final_master['ra'] = np.zeros(len(final_master))
+	final_master['dec'] = np.zeros(len(final_master))
+
+	ra, dec = [], []
+	for i in range(len(final_master)):
+		index = np.where((survey_objects.NDWFS_objname == final_master.obj_name.iloc[i]) & (survey_objects.field_name == final_master.field_name.iloc[i]))[0]
+		if len(index) >= 2: # If there are duplicates (e.g., objects near edge of subfield that falls in multiple subfields)
+			index = index[0]
+		ra.append(float(survey_objects.ra.iloc[index]))
+		dec.append(float(survey_objects.dec.iloc[index]))
+
+	# Now set the columns
+	final_master['ra'] = ra
+	final_master['dec'] = dec
+
+	#Finally save this master cat which contains 2,377,342 (from the Table in paper) plus the 860 LAB candidates we train with
+	final_master.to_csv('final_master_catalog.csv')
+
+
+This final master catalog containing all sources and features and scores is available for download here. 
+
+This catalog contains all of the sources in NDWFS Boötes which includes non-detections and duplicate objects (i.e., those near each other that are effectively the same as seen by our models). We now proceed by generating a sub-catalog of only the priority candidates identified in the earlier stage, and removing any duplicates. Duplicates objects are flagged if they are within 10 arcseconds of each other, in which case we keep only one. This is important as the group-like nature of LABs results in candidates that may be composed of several galaxies being cataloged as distinct sources by NDWFS, but for our purposes should really be considered a single object. 
+
+At the end we perform a visual inspection to remove any outliers sources that may still be present. 
+
+.. code-block:: python 
+
+	import pandas as pd
+	import numpy as np
+	from astropy.coordinates import SkyCoord
+	import astropy.units as u
+	from pyBIA.data_processing import concat_channels 
+
+	# Load the master cat
+	final_master = pd.read_csv('final_master_catalog.csv')
+
+	# Our priority candidate selection criteria
+	priority_index = np.where((final_master.XGBoost8_Proba >= 0.9) & (final_master.CNN_proba >= 0.6) & (final_master.area >= 850) & (final_master.area <= 2000) & (final_master.Color <= 0.8) & (np.isfinite(final_master.Color)) & (final_master.gini <= 0.49))[0]
+	priority_cat = final_master.iloc[priority_index]
+
+	def dedupe_by_angular_separation(
+	    df: pd.DataFrame,
+	    ra_col: str = "ra",
+	    dec_col: str = "dec",
+	    sep_arcsec: float = 10.0,
+	    keep: str = "first", # "first", "max", or "min"
+	    score_col: str | None = None):
+		
+	    # Work on a reset-index
+	    work = df.reset_index().rename(columns={"index": "orig_idx"}).copy()
+	    
+	    # Build coordinates and find all pairs within sep_arcsec
+	    coords = SkyCoord(ra=work[ra_col].values * u.deg, dec=work[dec_col].values * u.deg, frame="icrs")
+	    i1, i2, sep, _ = coords.search_around_sky(coords, sep_arcsec * u.arcsec)
+	    
+	    # Keep only (i<j) to avoid self-pairs and double counting
+	    m = i1 < i2
+	    pairs = np.column_stack([i1[m], i2[m]])
+	    if pairs.size == 0:
+	        # No duplicates found
+	        groups = pd.DataFrame(columns=["group_id","kept","orig_idx","ra","dec","sep_to_keep_arcsec"])
+	        return df.copy(), groups
+	    
+	    # Do a union-find to get the components
+	    parent = np.arange(len(work))
+	    
+	    def find(x):
+	        while parent[x] != x:
+	            parent[x] = parent[parent[x]]
+	            x = parent[x]
+	        return x
+	    
+	    def union(a, b):
+	        ra, rb = find(a), find(b)
+	        if ra != rb:
+	            parent[rb] = ra
+	    
+	    for a, b in pairs:
+	        union(a, b)
+	    
+	    # Interate and collect members per 
+	    comp = {}
+	    for idx in range(len(work)):
+	        root = find(idx)
+	        comp.setdefault(root, []).append(idx)
+	    
+	    # Only groups with size > 1 are considered as duplicate groups
+	    groups_list = [sorted(v) for v in comp.values() if len(v) > 1]
+	   	
+	    # Choose which to keep per group
+	    def choose_keep(members):
+	        if keep == "first":
+	            # first in current order (i.e., lowest reset-index)
+	            return members[0]
+	        elif keep in {"max", "min"}:
+	            if score_col is None:
+	                raise ValueError("`score_col` must be provided when keep='max' or keep='min'.")
+	            vals = work.loc[members, score_col].values
+	            sel = np.nanargmax(vals) if keep == "max" else np.nanargmin(vals)
+	            return members[sel]
+	        else:
+	            raise ValueError("keep must be one of {'first','max','min'}")
+	    
+	    to_drop_orig = []
+	    rows = []
+	    gid = 0
+	    for members in groups_list:
+	        gid += 1
+	        keep_idx = choose_keep(members)
+	        keep_coord = coords[keep_idx]
+	        
+	        # Iterate and store each group
+	        for m_idx in members:
+	            sep_to_keep = keep_coord.separation(coords[m_idx]).arcsec
+	            rows.append({
+	                "group_id": gid,
+	                "kept": (m_idx == keep_idx),
+	                "orig_idx": int(work.loc[m_idx, "orig_idx"]),
+	                "ra": float(work.loc[m_idx, ra_col]),
+	                "dec": float(work.loc[m_idx, dec_col]),
+	                "sep_to_keep_arcsec": float(sep_to_keep)
+	            })
+	        
+	        # Mark all non-kept members for dropping (by original index)
+	        for m_idx in members:
+	            if m_idx != keep_idx:
+	                to_drop_orig.append(int(work.loc[m_idx, "orig_idx"]))
+	    
+	    # Sort and remove duplicates from final catalog
+	    groups = pd.DataFrame(rows).sort_values(["group_id","kept"], ascending=[True, False])
+	    deduped = df.drop(index=to_drop_orig)
+	    
+	    return deduped, groups
+
+
+deduped_priority_cat, dup_groups = dedupe_by_angular_separation(
+    priority_cat,
+    ra_col="ra",
+    dec_col="dec",
+    sep_arcsec=10.0,
+    keep="first"
+    )
+
+# Now remove the confirmed LABs (NOTE: 1 confirmed LAB was in the duplicates)
+confirmed_names = ['NDWFS_J143410.9+331730', 'NDWFS_J143512.2+351108', 'NDWFS_J142623.0+351422', 'NDWFS_J143412.7+332939', 'NDWFS_J142653.1+343856'] #loo_confirmed[:,0]
+
+deduped_priority_cat = deduped_priority_cat[~deduped_priority_cat['obj_name'].isin(confirmed_names)]
 
 
 

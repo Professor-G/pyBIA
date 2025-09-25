@@ -9,7 +9,7 @@ Godines & Prescott (2025)
 
 **NOTE:** All figures are formatted using the `scienceplots` Python package, available via pip.
 
-Out complete catalog of the Bootes field (~2.4M sources) including the probability prediction scores from the three machine learning models as well as the morphological features computed from the Bw imaging is available for `download here <https://drive.google.com/file/d/1nshifEK3pIeILg0m7Wf4kmJE5hotoOZ8/view?usp=sharing>`_. 
+Our complete catalog of the Bootes field (~2.4M sources) including the probability prediction scores from the three machine learning models as well as the morphological features computed from the Bw imaging is available for `download here <https://drive.google.com/file/d/1nshifEK3pIeILg0m7Wf4kmJE5hotoOZ8/view?usp=sharing>`_. 
 
 A sub-catalog containing the ~100 priority candidates has also been made available `here <https://drive.google.com/file/d/15Z7yPMplVdz51CmUD6yKl67dEQxCHNaM/view?usp=sharing>`_, as well as the corresponding Bw and R-band imaging data which is available for download as a binary file `here <https://drive.google.com/file/d/1bgoOmlghqnb_ioZW0ZTRkWHBnJ8UyFuW/view?usp=sharing>`_.
 
@@ -3622,7 +3622,6 @@ Priority candidates are selected according to their Bw area, Bw-R color, and Bw-
 	# Save a dataframe with only the confirmed blobs, to be used for the color-color selection below
 	confirmed_set.to_csv('_Bw_FINAL_confirmed_catalog.csv')
 
-
 	# Create a new catalog in the R band for the final candidates (see above, includes both new others and original training set)
 
 	data_path = 'NDWFS/fits_images/R_FITS/'
@@ -3630,19 +3629,26 @@ Priority candidates are selected according to their Bw area, Bw-R color, and Bw-
 
 	frame = [] #To store all 27 subfields
 	for fieldname in np.unique(np.array(final_candidate_catalog_bw['field_name'])):
+	    
 	    print(fieldname)
+	    
 	    # Load the field data
 	    data_hdu, error_map = fits.open(data_path+fieldname+'_R_03_reg_fix.fits'), np.load(data_error_path+fieldname+'_R_03_rms.npy')
+	    
 	    # Extract the data and corresponding ZP
 	    data_map, zeropoint, exptime = data_hdu[0].data, data_hdu[0].header['MAGZERO'], data_hdu[0].header['EXPTIME']
+	    
 	    # Select only the samples from this subfield
 	    subfield_index = np.where(final_candidate_catalog_bw['field_name']==fieldname)[0]
 	    xpix, ypix = final_candidate_catalog_bw[['xpix', 'ypix']].iloc[subfield_index].values.T
 	    objname, field, flag = final_candidate_catalog_bw[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
+	    
 	    # Create the catalog object
 	    cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, exptime=exptime, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
+	    
 	    # Generate the catalog and append the ``cat`` attribute to the frame list
 	    cat.create(save_file=False); frame.append(cat.cat)
+	
 	# Combine all 27 sub-catalogs into one master frame and save
 	frame = pd.concat(frame, axis=0, join='inner'); frame.to_csv('_R_FINAL_candidate_catalog.csv', chunksize=1000)                                                
 
@@ -3652,18 +3658,24 @@ Priority candidates are selected according to their Bw area, Bw-R color, and Bw-
 
 	frame = [] #To store all 27 subfields
 	for fieldname in np.unique(np.array(confirmed_set['field_name'])):
+	    
 	    # Load the field data
 	    data_hdu, error_map = fits.open(data_path+fieldname+'_R_03_reg_fix.fits'), np.load(data_error_path+fieldname+'_R_03_rms.npy')
+	    
 	    # Extract the data and corresponding ZP and exposure time
 	    data_map, zeropoint, exptime = data_hdu[0].data, data_hdu[0].header['MAGZERO'], data_hdu[0].header['EXPTIME']
+	    
 	    # Select only the samples from this subfield
 	    subfield_index = np.where(confirmed_set['field_name']==fieldname)[0]
 	    xpix, ypix = confirmed_set[['xpix', 'ypix']].iloc[subfield_index].values.T
 	    objname, field, flag = confirmed_set[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
+	    
 	    # Create the catalog object
 	    cat = catalog.Catalog(data_map, error=error_map, x=xpix, y=ypix, zp=zeropoint, exptime=exptime, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
+	    
 	    # Generate the catalog and append the ``cat`` attribute to the frame list
 	    cat.create(save_file=False); frame.append(cat.cat)
+	
 	# Combine all 27 sub-catalogs into one master frame and save
 	frame = pd.concat(frame, axis=0, join='inner'); frame.to_csv('_R_FINAL_confirmed_catalog.csv')                                                
 
@@ -3956,7 +3968,7 @@ Now we can do the plot, filtering from the top-down
 |
 
 
-Final Catalogs
+Final Catalogs and Candidates
 -----------
 
 We can now compile a complete catalog of all the cataloged sources in NDWFS Boötes, which will include the iForest and CNN probability scores. As the catalogs used thus far have omitted the RA and DEC, in this code we compile a final complete catalog with all the scores and segmentation-based features after which we add the RA and DEC positions, which are available in this file: `ndwfs_bootes_extracted_from_DW <https://drive.google.com/file/d/1KEje_5UdmDeBuM5XXLQ63tv05qKsGUzX/view?usp=sharing>`_.
@@ -4101,17 +4113,19 @@ At the end we perform a visual inspection to remove any outliers sources that ma
 	# Load the master cat
 	final_master = pd.read_csv('final_master_catalog.csv')
 
-	# Our priority candidate selection criteria
+	# Our priority candidate selection
 	priority_index = np.where((final_master.XGBoost8_Proba >= 0.9) & (final_master.CNN_proba >= 0.6) & (final_master.area >= 850) & (final_master.area <= 2000) & (final_master.Color <= 0.8) & (np.isfinite(final_master.Color)) & (final_master.gini <= 0.49))[0]
 	priority_cat = final_master.iloc[priority_index]
 
+	# Function to identify the duplicate objects
 	def dedupe_by_angular_separation(
 	    df: pd.DataFrame,
-	    ra_col: str = "ra",
-	    dec_col: str = "dec",
-	    sep_arcsec: float = 10.0,
-	    keep: str = "first", # "first", "max", or "min"
-	    score_col: str | None = None):
+	    ra_col: str = "ra", # As the column shows in the dataframe
+	    dec_col: str = "dec", # As the column shows in the dataframe
+	    sep_arcsec: float = 10.0, # Arcsec separation to consider duplicates
+	    keep: str = "first", # "first", "max", or "min" 
+	    score_col: str | None = None): # Only used if keep is either "max" or "min", to determine which source to keep among the group 
+	    #Remove duplicate rows from a DataFrame based on angular separation of sky coordinates, keeping only one per group and returning the cleaned DataFrame plus a table of grouped duplicates.
 		
 	    # Work on a reset-index
 	    work = df.reset_index().rename(columns={"index": "orig_idx"}).copy()
@@ -4154,7 +4168,7 @@ At the end we perform a visual inspection to remove any outliers sources that ma
 	    # Only groups with size > 1 are considered as duplicate groups
 	    groups_list = [sorted(v) for v in comp.values() if len(v) > 1]
 	   	
-	    # Choose which to keep per group
+	    # Choose representative to keep per group
 	    def choose_keep(members):
 	        if keep == "first":
 	            # first in current order (i.e., lowest reset-index)
@@ -4176,7 +4190,7 @@ At the end we perform a visual inspection to remove any outliers sources that ma
 	        keep_idx = choose_keep(members)
 	        keep_coord = coords[keep_idx]
 	        
-	        # Iterate and store each group
+	        # Iterate and a summary for this group
 	        for m_idx in members:
 	            sep_to_keep = keep_coord.separation(coords[m_idx]).arcsec
 	            rows.append({
@@ -4193,25 +4207,588 @@ At the end we perform a visual inspection to remove any outliers sources that ma
 	            if m_idx != keep_idx:
 	                to_drop_orig.append(int(work.loc[m_idx, "orig_idx"]))
 	    
-	    # Sort and remove duplicates from final catalog
 	    groups = pd.DataFrame(rows).sort_values(["group_id","kept"], ascending=[True, False])
+	    
+	    # Remove duplicates from final catalog
 	    deduped = df.drop(index=to_drop_orig)
 	    
 	    return deduped, groups
 
 
-deduped_priority_cat, dup_groups = dedupe_by_angular_separation(
-    priority_cat,
-    ra_col="ra",
-    dec_col="dec",
-    sep_arcsec=10.0,
-    keep="first"
-    )
+	# Now run the function, keeping only the 
+	deduped_priority_cat, dup_groups = dedupe_by_angular_separation(
+	    priority_cat,
+	    ra_col="ra",
+	    dec_col="dec",
+	    sep_arcsec=10.0,
+	    keep="first"
+	    )
 
-# Now remove the confirmed LABs (NOTE: 1 confirmed LAB was in the duplicates)
-confirmed_names = ['NDWFS_J143410.9+331730', 'NDWFS_J143512.2+351108', 'NDWFS_J142623.0+351422', 'NDWFS_J143412.7+332939', 'NDWFS_J142653.1+343856'] #loo_confirmed[:,0]
+	# Now remove the confirmed LABs (NOTE: 1 confirmed LAB was in the duplicates)
+	confirmed_names = ['NDWFS_J143410.9+331730', 'NDWFS_J143512.2+351108', 'NDWFS_J142623.0+351422', 'NDWFS_J143412.7+332939', 'NDWFS_J142653.1+343856'] #loo_confirmed[:,0]
 
-deduped_priority_cat = deduped_priority_cat[~deduped_priority_cat['obj_name'].isin(confirmed_names)]
+	deduped_priority_cat = deduped_priority_cat[~deduped_priority_cat['obj_name'].isin(confirmed_names)]
+
+	# NOW CHECK THE NAMES THAT ARE PRESENT so we can index the ones that made it through
+	other_names = np.loadtxt('xgb_output_images_names.txt', dtype=str)
+	indices_other = []
+	for i in range(len(deduped_priority_cat)):
+		index = np.where(other_names == deduped_priority_cat.obj_name.iloc[i])[0]
+		if len(index) == 1:
+			indices_other.append(index[0])
+
+	other_bw = np.load('xgb_output_images_bw.npy')
+	other_bw = other_bw[indices_other]
+	other_r = np.load('xgb_output_images_R.npy')
+	other_r = other_r[indices_other]
+	other_images = concat_channels(other_bw, other_r)
+
+	other_names = other_names[indices_other]
+
+	# Now find the objects in our LAB training set (excluding the Prescott+12 priority candidates) that made it through 
+	other_lab_names = np.loadtxt('other_diffuse_names_final.txt', dtype=str)
+	indices_other_lab = []
+	for i in range(len(deduped_priority_cat)):
+		index = np.where(other_lab_names == deduped_priority_cat.obj_name.iloc[i])[0]
+		if len(index) == 1:
+			indices_other_lab.append(index[0])
+
+	other_lab_images = np.load('other_diffuse_final.npy')
+	other_lab_images = other_lab_images[indices_other_lab]
+	other_lab_names = other_lab_names[indices_other_lab]
+
+
+	# Now find the objects in our LAB training set (the Prescott+12 priority candidates) that made it through 
+	priority_lab_names = np.loadtxt('priority_diffuse_names_final.txt', dtype=str)
+	indices_priority_lab = []
+	for i in range(len(deduped_priority_cat)):
+		index = np.where(priority_lab_names == deduped_priority_cat.obj_name.iloc[i])[0]
+		if len(index) == 1:
+			indices_priority_lab.append(index[0])
+
+	priority_lab_images = np.load('priority_diffuse_final.npy')
+	priority_lab_images = priority_lab_images[indices_priority_lab]
+	priority_lab_names = priority_lab_names[indices_priority_lab]
+
+	# COMBINE ALL NAMES AND IMAGES
+	all_new_candidate_names = np.r_[other_names, other_lab_names, priority_lab_names]
+	all_new_candidate_images = np.r_[other_images, other_lab_images, priority_lab_images]
+
+	# Re-sort the dataframe to be in this order
+	indices = []
+	for i in range(len(all_new_candidate_names)):
+		index = np.where(deduped_priority_cat.obj_name == all_new_candidate_names[i])[0]
+		indices.append(index[0])
+
+	deduped_priority_cat = deduped_priority_cat.iloc[indices]
+
+	# NOW VISUAL INSPECTION
+	# These are the indices of the outliers identified 
+	indices_to_remove = [4, 15, 28, 29, 41, 42, 73, 77, 78, 81, 82, 83, 84, 85, 86]
+	indices_to_keep = [int(i) for i in range(len(deduped_priority_cat)) if i not in indices_to_remove]
+
+	final_new_candidates_csv = deduped_priority_cat.iloc[indices_to_keep]
+	final_new_candidate_names = all_new_candidate_names[indices_to_keep] #dont need this
+	final_new_candidate_images = all_new_candidate_images[indices_to_keep]
+
+	#FINAL SAVE of the priority candidates including the corresponding image data (not including error maps)
+	final_new_candidates_csv = final_new_candidates_csv.drop(['Unnamed: 0'], axis=1)
+
+	final_new_candidates_csv.to_csv('Final_New_Candidate_Catalog.csv')
+	np.save('Final_New_Candidate_Images.npy', final_new_candidate_images)
+
+
+The saved catalog of the Bootes field (~2.4M sources) including the probability prediction scores from the three machine learning models as well as the morphological features computed from the Bw imaging is available for `download here <https://drive.google.com/file/d/1nshifEK3pIeILg0m7Wf4kmJE5hotoOZ8/view?usp=sharing>`_. 
+
+The sub-catalog containing the priority candidates has also been made available `here <https://drive.google.com/file/d/15Z7yPMplVdz51CmUD6yKl67dEQxCHNaM/view?usp=sharing>`_, as well as the corresponding Bw and R-band imaging data which is available for download as a binary file `here <https://drive.google.com/file/d/1bgoOmlghqnb_ioZW0ZTRkWHBnJ8UyFuW/view?usp=sharing>`_.
+
+.. code-block:: python 
+
+	from pyBIA import catalog
+	import pandas as pd
+	import numpy as np
+	import matplotlib.pyplot as plt
+	from pyBIA.data_augmentation import resize
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size':21,})
+
+	# Load the priority candidate catalog and probas and names
+	final_cat = pd.read_csv('Final_New_Candidate_Catalog.csv')
+	final_cnn_probas = final_cat.CNN_proba
+	final_names = final_cat.obj_name
+	final_cnn_probas = np.array(final_cnn_probas)
+
+	# Load the corresponding images
+	final_images = np.load('Final_New_Candidate_Images.npy')
+	final_images = resize(final_images, 100)
+
+	# Sort according to CNN probability prediction
+	x = np.argsort(final_cnn_probas)[::-1]
+
+	final_cnn_probas = final_cnn_probas[x]
+	final_names = final_names[x]
+	final_images = final_images[x]
+
+	followed_up_candidate = 'NDWFS_J143128.2+352656' # Need to include this one on the figure (New Candidate 48) since it was followed-up
+
+	N = len(final_cnn_probas)
+	n_show = 8
+	step_count = n_show - 1 # We will always show the highest-scored object and 7 others evenly spaced out
+
+	# Rank of the followed-up object
+	pos_target = int(np.where(final_names.to_numpy() == followed_up_candidate)[0][0])
+
+	# Always include the candidate with highest CNN proba
+	first = 0
+
+	if pos_target == 0:
+	    anchors = np.rint(np.linspace(1, N-1, step_count)).astype(int)
+	else:
+	    # Choose how many evenly-spaced slots fall before pos_target
+	    step = (N - 1) / step_count
+	    k_star = int(np.round((pos_target - 1) / step))
+	    k_star = np.clip(k_star, 0, step_count - 1)
+
+	    # Build evenly spaced picks on each side so that New Cand 48 is on the grid
+	    left  = np.rint(np.linspace(1, pos_target, k_star + 1)).astype(int)
+	    right = np.rint(np.linspace(pos_target, N - 1, (step_count - k_star))).astype(int)
+	    anchors = np.r_[left[:-1], pos_target, right[1:]]
+
+	anchors = np.clip(anchors, 1, N - 1).astype(int)
+	selected_indices = np.r_[first, anchors]
+
+	#Now we can extract the eight stratified by CNN probability
+
+	final_cnn_probas = final_cnn_probas[selected_indices]
+	final_names = final_names[selected_indices]
+	final_images = final_images[selected_indices]
+
+	pix_conversion = 3.8961 # NDWFS survey pixel-per-arcsecond 
+	cmap = 'viridis' # Colormap to use
+
+	# Save the images and segmentation maps for the new candidates
+	images_bw, images_r = [], []
+	segm1, segm2 = [], []
+	for i in range(n_show):
+	    data1 = np.flip(final_images[:,:,:,0][i], axis=0)
+	    data2 = np.flip(final_images[:,:,:,1][i], axis=0)
+	    segm1_ = catalog.get_segmentation(data1, nsig=0.32, xpix=None, ypix=None, size=100, median_bkg=0)
+	    segm2_ = catalog.get_segmentation(data2, nsig=0.32, xpix=None, ypix=None, size=100, median_bkg=0)
+	    segm1.append(segm1_), segm2.append(segm2_)
+	    images_bw.append(data1); images_r.append(data2)
+
+	# Now load the confirmed LABs
+	confirmed = np.load('confirmed_diffuse.npy')
+	confirmed = resize(confirmed, 100)
+	names = np.loadtxt('confirmed_diffuse_names.txt', dtype=str)
+	confirmed_probas = np.loadtxt('confirmed_candidates_final_CNN_names_probas.txt', usecols=1)
+
+	# Save the images and segmentation maps for the confirmed LABs
+	confirmed_bw, confirmed_r = [], []
+	confirmed_segm1, confirmed_segm2 = [], []
+	for i in range(5):
+	    data1 = np.flip(confirmed[:,:,:,0][i], axis=0)
+	    data2 = np.flip(confirmed[:,:,:,1][i], axis=0)
+	    segm1_ = catalog.get_segmentation(data1, nsig=0.32, xpix=None, ypix=None, size=100, median_bkg=0)
+	    segm2_ = catalog.get_segmentation(data2, nsig=0.32, xpix=None, ypix=None, size=100, median_bkg=0)  
+	    confirmed_segm1.append(segm1_), confirmed_segm2.append(segm2_)
+	    confirmed_bw.append(data1); confirmed_r.append(data2)
+
+	confirmed_bw, confirmed_r = np.array(confirmed_bw), np.array(confirmed_r)
+
+	# PLOTS
+	image_size = 100  # Image size (100x100 pixels)
+
+	# Create pixel grids centered at (50, 50)
+	x = np.arange(0, image_size) - image_size // 2  # Shift by 50 to center at (0,0)
+	y = np.arange(0, image_size) - image_size // 2
+
+	# Convert pixel coordinates to arcseconds (for axes)w
+	x_arcsec = x / pix_conversion
+	y_arcsec = y / pix_conversion
+
+	for i in range(n_show):
+
+	    # To set a robust vmin/vmax for Bw image
+	    data = images_bw[i]
+	    index = np.where(np.isfinite(data))
+	    std = np.median(np.abs(data[index] - np.median(data[index])))
+	    vmin = np.median(data[index]) - 3 * std
+	    vmax = np.median(data[index]) + 10 * std
+	    
+	    # To set a robust vmin/vmax for R-band image
+	    data = images_r[i]
+	    index = np.where(np.isfinite(data))
+	    std = np.median(np.abs(data[index] - np.median(data[index])))
+	    vminr = np.median(data[index]) - 3 * std
+	    vmaxr = np.median(data[index]) + 10 * std
+	    
+	    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8), sharex=True, sharey=True)
+	    
+	    # Plot images with arcsecond scaling for the axes
+	    im1 = ax[0, 0].imshow(images_bw[i], vmin=vmin, vmax=vmax, cmap='viridis', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    im2 = ax[0, 1].imshow(images_r[i], vmin=vminr, vmax=vmaxr, cmap='viridis', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    im3 = ax[1, 0].imshow(segm1[i], cmap='binary', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    im4 = ax[1, 1].imshow(segm2[i], cmap='binary', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    
+	    ax[0, 0].set_title(r'$B_W$')
+	    ax[0, 1].set_title(r'$R$')
+	    
+	    fig.suptitle(f'New Candidate {selected_indices[i]+1}: $P(y =$ LAB $\mid \\mathbf{{X}})$ = {final_cnn_probas[i]:.2f}')
+	    
+	    # Adjust the layout so the subplots are touching
+	    plt.subplots_adjust(wspace=0, hspace=0)
+	    
+	    # Add labels to the outer plots for physical units (arcseconds)
+	    ax[0, 0].set_ylabel(r'$\Delta \delta$ (arcsec)')
+	    ax[1, 0].set_ylabel(r'$\Delta \delta$ (arcsec)')
+	    ax[1, 0].set_xlabel(r'$\Delta \alpha$ (arcsec)')
+	    ax[1, 1].set_xlabel(r'$\Delta \alpha$ (arcsec)')
+	    plt.savefig(f'/Users/daniel/Desktop/priority_{i}.png', dpi=300, bbox_inches='tight')
+	    plt.show()
+
+	# Now plot the confirmed LABS
+	# Note that we plot them all here but the paper only shows the three that made it through the pipeline
+	names = ['PRG4', 'LABd05', 'PRG3', 'PRG2', 'PRG1']
+	for i in range(5):
+
+	    # To set a robust vmin/vmax for Bw image
+	    data = confirmed_bw[i]
+	    index = np.where(np.isfinite(data))
+	    std = np.median(np.abs(data[index] - np.median(data[index])))
+	    vmin = np.median(data[index]) - 3 * std
+	    vmax = np.median(data[index]) + 10 * std
+	    
+	    # To set a robust vmin/vmax for R-band image
+	    data = confirmed_r[i]
+	    index = np.where(np.isfinite(data))
+	    std = np.median(np.abs(data[index] - np.median(data[index])))
+	    vminr = np.median(data[index]) - 3 * std
+	    vmaxr = np.median(data[index]) + 10 * std
+	    
+	    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8), sharex=True, sharey=True)
+	    
+	    # Plot images with arcsecond scaling for the axes
+	    im1 = ax[0, 0].imshow(confirmed_bw[i], vmin=vmin, vmax=vmax, cmap='viridis', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    im2 = ax[0, 1].imshow(confirmed_r[i], vmin=vminr, vmax=vmaxr, cmap='viridis', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    im3 = ax[1, 0].imshow(confirmed_segm1[i], cmap='binary', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    im4 = ax[1, 1].imshow(confirmed_segm2[i], cmap='binary', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    
+	    ax[0, 0].set_title(r'$B_W$')
+	    ax[0, 1].set_title(r'$R$')
+	    
+	    fig.suptitle(f'{names[i]}: $P(y =$ LAB $\mid \\mathbf{{X}})$ = {confirmed_probas[i]:.2f}')
+	    
+	    # Adjust the layout so the subplots are touching
+	    plt.subplots_adjust(wspace=0, hspace=0)
+	    
+	    # Add labels to the outer plots for physical units (arcseconds)
+	    ax[0, 0].set_ylabel(r'$\Delta \delta$ (arcsec)')
+	    ax[1, 0].set_ylabel(r'$\Delta \delta$ (arcsec)')
+	    ax[1, 0].set_xlabel(r'$\Delta \alpha$ (arcsec)')
+	    ax[1, 1].set_xlabel(r'$\Delta \alpha$ (arcsec)')
+	    
+	    plt.savefig(f'/Users/daniel/Desktop/confirmed_{i}.png', dpi=300, bbox_inches='tight')
+	    plt.show()
+
+.. figure:: _static/new_candidates_example.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+
+Narrowband LABs (Yang+09)
+-----------
+
+To test how our pipeline performs when classifying LABs that were selected via narrowband imaging, we identify the four LABs identified by `Yang et al 2009 <https://iopscience.iop.org/article/10.1088/0004-637X/693/2/1579>`_ in the Bootes field. These are identified in our master catalog and the images extracted using the following code.
+
+.. code-block:: python 
+
+	import numpy as np
+	import pandas as pd
+	from astropy.io import fits 
+	from astropy.stats import SigmaClip
+	from photutils.aperture import ApertureStats, CircularAnnulus
+	from pyBIA.data_processing import crop_image, concat_channels 
+
+	# The path to the NDWFS data files
+	data_path_bw = 'NDWFS/fits_images/Bw_FITS/'
+	data_path_r = 'NDWFS/fits_images/R_FITS/'
+
+	# Load the candidate catalog according to the optimized model 
+	cat = pd.read_csv('final_master_catalog.csv')
+
+	# The NDWFS Bootes catalog name and their names as they appear in the Yang+09 paper
+	yang_names = ['NDWFS_J142503.4+345854', 'NDWFS_J143059.0+353324', 'NDWFS_J143057.8+353431', 'NDWFS_J143725.0+351048']
+	yang_names_to_use = ['Yang+09 Blob 4', 'Yang+09 Blob 1', 'Yang+09 Blob 2', 'Yang+09 Blob 3']
+
+	# Find these in the master catalog
+	indices = []
+	for i in range(len(yang_names)):
+		index = np.where(cat.obj_name == yang_names[i])[0]
+		print(len(index))
+		indices.append(index[0])
+
+	yang_sample = cat.iloc[indices]
+
+	# Saving images as 250x250 pix
+	image_size = 250 
+
+	# Setting the apertures for the background subtraction, approximated using the sigma-clipped median within annuli of 20 and 35 pixel radii
+	annulus_apertures = CircularAnnulus((int(image_size/2),int(image_size/2)), r_in=20, r_out=35)
+
+	# Extract the images one field at a time, normalizing by the exposure time to convert to counts per second
+	counter = 0
+	images_bw, images_r = [], []
+	names = []
+	for field_name in np.unique(yang_sample['field_name']):
+
+		# Load the B and R broadband data 
+		hdu_bw = fits.open(data_path_bw+field_name+'_Bw_03_fix.fits')
+		hdu_r = fits.open(data_path_r+field_name+'_R_03_reg_fix.fits')
+		
+		# Select only the objects in this subfield
+		subfield_index = np.where(yang_sample['field_name'] == field_name)[0] 
+		
+		# Loop through these objects, subtract the background using aperture photometry, and save as txt file
+		for i in range(len(subfield_index)):
+			
+			counter += 1
+			print(counter)
+			
+			# Select the object's pixel positions
+			xpix, ypix = yang_sample[['xpix', 'ypix']].iloc[subfield_index[i]].values.T
+			
+			# Bw first, crop the image from the entire subfield array, and calculate the background in this region
+			image = crop_image(hdu_bw[0].data, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
+			bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
+			
+			# Subtract the background and then normalize by the exposure time to get counts/sec
+			image = (image - bkg_stats.median) / hdu_bw[0].header['EXPTIME']
+			images_bw.append(image)
+			
+			# R next, crop the image from the entire subfield array, and calculate the background in this region
+			image = crop_image(hdu_r[0].data, x=np.array(xpix), y=np.array(ypix), size=image_size, invert=True)
+			bkg_stats = ApertureStats(image, annulus_apertures, error=None, sigma_clip=SigmaClip())
+			
+			# Subtract the background and then normalize by the exposure time to get counts/sec
+			image = (image - bkg_stats.median) / hdu_r[0].header['EXPTIME']
+			images_r.append(image)
+			names.append(yang_sample.obj_name.iloc[subfield_index[i]])
+
+	#Confirmed that names == yang_names so these images are aligned with the csv
+	#NOW save
+	yang_images = concat_channels(np.array(images_bw), np.array(images_r))
+	np.save('Yang_Blob_Images.npy', yang_images)
+	yang_sample.to_csv('Yang_Blobs_Catalog.csv')
+
+The dataframe consisting the sub-catalog of these four NB-selected LABs as well as the corresponding images can be downloaded below.
+
+- :download:`Yang_Blobs_Catalog.csv <Yang_Blobs_Catalog.csv>`
+- :download:`Yang_Blob_Images.npy <Yang_Blob_Images.npy>`
+
+We proceed by running these four through the iForest and CNN stages in the pipeline to assess how all the models assess each object, even if they were excluded in the early stages. Note that these scores are already present in the above dataframe, but the code below shows how the models were loaded and these scores were calculated (except the initial XGBoost-based filter, as all detected objects have this score already).
+
+.. code-block:: python 
+
+	import numpy as np
+	import pandas as pd
+	from pyBIA import outlier_detection
+	from pyBIA.data_augmentation import resize 
+
+	# FIRST DO THE OUTLIER DETECTION
+
+	image_size = 241 # Optimal image size to use
+	normalize = True
+	min_pixel = 0
+	max_pixel = 10
+	img_num_channels = 1
+	feat_set='hog'
+	clf = 'iforest'
+	impute = True
+	imp_method = 'median'
+	SEED_NO = 1909
+	#
+	model = outlier_detection.Classifier(
+		normalize=normalize,
+		min_pixel=min_pixel,
+		max_pixel=max_pixel,
+		img_num_channels=img_num_channels,
+		feat_set=feat_set,
+		clf=clf,
+		impute=impute,
+		imp_method=imp_method,
+		SEED_NO=SEED_NO
+		)
+
+	# Load the saved iForest model
+	model.load(path='anomaly_detection_model')
+
+	# CLASSIFY WITH iFOREST
+	yang_blobs = np.load('Yang_Blob_Images.npy')
+	yang_blobs = resize(yang_blobs, image_size)
+	iforest_predictions = model.predict(yang_blobs)
+
+	# Now add these iForest scores to the dataframe
+	yang_sample = pd.read_csv('Yang_Blobs_Catalog.csv')
+	yang_sample['iForest_scores'] = iforest_predictions[:,1]
+
+	# Now do the CNN
+	from pyBIA import cnn_model
+
+	# Load the saved model
+	model = cnn_model.Classifier()
+	model.load('cnn_model')
+
+	# Load the images and add the difference/color image
+	yang_blobs = np.load('Yang_Blob_Images.npy')
+	bw_minus_r = yang_blobs[:,:,:,0] / yang_blobs[:,:,:,1]
+	bw_minus_r = np.expand_dims(bw_minus_r, axis=-1)
+	yang_blobs = np.concatenate([yang_blobs, bw_minus_r], axis=-1)
+
+	# Now do the predictions
+	yang_cnn_predictions = model.predict(yang_blobs, cv_model='all', return_proba=True)
+
+	# Add the CNN score to the dataframe
+	yang_sample['CNN_proba'] = yang_cnn_predictions[:,1].astype('float')
+
+	# Now need to compute the Bw-R color to assess whether they would have made it through our priority selection
+	from astropy.io import fits
+	from pyBIA import catalog
+
+	data_path = 'NDWFS/fits_images/R_FITS/'
+
+	sig = 0.32 # The optimal noise-detection threshold to apply
+	frame = [] #To store all 27 subfields
+
+	# Loop through all the fields and save catalog
+	for fieldname in np.unique(np.array(yang_sample['field_name'])):
+	    
+	    # Load the field data
+	    data_hdu = fits.open(data_path+fieldname+'_R_03_reg_fix.fits')
+	    data_map, zeropoint, exptime = data_hdu[0].data, data_hdu[0].header['MAGZERO'], data_hdu[0].header['EXPTIME']
+	    
+	    subfield_index = np.where(yang_sample['field_name']==fieldname)[0]
+	    xpix, ypix = yang_sample[['xpix', 'ypix']].iloc[subfield_index].values.T
+	    objname, field, flag = yang_sample[['obj_name', 'field_name', 'flag']].iloc[subfield_index].values.T
+	    
+	    # Create the catalog object
+	    cat = catalog.Catalog(data_map, error=None, x=xpix, y=ypix, zp=zeropoint, exptime=exptime, nsig=sig, flag=flag, obj_name=objname, field_name=field, invert=True)
+	    
+	    # Generate the catalog and save the subfield catalog, after which it is appended to the master frame 
+	    cat.create(save_file=False)#, filename='Cat_BW_Subfield_'+fieldname)
+	    frame.append(cat.cat)
+
+	# Combine all 27 sub-catalogs into one master frame and save
+	frame = pd.concat(frame, axis=0, join='inner')
+
+	# NOW FRAME IS SAME ORDER AS YANG_SAMPLE CSV
+	# Add Bw-R color to the dataframe
+	yang_sample['Color'] = np.array(yang_sample.mag) - np.array(frame.mag)
+
+	# FINAL SAVE FOR YANG CSV
+	yang_sample.to_csv('Yang_Blobs_Catalog.csv')
+
+With all machine learning probability predictions calculated, we now plot these NB-selected LABs with the scores listed above each image.
+
+
+.. code-block:: python 
+
+	from pyBIA import catalog
+	import pandas as pd
+	import numpy as np
+	from pyBIA.data_augmentation import resize
+	import matplotlib.pyplot as plt
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size':21,})
+
+	# Load the images and resize to 100x100 pixels
+	yang_blob_images = np.load('Yang_Blob_Images.npy')
+	yang_blob_images = resize(yang_blob_images, 100)
+
+	# To store the segmentation patches
+	yang_blob_images_bw, yang_blob_images_r = [], []
+	yang_blob_images_segm1, yang_blob_images_segm2 = [], []
+	for i in range(4):
+	    data1 = np.flip(yang_blob_images[:,:,:,0][i], axis=0)
+	    data2 = np.flip(yang_blob_images[:,:,:,1][i], axis=0)
+	    segm1_ = catalog.get_segmentation(data1, nsig=0.32, xpix=None, ypix=None, size=100, median_bkg=0)
+	    segm2_ = catalog.get_segmentation(data2, nsig=0.32, xpix=None, ypix=None, size=100, median_bkg=0)
+	    yang_blob_images_segm1.append(segm1_), yang_blob_images_segm2.append(segm2_)
+	    yang_blob_images_bw.append(data1); yang_blob_images_r.append(data2)
+
+	yang_blob_images_bw, yang_blob_images_r = np.array(yang_blob_images_bw), np.array(yang_blob_images_r)
+
+	# Load the catalog and store the XGBoost-8 and CNN probability predictions
+	df_yang = pd.read_csv('Yang_Blobs_Catalog.csv')
+	names = ['Yang+09 Blob 4', 'Yang+09 Blob 1', 'Yang+09 Blob 2', 'Yang+09 Blob 3']
+	probas_xgb = np.array(df_yang.XGBoost8_Proba)
+	probas_cnn = np.array(df_yang.CNN_proba)
+
+	# PLOT
+	pix_conversion = 3.8961 # NDWFS pixel-per-arcsecond conversion factor
+	image_size = 100 # Image size (100x100 pixels)
+
+	# Create pixel grids centered at (50, 50)
+	x = np.arange(0, image_size) - image_size // 2 # Shift by 50 to center at (0,0)
+	y = np.arange(0, image_size) - image_size // 2
+
+	# Convert pixel coordinates to arcseconds
+	x_arcsec = x / pix_conversion
+	y_arcsec = y / pix_conversion
+
+	for i in range(4):
+
+	    # Calculate vmin/vmax (robust scale)
+	    data = yang_blob_images_bw[i]
+	    index = np.where(np.isfinite(data))
+	    std = np.median(np.abs(data[index] - np.median(data[index])))
+	    vmin = np.median(data[index]) - 3 * std
+	    vmax = np.median(data[index]) + 10 * std
+	    
+	    # Calculate vmin/vmax (robust scale)
+	    data = yang_blob_images_r[i]
+	    index = np.where(np.isfinite(data))
+	    std = np.median(np.abs(data[index] - np.median(data[index])))
+	    vminr = np.median(data[index]) - 3 * std
+	    vmaxr = np.median(data[index]) + 10 * std
+	    
+	    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8), sharex=True, sharey=True)
+	    
+	    # Plot images with arcsecond scaling for the axes
+	    im1 = ax[0, 0].imshow(yang_blob_images_bw[i], vmin=vmin, vmax=vmax, cmap='viridis', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    im2 = ax[0, 1].imshow(yang_blob_images_r[i], vmin=vminr, vmax=vmaxr, cmap='viridis', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    im3 = ax[1, 0].imshow(yang_blob_images_segm1[i], cmap='binary', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    im4 = ax[1, 1].imshow(yang_blob_images_segm2[i], cmap='binary', extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    
+	    ax[0, 0].set_title(r'$B_W$')
+	    ax[0, 1].set_title(r'$R$')
+	    
+	    fig.suptitle(f'{names[i]}\n$P(y =$ LAB $\mid \\mathbf{{X}})$ = {probas_xgb[i]:.2f} (XGBoost) \& {probas_cnn[i]:.2f} (CNN)', y=1.02)
+	    
+	    plt.subplots_adjust(wspace=0, hspace=0)
+	    
+	    ax[0, 0].set_ylabel(r'$\Delta \delta$ (arcsec)')
+	    ax[1, 0].set_ylabel(r'$\Delta \delta$ (arcsec)')
+	    ax[1, 0].set_xlabel(r'$\Delta \alpha$ (arcsec)')
+	    ax[1, 1].set_xlabel(r'$\Delta \alpha$ (arcsec)')
+	    
+	    plt.savefig(f'YANG_{i}.png', dpi=300, bbox_inches='tight')
+	    plt.show()
+
+.. figure:: _static/yang_09_LABS.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+
+Finally, we compare these four NB-selected LABs with the broadband-selected LABs that were in our training set. 
+
+
 
 
 

@@ -3,17 +3,16 @@
 Godines & Prescott (2025)
 ===========
 
-.. admonition:: Under Construction (last updated 2025-09-22)
+This page provides all of the code necessary to reproduce our analysis. This Python code utilizes the core modules provided in pyBIA and is designed for clarity and ease of use.
 
-   This documentation is still being written and may change frequently!
+The associated data products are supplied incrementally within the scripts, allowing users to follow the analysis step by step or replicate individual stages in a transparent, technical manner. For convenience, we also provide direct access to the complete and priority catalogs below.
+
+Our complete catalog of the Boötes field (~2.4 million sources), including probability prediction scores from the three machine-learning models and the morphological features computed from the B<sub>w</sub> imaging, is available for `download here <https://drive.google.com/file/d/1nshifEK3pIeILg0m7Wf4kmJE5hotoOZ8/view?usp=sharing>`_. 
+
+A sub-catalog containing the 110 priority candidates is available `here <https://drive.google.com/file/d/15Z7yPMplVdz51CmUD6yKl67dEQxCHNaM/view?usp=sharing>`_, along with the corresponding B<sub>w</sub> and R-band imaging data, which can be downloaded as a binary file `here <https://drive.google.com/file/d/1bgoOmlghqnb_ioZW0ZTRkWHBnJ8UyFuW/view?usp=sharing>`_.
+
 
 **NOTE:** All figures are formatted using the `scienceplots` Python package, available via pip.
-
-Our complete catalog of the Bootes field (~2.4M sources) including the probability prediction scores from the three machine learning models as well as the morphological features computed from the Bw imaging is available for `download here <https://drive.google.com/file/d/1nshifEK3pIeILg0m7Wf4kmJE5hotoOZ8/view?usp=sharing>`_. 
-
-A sub-catalog containing the ~100 priority candidates has also been made available `here <https://drive.google.com/file/d/15Z7yPMplVdz51CmUD6yKl67dEQxCHNaM/view?usp=sharing>`_, as well as the corresponding Bw and R-band imaging data which is available for download as a binary file `here <https://drive.google.com/file/d/1bgoOmlghqnb_ioZW0ZTRkWHBnJ8UyFuW/view?usp=sharing>`_.
-
-
 
 Image Segmentation
 -----------
@@ -4970,8 +4969,190 @@ Finally, we compare these four NB-selected LABs with the broadband-selected LABs
 |
 
 
+Candidate Table and Image Cutouts
+-----------
+
+Below we show the code that outputs the last table in the paper (Table 5) and the corresponding imaging cutouts shown in Fig. 14.
+
+.. code-block:: python 
+
+	import numpy as np
+	import pandas as pd  
+	from astropy.coordinates import SkyCoord
+	from astropy import units as u
+
+	final_cat = pd.read_csv('Final_New_Candidate_Catalog.csv')
+
+	# sort by CNN probability
+	sort_index = np.argsort(final_cat.CNN_proba)[::-1]
+	final_cat = final_cat.iloc[sort_index]
+
+	final_names = np.array([name.replace('_', '') for name in final_cat.obj_name])
+	final_cnn_probas = np.array(final_cat.CNN_proba)
+	final_xgb_probas = np.array(final_cat.XGBoost8_Proba)
+
+	for i in range(len(final_cat)):
+
+	    # Convert the coordinates which are stored in the catalog in decimal degrees
+	    ra_decimal, dec_decimal = final_cat.ra.iloc[i], final_cat.dec.iloc[i]
+	    c = SkyCoord(ra=ra_decimal*u.degree, dec=dec_decimal*u.degree)
+	    ra_str, dec_str = c.to_string('hmsdms', precision=3).split()
+	    
+	    # For readibility
+	    ra_hms = ra_str.replace('h', ':').replace('m', ':').replace('s', '')
+	    dec_dms = dec_str.replace('+', '').replace('d', ':').replace('m', ':').replace('s', '')
+	    
+	    # This is formatted for easy placement in the LaTex table (Table 5 of the paper)
+	    print(fr'({i+1}) & {final_names[i]} & {ra_hms} & {dec_dms} & '
+	      f'{final_cnn_probas[i]:.2f} & '
+	      f'{final_cat.mag.iloc[i]:.2f} $\pm$ {final_cat.mag_err.iloc[i]:.2f} & '
+	      f'{final_cat.Color.iloc[i]:.2f} \\\\')
+
+.. figure:: _static/table_5_1.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/table_5_2.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/table_5_3.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
 
+.. code-block:: python 
 
+	import numpy as np
+	import matplotlib.pyplot as plt
+	import matplotlib.gridspec as gridspec
+	import pandas as pd
+	import scienceplots
+	from pyBIA.data_augmentation import resize
+	plt.style.use('science')
+	plt.rcParams.update({'font.size': 21})
 
+	# Load the priority candidate catalog
+	final_cat = pd.read_csv('Final_New_Candidate_Catalog.csv')
+	final_cnn_probas = np.array(final_cat.CNN_proba)
+	final_images = np.load('Final_New_Candidate_Images.npy')
+	final_images = resize(final_images, 100) # Resize to 100x100 pixels
 
+	# Sort the objects based on the CNN probability prediction score
+	x = np.argsort(final_cnn_probas)[::-1]
+	final_images = final_images[x]
+	final_cnn_probas = final_cnn_probas[x]
+
+	n_select = len(final_cnn_probas) # Number of priority candidates (110)
+
+	# For plotting/setting axes
+	pix_conversion = 3.8961  # NDWFS pixel/arcsec
+	image_size = 100 
+	x = np.arange(image_size) - image_size // 2
+	y = np.arange(image_size) - image_size // 2
+	x_arcsec = x / pix_conversion
+	y_arcsec = y / pix_conversion
+
+	# Loop through and plot all individually
+	for i in range(n_select):
+
+	    # All this time we have been flipping images to be North-up
+	    bw_img = np.flip(final_images[i, :, :, 0], axis=0)
+	    r_img = np.flip(final_images[i, :, :, 1], axis=0)
+	    
+	    # Bw image with robust scaling for vmin/vmax
+	    data = bw_img
+	    valid = np.isfinite(data)
+	    std = np.median(np.abs(data[valid] - np.median(data[valid])))
+	    vmin = np.median(data[valid]) - 3 * std
+	    vmax = np.median(data[valid]) + 10 * std
+	    
+	    # R image with robust scaling for vmin/vmax
+	    datar = r_img
+	    validr = np.isfinite(datar)
+	    stdr = np.median(np.abs(datar[validr] - np.median(datar[validr])))
+	    vminr = np.median(datar[valid]) - 3 * stdr
+	    vmaxr = np.median(datar[valid]) + 10 * stdr
+	    
+	    # PLOT
+	    fig = plt.figure(figsize=(16, 8))  
+	    gs = gridspec.GridSpec(2, 1, height_ratios=[1, 1], hspace=0.02)
+	    
+	    ax1 = fig.add_subplot(gs[0])
+	    ax2 = fig.add_subplot(gs[1], sharex=ax1, sharey=ax1)
+	    
+	    im1 = ax1.imshow(bw_img, cmap='viridis', vmin=vmin, vmax=vmax,
+	                     extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    im2 = ax2.imshow(r_img, cmap='viridis', vmin=vminr, vmax=vmaxr,
+	                     extent=[x_arcsec.min(), x_arcsec.max(), y_arcsec.min(), y_arcsec.max()])
+	    
+	    ax1.text(0.02, 0.95, r'$B_W$', color='white', transform=ax1.transAxes,
+	             fontsize=20, verticalalignment='top', horizontalalignment='left')
+	    ax2.text(0.02, 0.95, r'$R$', color='white', transform=ax2.transAxes,
+	             fontsize=20, verticalalignment='top', horizontalalignment='left')
+	    
+	    ax1.set_xticklabels([])
+	    ax1.set_yticklabels([])
+	    ax2.set_xticklabels([])
+	    ax2.set_yticklabels([])
+
+	    ax1.set_title(f'({i+1})')
+
+	    plt.setp(ax1.get_xticklabels(), visible=False)
+	    plt.subplots_adjust(hspace=0.03)
+	    plt.savefig(f'({i+1}).png', dpi=300, bbox_inches='tight')
+	    plt.close()
+
+.. figure:: _static/priority_cutouts1.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/priority_cutouts2.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/priority_cutouts3.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/priority_cutouts4.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/priority_cutouts5.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/priority_cutouts6.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/priority_cutouts7.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/priority_cutouts8.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|

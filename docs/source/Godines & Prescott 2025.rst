@@ -103,7 +103,7 @@ Training Morphological Catalog
 
 To download the images used in this study please visit the `NoirLab <https://noirlab.edu/science/data-services/other/ndwfs>`_ website. We utilized the Bootes field catalog and imaging datasets, from which there are 27 total subfields. The imaging data necessary to follow our complete analysis has been made available for `download here <https://drive.google.com/file/d/17F4e9CaDsyvusrTHKzSk8VQ8Nbz7MD87/view?usp=sharing>`_.
 
-The training set objects used in our study can be :download:`downloaded here <training_set.csv>`_. This dataframe contains catalog information on the 866 LAB candidates compiled by `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_, as well as 3200 randomly selected OTHER sources from the same dataset. 
+The training set objects used in our study can be :download:`downloaded here <training_set.csv>`. This dataframe contains catalog information on the 866 LAB candidates compiled by `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_, as well as 3200 randomly selected OTHER sources from the same dataset. 
 
 The code below demonstrates how we conducted our detection threshold analysis. Using the catalog information available in the provided training set, we extracted the morphological features using image segmentation at different thresholds, between 0.1 to 1.5 standard deviations above the background rms.
 
@@ -3061,28 +3061,28 @@ With these images saved we can train our binary convolutional neural network cla
 		val_negative=None, 
 		img_num_channels=img_num_channels, 
 		normalize=normalize, 
-	    min_pixel=min_pixel, 
-	    max_pixel=max_pixel, 
-	    clf=clf,
-	    epochs=epochs, 
-	    batch_size=batch_size,
-	    opt_cv=opt_cv,
-	    augment_data=augment_data,
-	    batch_positive=batch_positive,
-	    balance=balance, 
-	    image_size=image_size,
-	    shift=shift,
-	    rotation=rotation,
-	    vertical=vertical,
-	    horizontal=horizontal,
-	    activation_conv=activation_conv,
-	    activation_dense=activation_dense,
-	    model_reg=model_reg,
-	    optimizer=optimizer,
-	    lr=lr,
-	    amsgrad=amsgrad, 
+		min_pixel=min_pixel, 
+		max_pixel=max_pixel, 
+		clf=clf,
+		epochs=epochs, 
+		batch_size=batch_size,
+		opt_cv=opt_cv,
+		augment_data=augment_data,
+		batch_positive=batch_positive,
+		balance=balance, 
+		image_size=image_size,
+		shift=shift,
+		rotation=rotation,
+		vertical=vertical,
+		horizontal=horizontal,
+		activation_conv=activation_conv,
+		activation_dense=activation_dense,
+		model_reg=model_reg,
+		optimizer=optimizer,
+		lr=lr,
+		amsgrad=amsgrad, 
 		conv_init=conv_init,
-	    dense_init=dense_init)
+		dense_init=dense_init)
 
 	# Create the model
 	model.create(overwrite_training=True)
@@ -4787,6 +4787,188 @@ With all machine learning probability predictions calculated, we now plot these 
 
 
 Finally, we compare these four NB-selected LABs with the broadband-selected LABs that were in our training set. 
+
+
+.. code-block:: python 
+
+	import pandas as pd
+	import numpy as np
+	import matplotlib.pyplot as plt
+	from matplotlib.lines import Line2D
+	import scienceplots  # use your preferred style settings
+	plt.style.use("science")
+	plt.rcParams.update({"font.size": 21})
+
+	pix_conversion = 3.8961  # NDWFS pixel-per-arcsecond conversion factor
+
+	# Load the catalogs
+	master_cat = pd.read_csv('final_master_catalog.csv')
+	confirmed_names = np.loadtxt('confirmed_diffuse_names.txt', dtype=str)
+
+	indices = []
+	for i in range(len(confirmed_names)):
+	    index = np.where(master_cat.obj_name == confirmed_names[i])[0]
+	    indices.append(index[0])
+	    print(len(index))
+
+	# Index the master catalog to only the confirmed LABs
+	master_cat = master_cat.iloc[indices]
+
+	# Set the attributes to plot
+	lab_bw_mag = np.array(master_cat.mag)
+	lab_area = np.array(master_cat.area)
+	lab_gini = np.array(master_cat.gini)
+	lab_BW_minus_R = np.array(master_cat.Color)
+	lab_cnn = np.array(master_cat.CNN_proba)
+	lab_xgb = np.array(master_cat.XGBoost8_Proba)
+	lab_names = ['PRG4', 'LABd05', 'PRG3', 'PRG2', 'PRG1']
+
+	# Load the Yang+09 catalog and set the attributes
+	df_yang = pd.read_csv("Yang_Blobs_Catalog.csv")
+	yang_bw_mag = np.array(df_yang.mag)
+	yang_bw_area = np.array(df_yang.area)
+	yang_bw_gini = np.array(df_yang.gini)
+	yang_BW_minus_R = np.array(df_yang.Color)
+	yang_cnn = np.array(df_yang.CNN_proba)
+	yang_xgb = np.array(df_yang.XGBoost8_Proba)
+	yang_names_to_use = ['Yang+09 Blob 4', 'Yang+09 Blob 1', 'Yang+09 Blob 2', 'Yang+09 Blob 3']
+
+	# Set up colormap and normalization (for probability values ranging from 0 to 1)
+	cmap = plt.get_cmap('viridis')
+	norm = plt.Normalize(0, 1)
+
+	# PLOT
+	special_colors_lab = ['red', 'blue', 'purple', 'cyan', 'green']
+	special_markers_lab = ['^', 'p',  'v', '>', 'P']
+
+	special_colors_yang = ['orange', 'magenta', 'brown', 'olive']
+	special_markers_yang = ['s', 'd', 'h', 'X']  # square, thin diamond, hexagon, star
+
+	# Set up colormap and normalization (probabilities range from 0 to 1)
+	cmap = plt.get_cmap('viridis')
+	norm = plt.Normalize(0, 1)
+
+	# To control marker size and linewidths (the Yang+09 LABs have thinner markerlines)
+	SS = 850
+	LW_BLOB = 7
+	LW_YANG = 2
+
+	fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16,8))
+
+	# Left subplot
+	# Plot confirmed LAB in our training set
+	for i in range(len(lab_names)):
+	    print('LAB:',i)
+	    print(lab_names[i], special_markers_lab[i], special_colors_lab[i])
+	    ax1.scatter(lab_gini[i],
+	                lab_area[i]/pix_conversion**2,
+	                marker=special_markers_lab[i],
+	                s=SS,
+	                linewidth=LW_BLOB,
+	                alpha=0.9,
+	                c=[lab_xgb[i]], # face color determined by XGB probability
+	                cmap=cmap,
+	                norm=norm,
+	                edgecolor=special_colors_lab[i])
+
+	# Plot Yang+09 LABs
+	for i in range(len(yang_names_to_use)):
+	    ax1.scatter(yang_bw_gini[i],
+	                yang_bw_area[i]/pix_conversion**2,
+	                marker=special_markers_yang[i],
+	                s=SS,
+	                linewidth=LW_YANG,
+	                alpha=0.9,
+	                c=[yang_xgb[i]], # face color determined by XGB probability
+	                cmap=cmap,
+	                norm=norm,
+	                edgecolor=special_colors_yang[i])
+
+	ax1.set_ylabel(r'$B_W$ Area (arcsec$^2$)')
+	ax1.set_xlabel('Gini Index')
+
+	# Right Subplot
+	# Plot confirmed LAB in our training set
+	for i in range(len(lab_names)):
+	    ax2.scatter(lab_cnn[i],
+	                lab_BW_minus_R[i],
+	                marker=special_markers_lab[i],
+	                s=SS,
+	                linewidth=LW_BLOB,
+	                alpha=0.9,
+	                c=[lab_xgb[i]], # face color determined by XGB probability
+	                cmap=cmap,
+	                norm=norm,
+	                edgecolor=special_colors_lab[i])
+
+	# Plot Yang+09 LABs
+	for i in [1, 3, 2, 0]:
+	    ax2.scatter(yang_cnn[i],
+	                yang_BW_minus_R[i],
+	                marker=special_markers_yang[i],
+	                s=SS,
+	                linewidth=LW_YANG,
+	                alpha=0.9,
+	                c=[yang_xgb[i]], # face color determined by XGB probability
+	                cmap=cmap,
+	                norm=norm,
+	                edgecolor=special_colors_yang[i])
+
+	ax2.set_xlabel('CNN Probability Prediction')
+	ax2.set_ylabel(r'$B_W - R$')
+
+	#Shared custom legend
+	row1 = ['LABd05', 'PRG1', 'PRG2', 'PRG3', 'PRG4']
+	row2 = ['Yang+09 Blob 1', 'Yang+09 Blob 2', 'Yang+09 Blob 3', 'Yang+09 Blob 4']
+
+	# Map names -> style indices
+	lab_idx  = {name: i for i, name in enumerate(lab_names)}
+	yang_idx = {name: i for i, name in enumerate(yang_names_to_use)}
+
+	def handle_for(name):
+	    # Quick function to return legend handle according to the object name (to distinguish between the LAB types)
+	    if name in lab_idx:
+	        i = lab_idx[name]
+	        return Line2D([0], [0], marker=special_markers_lab[i], color='w',
+	                      markerfacecolor="none", markeredgecolor=special_colors_lab[i],
+	                      markersize=20, markeredgewidth=5)
+	    else:
+	        i = yang_idx[name]
+	        return Line2D([0], [0], marker=special_markers_yang[i], color='w',
+	                      markerfacecolor="none", markeredgecolor=special_colors_yang[i],
+	                      markersize=20, markeredgewidth=2)
+
+	handles, labels = [], []
+	ncols = 5
+	for j in range(ncols):
+	    if j < len(row1):
+	        handles.append(handle_for(row1[j])); labels.append(row1[j])
+	    if j < len(row2):
+	        handles.append(handle_for(row2[j])); labels.append(row2[j])
+
+	fig.legend(handles=handles, labels=labels,
+	           loc='upper center', ncol=ncols, frameon=True, fancybox=True,
+	           bbox_to_anchor=(0.5, 1.05))
+
+	# Shared colorbar
+	sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+	sm.set_array([])
+
+	cbar_ax = fig.add_axes([0.90, 0.15, 0.02, 0.7])
+
+	cbar = fig.colorbar(sm, cax=cbar_ax)
+	cbar.set_label('XGBoost Probability Prediction')
+
+	plt.tight_layout(rect=[0, 0, 0.9, 0.95])
+	plt.savefig('lab_yang_comparison_scatter.png', dpi=300, bbox_inches='tight')
+	plt.show()
+
+.. figure:: _static/lab_yang_comparison_scatter.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
 
 
 

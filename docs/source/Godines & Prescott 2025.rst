@@ -472,7 +472,7 @@ We now re-train the optimal XGBoost model using the best-performing detection th
 Optimized XGBoost Models
 -----------
 
-We now proceed with the generated training set at the optimal detection threshold. Whereas the previous analysis trained baseline models, this step invokes our optimization routine to select the most informative features and the best hyperparameters for the XGBoost engine. In the code below, two distinct models are optimized: one using the boruta_model='rf' option and another using the 'xgb' option, which applies a more conservative feature-selection approach. This is all done using the `ensemble_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html>`_ module.
+We now proceed with the generated training set at the optimal detection threshold. Whereas the previous analysis trained baseline models, this step invokes our optimization routine to select the most informative features and the best hyperparameters for the XGBoost engine. In the code below, two distinct models are optimized: one using the ``boruta_model``="rf" option and another using the "xgb" option, which applies a more conservative feature-selection approach. This is all done using the `ensemble_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html>`_ module.
 
 .. code-block:: python
 
@@ -632,7 +632,7 @@ Below, we plot the optimization results (feature-selection from the BorutaSHAP a
 	xgboost8_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
 	xgboost8_model.load('ensemble_model_xgb_boruta_xgb')
 
-	# Next load the model that was optimized using RF-based feature selection (47 features selected)
+	# Next load the model that was optimized using RF-based feature selection (45 features selected)
 	xgboost45_model = ensemble_model.Classifier(data_x, data_y, clf=clf, impute=impute)
 	xgboost45_model.load('ensemble_model_xgb_boruta_rf')
 
@@ -716,7 +716,7 @@ Below, we plot the optimization results (feature-selection from the BorutaSHAP a
 		savefig=savefig
 		)
 
-	# First plot the results from the XGBoost model trained with 47 features
+	# First plot the results from the XGBoost model trained with 45 features
 	title = 'Hyperparameter Optimization (45 Features)' # Fig title
 
 	xgboost45_model.plot_hyper_opt(
@@ -829,9 +829,9 @@ Using this catalog, we can now load the optimal models to generate predictions. 
 Predictions & LOO CV
 -----------
 
-In the following script, we perform model predictions on the entire NDWFS Boötes field to generate the candidate catalogs (i.e., sources with probability predictions greater than 0.5).
+In the following script, we perform model predictions on the entire NDWFS Boötes field to generate the candidate catalogs (i.e., sources with probability predictions greater than or equal to 0.5).
 
-These candidate catalogs exclude the 866 LAB training objects, which were deliberately removed from the source catalog. While the randomly selected objects that comprised the OTHER class remain in the catalog, they were used for training purposes and thus cannot be fairly assessed, as their presence as OTHER training instances skews their probability predictions.
+These candidate catalogs exclude the 866 LAB training objects, which were deliberately removed from the source catalog. While the randomly selected objects that comprised the OTHER class remain in the catalog, they were used for training purposes and thus cannot be fairly assessed, as their presence as OTHER training instances skews their probability predictions. We thus employ a leave-one-out cross-validation (LOO CV) routine to fairly assess both the LAB and OTHER training set instances. 
 
 .. code-block:: python
 
@@ -1100,7 +1100,7 @@ The three candidate catalogs can be downloaded here:
 t-SNE Projections
 -----------
 
-With the LOO cross-validation results, we can generate t-SNE projections and scale the points by their predicted probabilities.
+With the LOO CV results, we can generate t-SNE projections and scale the points by their probability scores.
 
 We first generate the t-SNE projections and save the scatter-point positions using the built-in methods of the `Classifier <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html#pyBIA.ensemble_model.Classifier>`_ class.
 
@@ -1703,7 +1703,7 @@ We now assess the performance of the three XGBoost models, beginning with a ROC 
     :width: 600px
 |
 
-Next, we generate empirical cumulative distribution functions (eCDFs) to evaluate how many positive detections each model produces as a function of predicted probability—both for the candidate catalogs (the positively classified objects in the NDWFS Boötes field saved earlier) and for the LAB training instances that were also positively classified.
+Next, we generate empirical cumulative distribution functions (eCDFs) to evaluate how many positive detections each model produces as a function of predicted probability—both for the candidate catalogs (the positively classified objects in the NDWFS Boötes field saved earlier) and for the LAB training instances that were also positively classified as per the LOO CV.
 
 .. code-block:: python
 
@@ -1832,7 +1832,7 @@ XGBoost Classification Analysis
 
 Having established that, in this context, an XGBoost model trained with eight features performs best, we now proceed to analyze the factors driving its predictions. Here, we plot the classification outputs as a function of the top three features.
 
-Because the previous candidate catalogs contained only LAB objects, we need to re-run the classification to include non-LAB sources. The original LOO analysis code omitted these non-LAB entries from the ~2 million original objects. The updated code reconstructs this catalog and appends the missing sources, since the master catalog excludes the negative training class.
+Because the previous candidate catalogs contained only positive class predictions (i.e., LAB candidates), we need to re-run the classification to include non-LAB sources. The original LOO CV analysis code omitted these non-LAB entries from the candidate catalogs, therefore in the code below we generate a catalog containing the negatively-classified objects (i.e., OTHER candidates).
 
 .. code-block:: python
 
@@ -1953,9 +1953,9 @@ Because the previous candidate catalogs contained only LAB objects, we need to r
 	# Save candidate catalogs
 	candidate_catalog_optimized.to_csv('non_candidate_catalog_xgboost_8.csv')
 
-This catalog of non-LAB candidates (i.e., classified as OTHER) can be `downloaded here <https://drive.google.com/file/d/12d4ijXq55P6cVxFuoLXAlQDATUmZSRN_/view?usp=sharing>`_.
+This catalog of non-LAB candidates (classified as OTHER) can be `downloaded here <https://drive.google.com/file/d/12d4ijXq55P6cVxFuoLXAlQDATUmZSRN_/view?usp=sharing>`_.
 
-Together with the previously saved candidate catalog, we can now assess how the feature values influence the XGBoost model’s classifications.
+Together with the previously saved LAB candidate catalog, we can now assess how the feature values influence the XGBoost model’s classifications across the full range of probability scores.
 
 .. code-block:: python
 
@@ -2183,12 +2183,12 @@ Together with the previously saved candidate catalog, we can now assess how the 
 Image Extraction
 -----------
 
-To prepare for training the outlier-detection algorithm and the CNN, we now extract the multi-band imaging of our candidates, restricted to those with probability predictions greater than or equal to 0.9.
+To prepare for training the outlier-detection algorithm and the CNN, we now extract the multi-band imaging of our initial candidates, which includes only those with XGBoost probability predictions greater than or equal to 0.9.
 
-This step requires two supporting files: **(1)** the catalog names of the 80 priority candidates in our training sample (from `Prescott et al 2012 `<https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_), and **(2)** the names of the training-set LABs with unusable R-band imaging, as these are excluded from both outlier detection and CNN training. These files can be downloaded below:
+This step requires two supporting files: **(1)** the catalog names of the 80 priority candidates in our training sample (from `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_), and **(2)** the names of the training-set LABs with unusable R-band imaging, as these are excluded from both outlier detection and CNN training. These files can be downloaded below:
 
-- :download:`obj_name_80 <obj_name_80>`.
-- :download:`bad_r_names_866.txt <bad_r_names_866.txt>`.
+- :download:`obj_name_80 <obj_name_80>`
+- :download:`bad_r_names_866.txt <bad_r_names_866.txt>`
 
 .. code-block:: python
 
@@ -2408,7 +2408,7 @@ The candidate images in binary format (containing approximately 50,000 objects),
 
 - `xgb_output_images_bw <https://drive.google.com/file/d/1vcXOxusGkBpCwBOBbqHk0wWtd5M93b7T/view?usp=sharing>`_
 - `xgb_output_images_R <https://drive.google.com/file/d/132HyBA_FNJaL0NyQEPL9aBoRPxEA1cGW/view?usp=sharing>`_ 
-- :download:`xgb_output_images_names.txt <xgb_output_images_names.txt>`.
+- :download:`xgb_output_images_names.txt <xgb_output_images_names.txt>`
 
 The LAB training-set images in binary format, along with their catalog names, are available for download below.
 
@@ -2420,9 +2420,9 @@ Images:
 
 Corresponding names:
 
-- :download:`confirmed_diffuse_names.txt <confirmed_diffuse_names.txt>`.
-- :download:`priority_diffuse_names.txt <priority_diffuse_names.txt>`.
-- :download:`other_diffuse_names.txt <other_diffuse_names.txt>`.
+- :download:`confirmed_diffuse_names.txt <confirmed_diffuse_names.txt>`
+- :download:`priority_diffuse_names.txt <priority_diffuse_names.txt>`
+- :download:`other_diffuse_names.txt <other_diffuse_names.txt>`
 
 
 Outlier Removal
@@ -2431,9 +2431,9 @@ Outlier Removal
 We find that a subset of classified objects are outliers (e.g., edge effects, bright halos contaminating the pixel distribution, or bleed trails from nearby stars). After visually inspecting a subset of candidates, we manually selected 1,000 objects identified as outliers in either band. These are available for download as a binary file along with the corresponding catalog names:
 
 - `outlier_sample_visually_inspected <https://drive.google.com/file/d/1MlE-9JXsEsq308ssXSTKqaog-UZ5tf5h/view?usp=sharing>`_
-- :download:`outlier_sample_visually_inspected_names.txt <outlier_sample_visually_inspected_names.txt>`.
+- :download:`outlier_sample_visually_inspected_names.txt <outlier_sample_visually_inspected_names.txt>`
 
-We begin by plotting four of these outliers using the plot_images_grid_2x2 function provided in the `Catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module.
+We begin by plotting four of these outliers using the `plot_images_grid_2x2 <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_images_grid_2x2>`_ function provided in the `Catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module.
 
 .. code-block:: python
 
@@ -2659,9 +2659,9 @@ We now proceed to plot the model performance as a function of both image size an
     :width: 600px
 |
 
-After determining the best feature set (HOG features) and the optimal image size (241×241 pixels), we proceed as follows.
+After determining the best feature set (HOG features) and the optimal image size (241×241 pixels), we proceed with training and saving the the optimal iForest model and classifying the initial candidates to flag any outliers present.
 
-We load the previously saved binary files `xgb_output_images_bw.npy` and `xgb_output_images_R.npy`, which contain all candidate objects (approximately 53,000).
+For this we load the previously saved binary files `xgb_output_images_bw.npy` and `xgb_output_images_R.npy`, which contain the imaging data for all initial candidate objects (approximately 53,000). After classifying these, we save the anomaly detection scores alongside several Bw-based morphological features from the image segmentation routine conducted earlier. These include the area of the segmentation patch as well as the first eigenvalue of the covariance matrix.
 
 .. code-block:: python 
 
@@ -2762,7 +2762,7 @@ The pyBIA iForest model can be `downloaded here <https://drive.google.com/file/d
 
 The saved predictions for the candidate objects, along with their corresponding area and the first eigenvalue of the covariance matrix, can be :download:`downloaded here <outlier_scores_and_areas.txt>`.
 
-With the predictions and morphological values saved, we can now generate the figure showing the iForest score distributions and the correlation between the scores and the extent of the image-segmentation patches.
+With the predictions and morphological values saved, we can now generate the figure showing the iForest score distributions and the correlation between the scores and the effective extent of the image-segmentation patches.
 
 .. code-block:: python
 
@@ -2876,7 +2876,7 @@ CNN Training
 
 With the majority of outliers removed from the candidate sample, we now train the multi-band CNN to identify the most promising LAB candidates.
 
-We begin by extracting the training-set images. The positive class consists of the 70 Prescott et al. (2012) priority candidates classified by our XGBoost model with a probability greater than or equal to 0.9. The remaining five confirmed LABs are reserved for testing. At the same time, we save the non-priority LABs from our training set so that, after CNN training, we can identify which of these should be considered final candidates. For computational efficiency, we also extract 3,800 random objects from our initial candidate sample to form the negative class.
+We begin by extracting the training-set images. The positive class consists of the 70 `Prescott et al 2012 <https://ui.adsabs.harvard.edu/abs/2012ApJ...748..125P/abstract>`_ priority candidates classified by our XGBoost model with a probability greater than or equal to 0.9. The five confirmed LABs are reserved for testing. At the same time, we save the non-priority LABs from our training set that also made it through the pipeline, so that after CNN training, we can identify which of these should be considered final candidates. For computational efficiency, we also extract 3,800 random objects from our initial candidate sample to form the negative class.
 
 .. code-block:: python 
 
@@ -2976,15 +2976,15 @@ These files can be downloaded below.
 
 Images:
 
-- `priority_diffuse_final <https://drive.google.com/file/d/1zWIUitBjN9Hag204xN-NbGq7KWwyu1pr/view?usp=sharing>`_.
+- `priority_diffuse_final <https://drive.google.com/file/d/1zWIUitBjN9Hag204xN-NbGq7KWwyu1pr/view?usp=sharing>`_
 - `other_diffuse_final <https://drive.google.com/file/d/1pyodZkCcDWKqu7PDppLfTMsXJ4f_Mnzk/view?usp=sharing>`_
 - `cnn_training_other_3800 <https://drive.google.com/file/d/16QIYIWxiqEaYXg2_AA5VG_WSsXmsXNuF/view?usp=sharing>`_
 
 Corresponding names: 
 
-- :download:`priority_diffuse_names_final.txt <priority_diffuse_names_final.txt>`.
-- :download:`other_diffuse_names_final.txt <other_diffuse_names_final.txt>`.
-- :download:`cnn_training_other_3800_names.txt <cnn_training_other_3800_names.txt>`.
+- :download:`priority_diffuse_names_final.txt <priority_diffuse_names_final.txt>`
+- :download:`other_diffuse_names_final.txt <other_diffuse_names_final.txt>`
+- :download:`cnn_training_other_3800_names.txt <cnn_training_other_3800_names.txt>`
 
 With these images saved, we can now train our binary convolutional neural-network classifier using the `cnn_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/cnn_model/index.html>`_ module.
 
@@ -3097,7 +3097,7 @@ We can then load this model and visualize its performance across epochs.
 	plt.rcParams.update({'font.size': 21})
 
 	model = cnn_model.Classifier()
-	model.load(f'cnn_model')
+	model.load('cnn_model')
 
 	# Training metrics are saved in the following class attributes, shape is (num_folds, num_epochs, num_metrics)
 	train_metrics = np.array(model.model_train_metrics)
@@ -3276,9 +3276,9 @@ Images:
 
 Corresponding names: 
 
-- :download:`priority_diffuse_final_CNN_candidates_names_probas.txt <priority_diffuse_final_CNN_candidates_names_probas.txt>`.
-- :download:`other_diffuse_final_CNN_candidates_names_probas.txt <other_diffuse_final_CNN_candidates_names_probas.txt>`.
-- :download:`OTHER_final_CNN_candidates_names_probas.txt <OTHER_final_CNN_candidates_names_probas.txt>`.
+- :download:`priority_diffuse_final_CNN_candidates_names_probas.txt <priority_diffuse_final_CNN_candidates_names_probas.txt>`
+- :download:`other_diffuse_final_CNN_candidates_names_probas.txt <other_diffuse_final_CNN_candidates_names_probas.txt>`
+- :download:`OTHER_final_CNN_candidates_names_probas.txt <OTHER_final_CNN_candidates_names_probas.txt>`
 
 We can now visualize the probability-prediction distributions for both the LABs used to train the CNN (based on the five-fold CV results) and the ~48,000 initial candidates identified as inliers by the iForest model.
 
@@ -3543,7 +3543,7 @@ Candidate Prioritization
 
 We now prioritize the final candidates for spectroscopic follow-up based on their similarity to the known LABs.
 
-Priority candidates are selected according to their Bw area, Bw–R color, and Bw-based Gini coefficient. To perform the color selection, we first compute the R-band magnitudes using the `Catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.Catalog>`_ class.
+Priority candidates are selected according to their Bw area, Bw–R color, and Bw-based Gini index. To perform the color selection, we first compute the R-band magnitudes using the `Catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.Catalog>`_ class.
 
 .. code-block:: python 
 
@@ -3923,7 +3923,7 @@ We can now generate the plot, applying a top-down filtering approach to select t
 	# Top title
 	ax_area.set_title('Priority Candidate Selection', y=1.18)
 
-	# Legend in order for asthetics
+	# Legend in order for aesthetics
 	legend_elements = [
 	    Line2D([0],[0], color='b', lw=1.5, label='Initial Candidates'),
 	    Line2D([0],[0], color='red', lw=1.5, label=r'$\langle P(y=\mathrm{LAB}\mid\mathbf{X}) \rangle$'),
@@ -3945,8 +3945,7 @@ We can now generate the plot, applying a top-down filtering approach to select t
 	           frameon=True, fancybox=True, handlelength=0.9,
 	           columnspacing=0.9, handletextpad=0.5)
 
-	plt.savefig('priority_selection_three_panel.png',
-	            dpi=300, bbox_inches='tight')
+	plt.savefig('priority_selection_three_panel.png', dpi=300, bbox_inches='tight')
 	plt.show()
 
 .. figure:: _static/priority_selection_three_panel.png
@@ -4086,9 +4085,7 @@ We can now compile a complete catalog of all the sources in NDWFS Boötes, incor
 
 This final master catalog containing all sources, features, and scores, is available for `download here <https://drive.google.com/file/d/1nshifEK3pIeILg0m7Wf4kmJE5hotoOZ8/view?usp=sharing>`_.
 
-This catalog includes every source in NDWFS Boötes, including non-detections and duplicate objects (i.e., those located close together and effectively representing the same system as seen by our models). We now generate a sub-catalog of only the priority candidates identified in earlier stages and remove any duplicates. Duplicate objects are flagged if they lie within 10 arcseconds of one another, in which case only one is retained. This step is essential because the group-like nature of LABs often results in multiple galaxies being cataloged as distinct sources by NDWFS but, for our purposes, should be treated as a single object.
-
-Finally, we perform a visual inspection to remove any remaining outlier sources that may still be present.
+This catalog includes every source in NDWFS Boötes, including non-detections and duplicate objects (i.e., those located close together and effectively representing the same system as seen by our models). We now generate a sub-catalog of only the priority candidates identified in earlier stages and remove any duplicates. Duplicate objects are flagged if they lie within 10 arcseconds of one another, in which case only one is retained. This step is essential because the group-like nature of LABs often results in multiple galaxies being cataloged as distinct sources by NDWFS but, for our purposes, should be treated as a single object. After removing duplicates, we perform a final visual inspection to remove any remaining outlier sources that may still be present.
 
 .. code-block:: python 
 
@@ -4285,9 +4282,9 @@ Finally, we perform a visual inspection to remove any remaining outlier sources 
 	final_new_candidates_csv.to_csv('Final_New_Candidate_Catalog.csv')
 	np.save('Final_New_Candidate_Images.npy', final_new_candidate_images)
 
-The saved catalog of the Boötes field (~2.4 million sources), including probability prediction scores from the three machine learning models and the morphological features computed from the Bw imaging, is available for `download here <https://drive.google.com/file/d/1nshifEK3pIeILg0m7Wf4kmJE5hotoOZ8/view?usp=sharing>`_. 
+The sub-catalog containing our priority candidates is available `here <https://drive.google.com/file/d/15Z7yPMplVdz51CmUD6yKl67dEQxCHNaM/view?usp=sharing>`_, along with the corresponding Bw and R-band imaging data, which can be downloaded as a binary file `here <https://drive.google.com/file/d/1bgoOmlghqnb_ioZW0ZTRkWHBnJ8UyFuW/view?usp=sharing>`_.
 
-A sub-catalog containing the priority candidates is available `here <https://drive.google.com/file/d/15Z7yPMplVdz51CmUD6yKl67dEQxCHNaM/view?usp=sharing>`_, along with the corresponding Bw and R-band imaging data, which can be downloaded as a binary file `here <https://drive.google.com/file/d/1bgoOmlghqnb_ioZW0ZTRkWHBnJ8UyFuW/view?usp=sharing>`_.
+We now load these files and plot a subset of these final candidates covering the full range of CNN probability prediction scores. We also plot the three confirmed LABs that made it through the entire pipeline.
 
 .. code-block:: python 
 
@@ -4432,7 +4429,7 @@ A sub-catalog containing the priority candidates is available `here <https://dri
 	    ax[1, 0].set_ylabel(r'$\Delta \delta$ (arcsec)')
 	    ax[1, 0].set_xlabel(r'$\Delta \alpha$ (arcsec)')
 	    ax[1, 1].set_xlabel(r'$\Delta \alpha$ (arcsec)')
-	    plt.savefig(f'/Users/daniel/Desktop/priority_{i}.png', dpi=300, bbox_inches='tight')
+	    plt.savefig(f'priority_{i}.png', dpi=300, bbox_inches='tight')
 	    plt.show()
 
 	# Now plot the confirmed LABS
@@ -4476,7 +4473,7 @@ A sub-catalog containing the priority candidates is available `here <https://dri
 	    ax[1, 0].set_xlabel(r'$\Delta \alpha$ (arcsec)')
 	    ax[1, 1].set_xlabel(r'$\Delta \alpha$ (arcsec)')
 	    
-	    plt.savefig(f'/Users/daniel/Desktop/confirmed_{i}.png', dpi=300, bbox_inches='tight')
+	    plt.savefig(f'confirmed_{i}.png', dpi=300, bbox_inches='tight')
 	    plt.show()
 
 .. figure:: _static/new_candidates_example.png
@@ -4489,7 +4486,7 @@ A sub-catalog containing the priority candidates is available `here <https://dri
 Narrowband LABs (Yang+09)
 -----------
 
-To evaluate how our pipeline performs when classifying LABs originally selected via narrowband imaging, we identify the four LABs reported by `Yang et al 2009 <https://iopscience.iop.org/article/10.1088/0004-637X/693/2/1579>`_ in the Boötes field. These objects are located in our master catalog, and their images can be extracted using the following code.
+To evaluate how our pipeline performs when classifying LABs discovered via narrowband imaging, we identify the four LABs reported by `Yang et al 2009 <https://iopscience.iop.org/article/10.1088/0004-637X/693/2/1579>`_ in the Boötes field. These objects are located in our master catalog, and their catalog data inlcuding images can be extracted using the following code.
 
 .. code-block:: python 
 
@@ -4576,7 +4573,7 @@ The dataframe containing the sub-catalog of these four narrowband-selected LABs,
 - :download:`Yang_Blobs_Catalog.csv <Yang_Blobs_Catalog.csv>`
 - :download:`Yang_Blob_Images.npy <Yang_Blob_Images.npy>`
 
-We then run these four objects through the iForest and CNN stages of the pipeline to evaluate how all models classify each object, even those excluded in the early stages. Note that these scores are already included in the dataframe above; however, the code below demonstrates how the models were loaded and how these scores were calculated (excluding the initial XGBoost filter, since all detected objects already have this score).
+We now run these four objects through the iForest and CNN models to evaluate how all models classify each object, even if they were removed in the early XGBoost-based stage. Note that these scores are already included in the dataframe above; however, the code below demonstrates how the models were loaded and how these scores were calculated (except the initial XGBoost model, since all detected objects already have this score).
 
 .. code-block:: python 
 

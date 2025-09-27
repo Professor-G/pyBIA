@@ -12,7 +12,7 @@ Welcome to pyBIA's documentation!
 
 pyBIA (Blob Identification Algorithm) is an open-source framework for machine learning detection of spatially extended and diffuse Lyman-alpha emission at high redshift (i.e., blob-like objects). Combining a variety of machine learning methods, pyBIA can reduce millions of cataloged sources to a small candidate list for follow-up study. 
 
-Although designed for astronomers, its modular architecture make it adaptable to any domain where large-scale image segmentation and/or classification are required. This documentation walks you through installation, data preparation, model training, and optimization so you can quickly build your own machine-learning classifiers with pyBIA. Note that all stochastic processes during machine learning model training (e.g., weight initilization) are controlled via the ``SEED_NO`` attribute present in the main class of every core module, and is set to **1909** by default. 
+Although designed for astronomers, its modular architecture make it adaptable to any domain where large-scale image segmentation and/or classification are required. This documentation walks you through installation, data preparation, model training, and optimization so you can quickly build your own machine-learning classifiers with pyBIA. Note that all stochastic processes during machine learning model training (e.g., weight initilization) are controlled via the ``SEED_NO`` attribute present in the main class of every core module, which is set to **1909** by default. 
 
 This software was created to conduct the research presented in Godines & Prescott (2025). If you use this code for publication, we would appreciate citations to the paper.
 

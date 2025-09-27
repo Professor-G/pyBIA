@@ -941,9 +941,9 @@ class Classifier:
 
         if ylabel is None:
             if self.opt_cv > 0:
-                plt.ylabel(f'{scoring_metric} ({str(self.opt_cv)}-Fold Cross-Validation)', alpha=1, color='k')
+                plt.ylabel(f'{self.scoring_metric} ({str(self.opt_cv)}-Fold Cross-Validation)', alpha=1, color='k')
             else:
-                plt.ylabel(f'{scoring_metric}', alpha=1, color='k')
+                plt.ylabel(f'{self.scoring_metric}', alpha=1, color='k')
         else:
             plt.ylabel(ylabel, alpha=1, color='k')
         

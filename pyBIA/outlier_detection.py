@@ -355,11 +355,6 @@ def hog_feature_extraction(
     """
     Extract Histogram of Oriented Gradients (HOG) features per channel.
 
-    For each image and channel, HOG features are computed using scikit-image
-    defaults (grayscale per channel). Channel-wise features are then either
-    concatenated (default) or reduced to a single scalar via max pooling.
-    Optionally, HOG visualizations are returned (one per channel).
-
     Parameters
     ----------
     images : ndarray
@@ -452,11 +447,6 @@ def wavelet_energy_feature_extraction(
     ) -> np.ndarray:
     """
     Compute per-subband wavelet energies per channel and concatenate.
-
-    For each image channel, perform a 2D decimated DWT (``pywt.wavedec2``) to level
-    ``L`` and record the energy of the approximation band at level ``L`` and the
-    detail bands (H, V, D) for level ``L`` down to level 1. Channel vectors are concatenated
-    to form per-image features.
 
     Parameters
     ----------
@@ -560,8 +550,8 @@ def statistical_feature_extraction(images: np.ndarray) -> np.ndarray:
         6) 99th percentile (p99)
         7) min
         8) max
-        9) skewness  (scipy.stats.skew, bias=True)
-       10) kurtosis  (scipy.stats.kurtosis, fisher=True, bias=True)
+        9) skewness
+       10) kurtosis
 
     Parameters
     ----------
@@ -620,10 +610,6 @@ def lbp_feature_extraction(
     ):
     """
     Extract Local Binary Pattern (LBP) histograms per channel and concatenate.
-
-    For each image channel, compute standard LBP codes using ``P`` sampling points 
-    on a circle of radius ``R``. Then we build a histogram with ``2**P`` bins,
-    normalized to unit sum. Then concatenate the channel histograms to form one feature vector per image.
 
     Parameters
     ----------

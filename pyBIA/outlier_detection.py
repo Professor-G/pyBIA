@@ -248,8 +248,7 @@ class Classifier:
         Parameters
         ----------
         path : str or None, optional
-            Base directory containing `pyBIA_outlier_model/`. If None, uses the
-            user's home directory.
+            Base directory containing `pyBIA_outlier_model/`. If None, uses the user's home directory.
 
         Returns
         -------
@@ -291,8 +290,7 @@ class Classifier:
         Parameters
         ----------
         data : ndarray
-            Image tensor with shape (N, H, W, C). If multi-channel, features are
-            computed per channel and concatenated (≤ 3 channels supported).
+            Image tensor with shape (N, H, W, C). If multi-channel, features are computed per channel and concatenated (≤ 3 channels supported).
 
         Returns
         -------
@@ -387,8 +385,7 @@ def hog_feature_extraction(
     Notes
     -----
     - Each channel is treated as a grayscale image (`channel_axis=None`).
-    - HOG parameters are the scikit-image defaults (orientations, pixels per
-      cell, cells per block, block normalization).
+    - HOG parameters are the scikit-image defaults (orientations, pixels per cell, cells per block, block normalization).
     """
 
     images = np.asarray(images)
@@ -451,7 +448,7 @@ def wavelet_energy_feature_extraction(
     Parameters
     ----------
     images : sequence of ndarray or ndarray
-        Iterable of images with shape `(H, W, C)` **or** an array with shape
+        Iterable of images with shape `(H, W, C)` or an array with shape
         `(N, H, W, C)`. Iteration is over the first dimension.
     wavelet : str, optional
         Wavelet name for PyWavelets. Default is 'db4'.
@@ -462,7 +459,7 @@ def wavelet_energy_feature_extraction(
         Boundary extension mode passed to `pywt.wavedec2`. Default is 'symmetric'.
     stat : {'sum','mean'}, optional
         Aggregation for each subband:
-        - 'sum'  : sum of squares (energy)
+        - 'sum' : sum of squares (energy)
         - 'mean' : energy per coefficient (area-normalized)
         Default is 'sum'.
     log_scale : bool, optional
@@ -500,7 +497,7 @@ def wavelet_energy_feature_extraction(
             # coeffs = [cA_L, (cH_L,cV_L,cD_L), ..., (cH_1,cV_1,cD_1)]
 
             energies = []
-            sizes    = []
+            sizes = []
 
             # Approximation energy at level L
             cA = coeffs[0]
@@ -514,7 +511,7 @@ def wavelet_energy_feature_extraction(
                     sizes.append(band.size)
 
             energies = np.asarray(energies, dtype=float)
-            sizes    = np.asarray(sizes, dtype=float)
+            sizes = np.asarray(sizes, dtype=float)
 
             if stat == "mean":
                 # area-normalize to remove bias from subband size

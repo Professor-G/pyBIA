@@ -398,13 +398,17 @@ class Classifier:
             if self.augment_data:
 
                 if self.img_num_channels == 1:
-                    channel1, channel2, channel3 = copy.deepcopy(self.positive_class), None, None 
+                    channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(self.positive_class), None, None, None, None
                 elif self.img_num_channels == 2:
-                    channel1, channel2, channel3 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), None 
+                    channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), None, None, None
                 elif self.img_num_channels == 3:
-                    channel1, channel2, channel3 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), copy.deepcopy(self.positive_class[:,:,:,2])
+                    channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), copy.deepcopy(self.positive_class[:,:,:,2]), None, None
+                elif self.img_num_channels == 4:
+                    channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), copy.deepcopy(self.positive_class[:,:,:,2]), copy.deepcopy(self.positive_class[:,:,:,3]), None
+                elif self.img_num_channels == 5:
+                    channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(self.positive_class[:,:,:,0]), copy.deepcopy(self.positive_class[:,:,:,1]), copy.deepcopy(self.positive_class[:,:,:,2]), copy.deepcopy(self.positive_class[:,:,:,3]), copy.deepcopy(self.positive_class[:,:,:,4])
                 else:
-                    raise ValueError('Only three filters are supported!')
+                    raise ValueError('Only FIVE filters are supported when augmenting the data!')
 
                 #min_pix, max_pix = self.min_pixel, self.max_pixel
 
@@ -429,6 +433,8 @@ class Classifier:
                     channel1=channel1, 
                     channel2=channel2, 
                     channel3=channel3, 
+                    channel4=channel4,
+                    channel5=channel5,
                     batch=self.batch_positive, 
                     width_shift=self.shift, 
                     height_shift=self.shift, 
@@ -452,9 +458,15 @@ class Classifier:
                     if self.img_num_channels == 2:
                         for i in range(len(augmented_images[0])):
                             class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i]))
-                    else:
+                    elif self.img_num_channels == 3:
                         for i in range(len(augmented_images[0])):
                             class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
+                    elif self.img_num_channels == 4:
+                        for i in range(len(augmented_images[0])):
+                            class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i], augmented_images[3][i]))
+                    elif self.img_num_channels == 5:
+                        for i in range(len(augmented_images[0])):
+                            class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i], augmented_images[3][i], augmented_images[4][i]))
                     class_1 = np.array(class_1)
                 else:
                     class_1 = augmented_images
@@ -466,16 +478,24 @@ class Classifier:
                 if self.batch_negative > 0: 
 
                     if self.img_num_channels == 1:
-                        channel1, channel2, channel3 = copy.deepcopy(self.negative_class), None, None 
+                        channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(self.negative_class), None, None, None, None
                     elif self.img_num_channels == 2:
-                        channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), None 
+                        channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), None, None, None
                     elif self.img_num_channels == 3:
-                        channel1, channel2, channel3 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), copy.deepcopy(self.negative_class[:,:,:,2])
-                    
+                        channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), copy.deepcopy(self.negative_class[:,:,:,2]), None, None
+                    elif self.img_num_channels == 4:
+                        channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), copy.deepcopy(self.negative_class[:,:,:,2]), copy.deepcopy(self.negative_class[:,:,:,3]), None
+                    elif self.img_num_channels == 5:
+                        channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(self.negative_class[:,:,:,0]), copy.deepcopy(self.negative_class[:,:,:,1]), copy.deepcopy(self.negative_class[:,:,:,2]), copy.deepcopy(self.negative_class[:,:,:,3]), copy.deepcopy(self.negative_class[:,:,:,4])
+
+
+
                     augmented_images_negative = augmentation(
                         channel1=channel1, 
                         channel2=channel2, 
                         channel3=channel3, 
+                        channel4=channel4,
+                        channel5=channel5,
                         batch=self.batch_negative, 
                         width_shift=self.shift, 
                         height_shift=self.shift, 
@@ -499,9 +519,15 @@ class Classifier:
                         if self.img_num_channels == 2:
                             for i in range(len(augmented_images_negative[0])):
                                 class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i]))
-                        else:
+                        elif self.img_num_channels == 3:
                             for i in range(len(augmented_images_negative[0])):
                                 class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i], augmented_images_negative[2][i]))
+                        elif self.img_num_channels == 4:
+                            for i in range(len(augmented_images_negative[0])):
+                                class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i], augmented_images_negative[2][i], augmented_images_negative[3][i]))
+                        elif self.img_num_channels == 5:
+                            for i in range(len(augmented_images_negative[0])):
+                                class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i], augmented_images_negative[2][i], augmented_images_negative[3][i], augmented_images_negative[4][i]))
                         class_2 = np.array(class_2)
                     else:
                         class_2 = augmented_images_negative
@@ -519,9 +545,18 @@ class Classifier:
                     channel2 = resize(class_2[:,:,:,1], size=self.image_size)
                     if self.img_num_channels == 2:
                         class_2 = concat_channels(channel1, channel2)
-                    else:
+                    elif self.img_num_channels == 3:
                         channel3 = resize(class_2[:,:,:,2], size=self.image_size)
                         class_2 = concat_channels(channel1, channel2, channel3)
+                    elif self.img_num_channels == 4:
+                        channel3 = resize(class_2[:,:,:,2], size=self.image_size)
+                        channel4 = resize(class_2[:,:,:,3], size=self.image_size)
+                        class_2 = concat_channels(channel1, channel2, channel3, channel4)
+                    elif self.img_num_channels == 5:
+                        channel3 = resize(class_2[:,:,:,2], size=self.image_size)
+                        channel4 = resize(class_2[:,:,:,3], size=self.image_size)
+                        channel5 = resize(class_2[:,:,:,4], size=self.image_size)
+                        class_2 = concat_channels(channel1, channel2, channel3, channel4, channel5)
 
                 if self.val_positive is not None:
                     if self.img_num_channels == 1:
@@ -531,23 +566,41 @@ class Classifier:
                         val_channel2 = resize(self.val_positive[:,:,:,1], size=self.image_size)
                         if self.img_num_channels == 2:
                             val_class_1 = concat_channels(val_channel1, val_channel2)
-                        else:
+                        elif self.img_num_channels == 3:
                             val_channel3 = resize(self.val_positive[:,:,:,2], size=self.image_size)
                             val_class_1 = concat_channels(val_channel1, val_channel2, val_channel3)
+                        elif self.img_num_channels == 4:
+                            val_channel3 = resize(self.val_positive[:,:,:,2], size=self.image_size)
+                            val_channel4 = resize(self.val_positive[:,:,:,3], size=self.image_size)
+                            val_class_1 = concat_channels(val_channel1, val_channel2, val_channel3, val_channel4)
+                        elif self.img_num_channels == 5:
+                            val_channel3 = resize(self.val_positive[:,:,:,2], size=self.image_size)
+                            val_channel4 = resize(self.val_positive[:,:,:,3], size=self.image_size)
+                            val_channel5 = resize(self.val_positive[:,:,:,4], size=self.image_size)
+                            val_class_1 = concat_channels(val_channel1, val_channel2, val_channel3, val_channel4, val_channel5)
                 else:
                     val_class_1 = None
 
                 if self.val_negative is not None:
                     if self.img_num_channels == 1:
                         val_class_2 = resize(self.val_negative, size=self.image_size)
-                    elif self.img_num_channels > 1:
+                    else:
                         val_channel1 = resize(self.val_negative[:,:,:,0], size=self.image_size)
                         val_channel2 = resize(self.val_negative[:,:,:,1], size=self.image_size)
                         if self.img_num_channels == 2:
                             val_class_2 = concat_channels(val_channel1, val_channel2)
-                        else:
+                        elif self.img_num_channels == 3:
                             val_channel3 = resize(self.val_negative[:,:,:,2], size=self.image_size)
                             val_class_2 = concat_channels(val_channel1, val_channel2, val_channel3)
+                        elif self.img_num_channels == 4:
+                            val_channel3 = resize(self.val_negative[:,:,:,2], size=self.image_size)
+                            val_channel4 = resize(self.val_negative[:,:,:,3], size=self.image_size)
+                            val_class_2 = concat_channels(val_channel1, val_channel2, val_channel3, val_channel4)
+                        elif self.img_num_channels == 5:
+                            val_channel3 = resize(self.val_negative[:,:,:,2], size=self.image_size)
+                            val_channel4 = resize(self.val_negative[:,:,:,3], size=self.image_size)
+                            val_channel5 = resize(self.val_negative[:,:,:,4], size=self.image_size)
+                            val_class_2 = concat_channels(val_channel1, val_channel2, val_channel3, val_channel4, val_channel5)
                 else:
                     val_class_2 = None
             
@@ -572,6 +625,7 @@ class Classifier:
 
             if self.clf == 'alexnet':
 
+                print('AlexNet Kernel Sizes!!!')
                 self.model, self.history = AlexNet(
                     class_1, 
                     class_2, 
@@ -605,8 +659,14 @@ class Classifier:
                     checkpoint=False, 
                     verbose=self.verbose, 
                     save_training_data=save_training, 
-                    path=self.path
-                    )
+                    path=self.path)
+                    #filter_size_1=7,  strides_1=2,  pool_size_1=2, pool_stride_1=2,  # 41→21→11
+                    #filter_size_2=5,  strides_2=1,  pool_size_2=2, pool_stride_2=2,  # 11→11→6
+                    #filter_size_3=3,  strides_3=1,  pool_size_3=2, pool_stride_3=2,  # 6→6→3
+                    #filter_size_4=3,  strides_4=1,
+                    #filter_size_5=3,  strides_5=1)
+                    #filter_1=32, filter_2=64, filter_3=128, filter_4=128, filter_5=128
+                   # )
 
             elif self.clf == 'custom_cnn':
 
@@ -760,16 +820,22 @@ class Classifier:
                     if self.augment_data:
 
                         if self.img_num_channels == 1:
-                            channel1, channel2, channel3 = copy.deepcopy(class_1), None, None 
+                            channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(class_1), None, None, None, None
                         elif self.img_num_channels == 2:
-                            channel1, channel2, channel3 = copy.deepcopy(class_1[:,:,:,0]), copy.deepcopy(class_1[:,:,:,1]), None 
-                        else:
-                            channel1, channel2, channel3 = copy.deepcopy(class_1[:,:,:,0]), copy.deepcopy(class_1[:,:,:,1]), copy.deepcopy(class_1[:,:,:,2])
+                            channel1, channel2, channel3, channel4, channel5  = copy.deepcopy(class_1[:,:,:,0]), copy.deepcopy(class_1[:,:,:,1]), None, None, None
+                        elif self.img_num_channels == 3:
+                            channel1, channel2, channel3, channel4, channel5  = copy.deepcopy(class_1[:,:,:,0]), copy.deepcopy(class_1[:,:,:,1]), copy.deepcopy(class_1[:,:,:,2]), None, None
+                        elif self.img_num_channels == 4:
+                            channel1, channel2, channel3, channel4, channel5  = copy.deepcopy(class_1[:,:,:,0]), copy.deepcopy(class_1[:,:,:,1]), copy.deepcopy(class_1[:,:,:,2]), copy.deepcopy(class_1[:,:,:,3]), None
+                        elif self.img_num_channels == 5:
+                            channel1, channel2, channel3, channel4, channel5  = copy.deepcopy(class_1[:,:,:,0]), copy.deepcopy(class_1[:,:,:,1]), copy.deepcopy(class_1[:,:,:,2]), copy.deepcopy(class_1[:,:,:,3]), copy.deepcopy(class_1[:,:,:,4])
 
                         augmented_images = augmentation(
                             channel1=channel1, 
                             channel2=channel2, 
                             channel3=channel3, 
+                            channel4=channel4, 
+                            channel5=channel5,
                             batch=self.batch_positive, 
                             width_shift=self.shift, 
                             height_shift=self.shift, 
@@ -791,9 +857,15 @@ class Classifier:
                             if self.img_num_channels == 2:
                                 for i in range(len(augmented_images[0])):
                                     class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i]))
-                            else:
+                            elif self.img_num_channels == 3:
                                 for i in range(len(augmented_images[0])):
                                     class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i]))
+                            elif self.img_num_channels == 4:
+                                for i in range(len(augmented_images[0])):
+                                    class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i], augmented_images[3][i]))
+                            elif self.img_num_channels == 5:
+                                for i in range(len(augmented_images[0])):
+                                    class_1.append(concat_channels(augmented_images[0][i], augmented_images[1][i], augmented_images[2][i], augmented_images[3][i], augmented_images[4][i]))
                             class_1 = np.array(class_1)
                         else:
                             class_1 = augmented_images
@@ -802,16 +874,22 @@ class Classifier:
 
                             #Perform same augmentation techniques on negative class data, batch_negative=1 by default
                             if self.img_num_channels == 1:
-                                channel1, channel2, channel3 = copy.deepcopy(class_2), None, None 
+                                channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(class_2), None, None, None, None
                             elif self.img_num_channels == 2:
-                                channel1, channel2, channel3 = copy.deepcopy(class_2[:,:,:,0]), copy.deepcopy(class_2[:,:,:,1]), None 
+                                channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(class_2[:,:,:,0]), copy.deepcopy(class_2[:,:,:,1]), None, None, None
                             elif self.img_num_channels == 3:
-                                channel1, channel2, channel3 = copy.deepcopy(class_2[:,:,:,0]), copy.deepcopy(class_2[:,:,:,1]), copy.deepcopy(class_2[:,:,:,2])
+                                channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(class_2[:,:,:,0]), copy.deepcopy(class_2[:,:,:,1]), copy.deepcopy(class_2[:,:,:,2]), None, None
+                            elif self.img_num_channels == 4:
+                                channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(class_2[:,:,:,0]), copy.deepcopy(class_2[:,:,:,1]), copy.deepcopy(class_2[:,:,:,2]), copy.deepcopy(class_2[:,:,:,3]), None
+                            elif self.img_num_channels == 5:
+                                channel1, channel2, channel3, channel4, channel5 = copy.deepcopy(class_2[:,:,:,0]), copy.deepcopy(class_2[:,:,:,1]), copy.deepcopy(class_2[:,:,:,2]), copy.deepcopy(class_2[:,:,:,3]), copy.deepcopy(class_2[:,:,:,4])
                             
                             augmented_images_negative = augmentation(
                                 channel1=channel1, 
                                 channel2=channel2, 
                                 channel3=channel3, 
+                                channel4=channel4,
+                                channel5=channel5,
                                 batch=self.batch_negative, 
                                 width_shift=self.shift, 
                                 height_shift=self.shift, 
@@ -833,9 +911,15 @@ class Classifier:
                                 if self.img_num_channels == 2:
                                     for i in range(len(augmented_images_negative[0])):
                                         class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i]))
-                                else:
+                                elif self.img_num_channels == 3:
                                     for i in range(len(augmented_images_negative[0])):
                                         class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i], augmented_images_negative[2][i]))
+                                elif self.img_num_channels == 4:
+                                    for i in range(len(augmented_images_negative[0])):
+                                        class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i], augmented_images_negative[2][i], augmented_images_negative[3][i]))
+                                elif self.img_num_channels == 5:
+                                    for i in range(len(augmented_images_negative[0])):
+                                        class_2.append(concat_channels(augmented_images_negative[0][i], augmented_images_negative[1][i], augmented_images_negative[2][i], augmented_images_negative[3][i], augmented_images_negative[4][i]))
                                 class_2 = np.array(class_2)
                             else:
                                 class_2 = augmented_images_negative
@@ -854,9 +938,18 @@ class Classifier:
                             channel2 = resize(class_2[:,:,:,1], size=self.image_size)
                             if self.img_num_channels == 2:
                                 class_2 = concat_channels(channel1, channel2)
-                            else:
+                            elif self.img_num_channels == 3:
                                 channel3 = resize(class_2[:,:,:,2], size=self.image_size)
                                 class_2 = concat_channels(channel1, channel2, channel3)
+                            elif self.img_num_channels == 4:
+                                channel3 = resize(class_2[:,:,:,2], size=self.image_size)
+                                channel4 = resize(class_2[:,:,:,3], size=self.image_size)
+                                class_2 = concat_channels(channel1, channel2, channel3, channel4)
+                            elif self.img_num_channels == 5:
+                                channel3 = resize(class_2[:,:,:,2], size=self.image_size)
+                                channel4 = resize(class_2[:,:,:,3], size=self.image_size)
+                                channel5 = resize(class_2[:,:,:,4], size=self.image_size)
+                                class_2 = concat_channels(channel1, channel2, channel3, channel4, channel5)
 
                         if val_class_1 is not None:
                             if self.img_num_channels == 1:
@@ -866,9 +959,18 @@ class Classifier:
                                 val_channel2 = resize(val_class_1[:,:,:,1], size=self.image_size)
                                 if self.img_num_channels == 2:
                                     val_class_1 = concat_channels(val_channel1, val_channel2)
-                                else:
+                                elif self.img_num_channels == 3:
                                     val_channel3 = resize(val_class_1[:,:,:,2], size=self.image_size)
                                     val_class_1 = concat_channels(val_channel1, val_channel2, val_channel3)
+                                elif self.img_num_channels == 4:
+                                    val_channel3 = resize(val_class_1[:,:,:,2], size=self.image_size)
+                                    val_channel4 = resize(val_class_1[:,:,:,3], size=self.image_size)
+                                    val_class_1 = concat_channels(val_channel1, val_channel2, val_channel3, val_channel4)
+                                elif self.img_num_channels == 5:
+                                    val_channel3 = resize(val_class_1[:,:,:,2], size=self.image_size)
+                                    val_channel4 = resize(val_class_1[:,:,:,3], size=self.image_size)
+                                    val_channel5 = resize(val_class_1[:,:,:,4], size=self.image_size)
+                                    val_class_1 = concat_channels(val_channel1, val_channel2, val_channel3, val_channel4, val_channel5)
 
                         if val_class_2 is not None:
                             if self.img_num_channels == 1:
@@ -878,9 +980,18 @@ class Classifier:
                                 val_channel2 = resize(val_class_2[:,:,:,1], size=self.image_size)
                                 if self.img_num_channels == 2:
                                     val_class_2 = concat_channels(val_channel1, val_channel2)
-                                else:
+                                elif self.img_num_channels == 3:
                                     val_channel3 = resize(val_class_2[:,:,:,2], size=self.image_size)
                                     val_class_2 = concat_channels(val_channel1, val_channel2, val_channel3)
+                                elif self.img_num_channels == 4:
+                                    val_channel3 = resize(val_class_2[:,:,:,2], size=self.image_size)
+                                    val_channel4 = resize(val_class_2[:,:,:,3], size=self.image_size)
+                                    val_class_2 = concat_channels(val_channel1, val_channel2, val_channel3, val_channel4)
+                                elif self.img_num_channels == 5:
+                                    val_channel3 = resize(val_class_2[:,:,:,2], size=self.image_size)
+                                    val_channel4 = resize(val_class_2[:,:,:,3], size=self.image_size)
+                                    val_channel5 = resize(val_class_2[:,:,:,4], size=self.image_size)
+                                    val_class_2 = concat_channels(val_channel1, val_channel2, val_channel3, val_channel4, val_channel5)
 
                          #Balance the class sizes if necessary
                         if self.balance:
@@ -1482,13 +1593,17 @@ class Classifier:
 
         #The augmentation function takes in each channel as individual inputs
         if self.img_num_channels == 1:
-            channel1, channel2, channel3 = self.positive_class, None, None 
+            channel1, channel2, channel3, channel4, channel5 = self.positive_class, None, None, None, None
         elif self.img_num_channels == 2:
-            channel1, channel2, channel3 = self.positive_class[:,:,:,0], self.positive_class[:,:,:,1], None 
+            channel1, channel2, channel3, channel4, channel5 = self.positive_class[:,:,:,0], self.positive_class[:,:,:,1], None, None, None
         elif self.img_num_channels == 3:
-            channel1, channel2, channel3 = self.positive_class[:,:,:,0], self.positive_class[:,:,:,1], self.positive_class[:,:,:,2]
+            channel1, channel2, channel3, channel4, channel5 = self.positive_class[:,:,:,0], self.positive_class[:,:,:,1], self.positive_class[:,:,:,2], None, None
+        elif self.img_num_channels == 4:
+            channel1, channel2, channel3, channel4, channel5 = self.positive_class[:,:,:,0], self.positive_class[:,:,:,1], self.positive_class[:,:,:,2], self.positive_class[:,:,:,3], None
+        elif self.img_num_channels == 5:
+            channel1, channel2, channel3, channel4, channel5 = self.positive_class[:,:,:,0], self.positive_class[:,:,:,1], self.positive_class[:,:,:,2], self.positive_class[:,:,:,3], self.positive_class[:,:,:,4]
         
-        self.positive_class = augmentation(channel1, channel2, channel3, batch=batch, width_shift=width_shift, height_shift=height_shift, 
+        self.positive_class = augmentation(channel1, channel2, channel3, channel4, channel5, batch=batch, width_shift=width_shift, height_shift=height_shift, 
             horizontal=horizontal, vertical=vertical, rotation=rotation, fill=fill, image_size=image_size, zoom_range=zoom_range, 
             mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, blending_func=blending_func, num_images_to_blend=num_images_to_blend, 
             skew_angle=skew_angle, return_stacked=True)
@@ -1560,13 +1675,17 @@ class Classifier:
 
         #The augmentation function takes in each channel as individual inputs
         if self.img_num_channels == 1:
-            channel1, channel2, channel3 = self.negative_class, None, None 
+            channel1, channel2, channel3, channel4, channel5 = self.negative_class, None, None, None, None 
         elif self.img_num_channels == 2:
-            channel1, channel2, channel3 = self.negative_class[:,:,:,0], self.negative_class[:,:,:,1], None 
+            channel1, channel2, channel3, channel4, channel5 = self.negative_class[:,:,:,0], self.negative_class[:,:,:,1], None, None, None
         elif self.img_num_channels == 3:
-            channel1, channel2, channel3 = self.negative_class[:,:,:,0], self.negative_class[:,:,:,1], self.negative_class[:,:,:,2]
+            channel1, channel2, channel3, channel4, channel5 = self.negative_class[:,:,:,0], self.negative_class[:,:,:,1], self.negative_class[:,:,:,2], None, None
+        elif self.img_num_channels == 4:
+            channel1, channel2, channel3, channel4, channel5 = self.negative_class[:,:,:,0], self.negative_class[:,:,:,1], self.negative_class[:,:,:,2], self.negative_class[:,:,:,3], None
+        elif self.img_num_channels == 5:
+            channel1, channel2, channel3, channel4, channel5 = self.negative_class[:,:,:,0], self.negative_class[:,:,:,1], self.negative_class[:,:,:,2], self.negative_class[:,:,:,3], self.negative_class[:,:,:,4]
         
-        self.negative_class = augmentation(channel1, channel2, channel3, batch=batch, width_shift=width_shift, height_shift=height_shift, 
+        self.negative_class = augmentation(channel1, channel2, channel3, channel4, channel5, batch=batch, width_shift=width_shift, height_shift=height_shift, 
             horizontal=horizontal, vertical=vertical, rotation=rotation, fill=fill, image_size=image_size, zoom_range=zoom_range, 
             mask_size=mask_size, num_masks=num_masks, blend_multiplier=blend_multiplier, blending_func=blending_func, num_images_to_blend=num_images_to_blend, 
             skew_angle=skew_angle, return_stacked=True)
@@ -4248,3 +4367,8 @@ def format_labels(labels: list) -> list:
         new_labels.append(label.title())
 
     return new_labels
+
+
+
+
+

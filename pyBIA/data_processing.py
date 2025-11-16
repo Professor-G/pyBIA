@@ -89,9 +89,9 @@ def crop_image(data, x, y, size=50, invert=False):
 
     return out
 
-def concat_channels(channel1, channel2, channel3=None):
+def concat_channels(channel1, channel2, channel3=None, channel4=None, channel5=None):
     """
-    Concatenate up to three single-band 2D images along a new last axis, producing a multi-channel tensor.
+    Concatenate up to FIVE single-band 2D images along a new last axis, producing a multi-channel tensor.
 
     Parameters
     ----------
@@ -101,6 +101,11 @@ def concat_channels(channel1, channel2, channel3=None):
         2D array for the second channel (H × W). Must have the same height and width as the other channels.
     channel3 : ndarray or None, optional
         2D array for the third channel (H × W). Must have the same height and width as the other channels. Default is None.
+    channel4 : ndarray or None, optional
+        2D array for the third channel (H × W). Must have the same height and width as the other channels. Default is None.
+    channel5 : ndarray or None, optional
+        2D array for the third channel (H × W). Must have the same height and width as the other channels. Default is None.
+    
 
     Returns
     -------
@@ -108,10 +113,14 @@ def concat_channels(channel1, channel2, channel3=None):
         3D array of shape (H, W, C) where C is 2 if `channel3` is None, otherwise 3. The dtype matches the input arrays.
     """
     
-    if channel3 is None:
+    if channel3 is None and channel4 is None and channel5 is None: # only the required two channels input
         colorized = (channel1[..., np.newaxis], channel2[..., np.newaxis])
-    else:
+    elif channel3 is not None and channel4 is None and channel5 is None: # three channels were input
         colorized = (channel1[..., np.newaxis], channel2[..., np.newaxis], channel3[..., np.newaxis])
+    elif channel3 is not None and channel4 is not None and channel5 is None: # four channels were input
+        colorized = (channel1[..., np.newaxis], channel2[..., np.newaxis], channel3[..., np.newaxis], channel4[..., np.newaxis])
+    else: #all five channels are input
+        colorized = (channel1[..., np.newaxis], channel2[..., np.newaxis], channel3[..., np.newaxis], channel4[..., np.newaxis], channel5[..., np.newaxis])
 
     return np.concatenate(colorized, axis=-1)
 

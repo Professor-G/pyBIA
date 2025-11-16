@@ -21,6 +21,8 @@ def augmentation(
     channel1, 
     channel2=None, 
     channel3=None, 
+    channel4=None,
+    channel5=None,
     batch=1, 
     width_shift=0, 
     height_shift=0, 
@@ -49,6 +51,10 @@ def augmentation(
         Second channel aligned to `channel1`, shape (H×W) or (N×H×W). Default is None.
     channel3 : ndarray or None, optional
         Third channel aligned to `channel1`, shape (H×W) or (N×H×W). Default is None.
+    channel4 : ndarray or None, optional
+        Fourth channel aligned to `channel1`, shape (H×W) or (N×H×W). Default is None.
+    channel5 : ndarray or None, optional
+        Fifth channel aligned to `channel1`, shape (H×W) or (N×H×W). Default is None.
     batch : int, optional
         Number of augmented samples to generate per input image. Default is 1.
     width_shift : int, optional
@@ -90,11 +96,16 @@ def augmentation(
         Augmented images for `channel2` when provided and `return_stacked` is False, same length and shape as `aug1`.
     aug3 : ndarray, optional
         Augmented images for `channel3` when provided and `return_stacked` is False, same length and shape as `aug1`.
+    aug4 : ndarray, optional
+        Augmented images for `channel4` when provided and `return_stacked` is False, same length and shape as `aug1`.
+    aug5 : ndarray, optional
+        Augmented images for `channel5` when provided and `return_stacked` is False, same length and shape as `aug1`.
     stacked : ndarray
-        If `return_stacked` is True, a single array of shape (M×H×W×C) with C equal to the number of provided channels (2 or 3).
+        If `return_stacked` is True, a single array of shape (M×H×W×C) with C equal to the number of provided channels (2 or 3 or 4 or 5).
 
     Notes
     -----
+    - Channels must be input in order, i.e., do not input channel4 is channel3 is None!
     - Identical random seeds are reused across channels so that all spatial transforms (shift/flip/rotate/zoom/skew, blending, cutouts) are aligned.
     - If `mask_size` is provided, `num_masks` must also be provided (and vice-versa).
     - `width_shift` and `height_shift` must be integers specifying pixel ranges.
@@ -105,10 +116,14 @@ def augmentation(
         if channel2 is None:
             return channel1 
         else:
-            if channel3 is None:
+            if channel3 is None and channel4 is None and channel5 is None:
                 return channel1, channel2
-            else:
+            elif channel3 is not None and channel4 is None and channel5 is None:
                 return channel1, channel2, channel3
+            elif channel3 is not None and channel4 is not None and channel5 is None:
+                return channel1, channel2, channel3, channel4
+            elif channel3 is not None and channel4 is not None and channel5 is not None:
+                return channel1, channel2, channel3, channel4, channel5
 
     if isinstance(width_shift, int) == False or isinstance(height_shift, int) == False:
         raise ValueError("Shift parameters must be integers indicating +- pixel range")
@@ -288,10 +303,128 @@ def augmentation(
             a.append(random_cutout(augmented_data3[i], mask_size=mask_size, num_masks=num_masks, seed=seeds_mask[i]))
         augmented_data3 = np.array(a)
 
-    if return_stacked:
-        return concat_channels(augmented_data, augmented_data2, augmented_data3)
+
+
+
+
+
+
+
+
+    if channel4 is None:
+        if return_stacked:
+            return concat_channels(augmented_data, augmented_data2, augmented_data3)
+        else:
+            return augmented_data, augmented_data2, augmented_data3
     else:
-        return augmented_data, augmented_data2, augmented_data3
+        if len(channel4.shape) == 3: 
+            data = np.array(np.expand_dims(channel4, axis=-1))
+        elif len(channel4.shape) == 2:
+            data = np.array(np.expand_dims(channel4, axis=-1))
+            data = data.reshape((1,) + data.shape)
+   
+        augmented_data4, k = [], 0
+        for i in np.arange(0, len(data)):
+            original_data = data[i].reshape((1,) + data[-i].shape)
+            for j in range(batch):
+                augment = datagen.flow(original_data, batch_size=1, seed=seeds[k])
+                augmented_data_batch = augment.__next__()[0]
+                width, height = augmented_data_batch.shape[:2]
+                augmented_data_reshaped = np.reshape(augmented_data_batch, (width, height))
+                if zoom_range is not None:
+                    augmented_data4.append(resize(random_zoom(augmented_data_reshaped, zoom_min=zoom_range[0], zoom_max=zoom_range[1], seed=seeds[k]), image_size))
+                else:
+                    augmented_data4.append(resize(augmented_data_reshaped, image_size))
+                k += 1
+
+    augmented_data4 = np.array(augmented_data4)
+
+    if skew_angle != 0:
+        a = [] #Individual images will be input independently to ensure proper seed use
+        for i in range(len(augmented_data4)):
+            a.append(random_skew(augmented_data4[i], max_angle=skew_angle, seed=seeds_skew[i]))
+        augmented_data4 = np.array(a)
+
+    if blend_multiplier >= 1:
+        a = [] #Individual images will be input independently to a list to ensure reproducibility across all channels
+        for i in range(int(blend_multiplier*len(augmented_data4))):
+            blended_image = image_blending(augmented_data4, num_augmentations=1, blending_func=blending_func, num_images_to_blend=num_images_to_blend, seed=seeds_blend[i])
+            a.append(blended_image[0])
+        augmented_data4 = np.array(a)
+
+    if mask_size is not None:
+        a = [] #Individual images will be input independently to ensure proper seed use
+        for i in range(len(augmented_data4)):
+            a.append(random_cutout(augmented_data4[i], mask_size=mask_size, num_masks=num_masks, seed=seeds_mask[i]))
+        augmented_data4 = np.array(a)
+
+
+
+
+
+
+
+    if channel5 is None:
+        if return_stacked:
+            return concat_channels(augmented_data, augmented_data2, augmented_data3, augmented_data4)
+        else:
+            return augmented_data, augmented_data2, augmented_data3, augmented_data4
+    else:
+        if len(channel5.shape) == 3: 
+            data = np.array(np.expand_dims(channel5, axis=-1))
+        elif len(channel5.shape) == 2:
+            data = np.array(np.expand_dims(channel5, axis=-1))
+            data = data.reshape((1,) + data.shape)
+   
+        augmented_data5, k = [], 0
+        for i in np.arange(0, len(data)):
+            original_data = data[i].reshape((1,) + data[-i].shape)
+            for j in range(batch):
+                augment = datagen.flow(original_data, batch_size=1, seed=seeds[k])
+                augmented_data_batch = augment.__next__()[0]
+                width, height = augmented_data_batch.shape[:2]
+                augmented_data_reshaped = np.reshape(augmented_data_batch, (width, height))
+                if zoom_range is not None:
+                    augmented_data5.append(resize(random_zoom(augmented_data_reshaped, zoom_min=zoom_range[0], zoom_max=zoom_range[1], seed=seeds[k]), image_size))
+                else:
+                    augmented_data5.append(resize(augmented_data_reshaped, image_size))
+                k += 1
+
+    augmented_data5 = np.array(augmented_data5)
+
+    if skew_angle != 0:
+        a = [] #Individual images will be input independently to ensure proper seed use
+        for i in range(len(augmented_data5)):
+            a.append(random_skew(augmented_data5[i], max_angle=skew_angle, seed=seeds_skew[i]))
+        augmented_data5 = np.array(a)
+
+    if blend_multiplier >= 1:
+        a = [] #Individual images will be input independently to a list to ensure reproducibility across all channels
+        for i in range(int(blend_multiplier*len(augmented_data5))):
+            blended_image = image_blending(augmented_data5, num_augmentations=1, blending_func=blending_func, num_images_to_blend=num_images_to_blend, seed=seeds_blend[i])
+            a.append(blended_image[0])
+        augmented_data5 = np.array(a)
+
+    if mask_size is not None:
+        a = [] #Individual images will be input independently to ensure proper seed use
+        for i in range(len(augmented_data5)):
+            a.append(random_cutout(augmented_data5[i], mask_size=mask_size, num_masks=num_masks, seed=seeds_mask[i]))
+        augmented_data5 = np.array(a)
+
+
+
+
+
+
+
+
+
+
+
+    if return_stacked:
+        return concat_channels(augmented_data, augmented_data2, augmented_data3, augmented_data4, augmented_data5)
+    else:
+        return augmented_data, augmented_data2, augmented_data3, augmented_data4, augmented_data5
 
 def random_cutout(
     images, 
@@ -505,7 +638,7 @@ def resize(data, size=50):
         return resized_data
     else:
         resized_images = [] 
-        filter1, filter2, filter3 = [], [], []
+        filter1, filter2, filter3, filter4, filter5 = [], [], [], [], []
         for i in np.arange(0, len(data)):
             if len(data[i].shape) == 2:
                 resized_images.append(crop_image(np.array(np.expand_dims(data[i], axis=-1))[:, :, 0], int(width/2.), int(height/2.), size))
@@ -514,10 +647,14 @@ def resize(data, size=50):
                     filter1.append(crop_image(data[i][:, :, 0], int(width/2.), int(height/2.), size))
                 if data[i].shape[-1] >= 2:
                     filter2.append(crop_image(data[i][:, :, 1], int(width/2.), int(height/2.), size))
-                if data[i].shape[-1] == 3:
-                    filter3.append(crop_image(data[i][:, :, 2], int(width/2.), int(height/2.), size))    
-                if data[i].shape[-1] > 3:
-                    raise ValueError('A maximum of 3 filters is currently supported!')            
+                if data[i].shape[-1] >= 3:
+                    filter3.append(crop_image(data[i][:, :, 2], int(width/2.), int(height/2.), size))   
+                if data[i].shape[-1] >= 4:
+                    filter4.append(crop_image(data[i][:, :, 3], int(width/2.), int(height/2.), size)) 
+                if data[i].shape[-1] == 5:
+                    filter5.append(crop_image(data[i][:, :, 4], int(width/2.), int(height/2.), size))       
+                if data[i].shape[-1] > 5:
+                    raise ValueError('A maximum of 5 filters is currently supported!')            
             else:
                 raise ValueError('Invalid data input size, the images must be shaped as follows (# of samples, width, height, filters)')
 
@@ -529,6 +666,10 @@ def resize(data, size=50):
                     resized_images.append(concat_channels(filter1[j], filter2[j]))
                 elif data[i].shape[-1] == 3:
                     resized_images.append(concat_channels(filter1[j], filter2[j], filter3[j]))
+                elif data[i].shape[-1] == 4:
+                    resized_images.append(concat_channels(filter1[j], filter2[j], filter3[j], filter4[j]))
+                elif data[i].shape[-1] == 5:
+                    resized_images.append(concat_channels(filter1[j], filter2[j], filter3[j], filter4[j], filter5[j]))
                 
     resized_data = np.array(resized_images)
 

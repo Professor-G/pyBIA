@@ -169,8 +169,13 @@ class Classifier:
         self.best_params = None 
 
         if self.csv_file is not None:
-            self.data_x = np.array(csv_file[csv_file.columns[:-1]])
+            #
+            feature_names = [feature for feature in csv_file.columns if feature not in ('label')]
+            self.data_x = np.array(csv_file[feature_names])
             self.data_y = csv_file.label
+            #
+            #self.data_x = np.array(csv_file[csv_file.columns[:-1]])
+            #self.data_y = csv_file.label
             print('Successfully loaded the data_x and data_y arrays from the input csv_file!')
         else:
             if self.data_x is None or self.data_y is None:

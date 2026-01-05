@@ -38,7 +38,7 @@ pyBIA is built on four interconnected modules that streamline the transition fro
 .. grid:: 2
    :gutter: 3
 
-   .. grid-item-card:: 1. Catalog Generation
+   .. grid-item-card:: Catalog Generation
       :link: source/Catalog%20Generation.html
       :text-align: center
       :class-card: intro-card
@@ -48,10 +48,9 @@ pyBIA is built on four interconnected modules that streamline the transition fro
          :width: 150px
          :class: no-scaled-link
 
-      **From Image to Data**
       Extract sources using segmentation maps, compute morphological moments, and generate photometric catalogs automatically.
 
-   .. grid-item-card:: 2. Supervised Learning
+   .. grid-item-card:: Supervised Learning
       :link: source/Supervised%20Learning%20Algorithms.html
       :text-align: center
       :class-card: intro-card
@@ -61,10 +60,9 @@ pyBIA is built on four interconnected modules that streamline the transition fro
          :width: 150px
          :class: no-scaled-link
 
-      **Ensemble Classification**
       Train robust classifiers (XGBoost, Random Forest, etc.) with built-in **BorutaSHAP** feature selection and **Optuna** hyperparameter optimization.
 
-   .. grid-item-card:: 3. Anomaly Detection
+   .. grid-item-card:: Anomaly Detection
       :link: source/Anomaly%20Detection.html
       :text-align: center
       :class-card: intro-card
@@ -74,20 +72,18 @@ pyBIA is built on four interconnected modules that streamline the transition fro
          :width: 150px
          :class: no-scaled-link
 
-      **Unsupervised Filtering**
       Identify and remove imaging artifacts or outliers using Isolation Forests on extracted feature vectors (HOG, FFT, Wavelet).
 
-   .. grid-item-card:: 4. Deep Learning
+   .. grid-item-card:: Deep Learning Classification
       :link: source/Deep%20Learning%20Algorithms.html
       :text-align: center
       :class-card: intro-card
 
       .. image:: _static/cnn_model_img_link.png
-         :alt: Deep Learning
+         :alt: Deep Learning Classification
          :width: 150px
          :class: no-scaled-link
 
-      **CNN Classification**
       Train pre-built convolutional neural networks (AlexNet, ResNet18, VGG16) on single or multi-band imaging (up to 3 channels), with automated data augmentation and cross-validation.
 
 ---

@@ -14,7 +14,7 @@ While we configured pyBIA for astrophysical image filtering of diffuse Lyman-alp
 
 
 Example
-========
+-----------
 
 The multi-band data for 20 lens candidates can be :download:`downloaded here <lenses.npy>`.
 An accompanying set of 500 images to be used for the negative class can be :download:`downloaded here <other.npy>`.

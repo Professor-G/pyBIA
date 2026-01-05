@@ -6,29 +6,15 @@
 Welcome to pyBIA
 ================
 
-.. image:: _static/pyBIA_logo.png
-   :alt: pyBIA Logo
-   :align: center
-   :width: 400px
-   :class: no-scaled-link
+.. admonition:: Under Construction (last updated 2026-01-04)
 
-.. raw:: html
+   This documentation is still being written and may change frequently!
 
-   <br>
-
-**pyBIA** (Blob Identification Algorithm) is an open-source Python framework designed for the automated detection and classification of spatially extended and diffuse Lyman-alpha emission at high redshift (i.e., blob-like objects), such as Lyman-alpha blobs (LABs).
+**pyBIA** (Blob Identification Algorithm) is an open-source Python framework designed for the automated detection and classification of spatially extended and diffuse Lyman-alpha emission at high redshift (i.e., blob-like objects), such as Lyman-alpha blobs (LABs). The software was developed to support the research in **Godines, D. & Prescott, K. M. (2025, submitted)**. If you use this code for publication, we would appreciate citations to the paper.
 
 By integrating source detection, aperture photometry, morphological segmentation, and state-of-the-art machine learning, pyBIA provides a complete pipeline for reducing millions of cataloged sources into a small candidate list for follow-up study. While optimized for high-redshift astronomy, its modular architecture makes it a powerful tool for any domain requiring **image segmentation**, **anomaly detection**, or **classification**.
 
 Note that all stochastic processes (e.g., model initialization, data shuffling) are controlled by a global seed attribute, ``SEED_NO``, available in every core module. The default seed is set to **1909**. You can override this during class initialization to ensure your results are deterministic and reproducible (set to ``None`` for random runs.)
-
-.. admonition:: Project Status
-   :class: note
-
-   This documentation is under active development (Last updated: January 2026).
-   The software was developed to support the research in **Godines & Prescott (2025, submitted)**. If you use this code for publication, we would appreciate citations to the paper.
-
----
 
 Key Features
 ============
@@ -86,8 +72,6 @@ pyBIA is built on four interconnected modules that streamline the transition fro
 
       Train pre-built convolutional neural networks (AlexNet, ResNet18, VGG16) on single or multi-band imaging (up to 3 channels), with automated data augmentation and cross-validation.
 
----
-
 Quick Start
 ===========
 
@@ -113,9 +97,7 @@ Citation
 
 If you use pyBIA in your research, please cite the following paper:
 
-    **Godines, D. & Prescott, K. M. (2025, submitted).** 
-
----
+    **Godines, D. & Prescott, K. M. (2025, submitted)** 
 
 User Guide
 ==========

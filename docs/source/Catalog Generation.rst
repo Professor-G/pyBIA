@@ -1,50 +1,121 @@
 .. _catalog:
 
 Morphological Catalog
-===========
+=====================
 
 .. admonition:: Under Construction (last updated 2026-01-04)
 
    This documentation is still being written and may change frequently!
 
+The `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module is the engine of pyBIA’s feature extraction pipeline. It handles source detection, photometry, and the calculation of advanced morphological descriptors necessary for machine learning classification.
 
-The `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module available in pyBIA provides functionality for source detection in astrophysical images, as well as subsequent catalog generation during which photometric and morphological features are computed. The morphological image descriptors pyBIA computes are derived using an image segmentation routine which isolates the pixels composing the source. These source characteristics includes raw image moments as well as invariants such as Hu moments. In addition, pyBIA utilizes the PhotUtils `SourceCatalog <https://photutils.readthedocs.io/en/latest/api/photutils.segmentation.SourceCatalog.html#photutils.segmentation.SourceCatalog>`_ API to compute additional morphological properties including common SourceExtractor parameters. 
+By integrating **image segmentation** with **orthonormal moment analysis**, pyBIA converts raw pixel data into a structured feature matrix containing:
 
-If you have a 2D array, but no positions, creating a catalog is quick and easy using the `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module:
+* **Photometry:** Fluxes, magnitudes, and photometric errors.
+* **Geometric Invariants:** Hu moments and raw image moments.
+* **Orthogonal Features:** Legendre moments for uncorrelated shape description.
+* **Morphometry:** Standard SourceExtractor-like shape parameters (ellipticity, FWHM, etc.).
+
+Quick Start
+-----------
+
+If you have a 2D image array containing many sources, and do not require specific positional extraction, you can generate a catalog immediately using the built-in auto-detection:
 
 .. code-block:: python
 
     from pyBIA import catalog
 
+    # Instantiate the Catalog class (data is the image)
     cat = catalog.Catalog(data)
+
+    # Run the source-detection and image segmetation routine
     cat.create(save_file=True)
 
-Positional arguments can be input if source locations are known, with optional parameters available to control background subtraction, source detection thresholds, and flux calculations. If the error map is provided, the output catalog will contain the photometric error as well; likewise, if the zeropoint (``zp``) is input, the catalog will contain the apparent magnitudes. The catalog that is generated can be accessed via the ``cat`` class attribute which will be a dataframe containing all of the source features. These computed features can then be used to train a machine learning model using the `ensemble_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html>`_ module. 
+    # The catalog is stored in the ``cat`` class attribute 
+    print(cat.cat)
 
-Overview
------------
+Computed Features
+-----------------
 
-By design, the catalog class requires that the source position(s) (in pixels relative to the image) be input alongside the image data. These positions are input as the ``x`` and ``y`` parameters. The pipeline begins by centering about the input position(s), cropping a square sub-image around it, and then performs the image segmentation. The size of this sub-image (controlled by the ``size`` parameter) is important to control as it determines the maximum extent of segmentation patches, as well as how much of the environment can be captured. By default the ``size`` parameter is set to 100 pixels, which will perform the image segmentation on a 100x100 pixel image centered around each source.
+The resulting catalog is comprehensive, containing approximately 50 columns per source. These are derived from two internal routines:
 
-Background subtraction is also important as this determines the validity of the segmentation patch. By default the catalog class assumes that image-subtraction is required. This is controlled via the ``bkg`` parameter which is None by default. If the images are already background-subtracted, set this parameter to zero. If image-subtraction is required, the local background will be calculated by sigma-clipping the sky present within circular annuli. The radius of the inner annuli is set by the ``annulus_in`` parameter (20 pixels by default), and the radius of the outer annuli is controlled by the ``annulus_out`` parameter (35 pixels by default). These radii must be greater than the ``aperture`` parameter, which sets the radius of the circular aperture used to compute the source flux (15 pixels by default).
+1.  **Moments Analysis** (`pyBIA.image_moments`):
+    Calculates pixel-intensity weighted moments on the segmented source.
 
-Other important parameters to consider include the segmentation detection threshold (``nsig``), which represents the standard deviations above the background noise a pixel must be to be included in the segmentation patch. Larger values constrain the segmentation patch to brighter pixels. There is also the ``deblend`` option which determines whether source deblending takes place, which is set to ``False`` by default and is the recommended setting for capturing environmental characteristics (e.g., adjacent galaxies part of a proto-cluster). We also include a ``threshold`` parameter which is used to control non-detections, which are sources for which no segmentation patch could be generated. This can happen if the source is faint and the ``nsig`` detection threshold is too high. By default this parameter is set to 10 pixels, meaning that the nearest segmentation patch to the source position will be taken to be the source, but only if it is present within a circular aperture centered about the input position with a radius of 10 pixels. Therefore, to require that the image segmentation patch be present at the input position(s), set the ``threshold`` parameter to zero. If no image segmentation patch exists within the circular aperture determine by the ``threshold``, the catalog will input a sentinel value of -999 on all of the morphological features, which effectively flags this as a non-detection. Note that the flux/magnitude measurements will still be recorded, as these are independent of the image segmentation.
+    * **Raw & Central Moments:** (:math:`M_{00}` ... :math:`M_{03}`) describing spatial distribution.
+    * **Hu Moments:** Scale, translation, and rotation invariant moments (:math:`Hu_1` ... :math:`Hu_7`).
+    * **Legendre Moments:** Orthonormal moments (:math:`L_{00}` ... :math:`L_{21}`) computed up to the 3rd order. Unlike raw moments, these provide an orthogonal representation of the source profile, reducing feature correlation.
 
-When generating the catalog, users can input corresponding arrays containing object name(s), field name(s), and/or flag(s) (i.e., class labels). These are appended to the catalog to facilitate comprehensive dataframe construction. Optional instrumentation and observational parameters includes the zeropoint (``zp``) as well as the exposure time (``exptime``), which are used to calculate magnitudes and normalize the pixel intensities, respectively. The resulting image segmentation can also be further controlled via the ``kernel_size``, ``npixels``, and ``connectivity`` parameters, which control how the data is convolved, how many connecting pixels are required to detect a source, and what the connectivitiy scheme should be (touch along edges or edge/corners). 
+2.  **Morphometry** (`photutils.segmentation`):
+    Shape, size, and photometric parameters compatible with SourceExtractor definitions.
 
-Example
------------
+    * **Shape & Geometry:** Ellipticity, Elongation, Eccentricity, Orientation, Perimeter, and Equivalent Radius.
+    * **Covariance & Ellipse:** Covariance Eigenvalues (:math:`\lambda_1, \lambda_2`), Covariance Matrix elements (`covar_sigx2`, `covar_sigy2`, `covar_sigxy`), and SourceExtractor ellipse parameters (`cxx`, `cxy`, `cyy`).
+    * **Size & Distribution:** Area (pixels), FWHM (approximate), Semimajor/Semiminor Axis Sigma, and Gini Coefficient.
+    * **Indices & Bounds:** Bounding Box coordinates (`xmin`, `xmax`, `ymin`, `ymax`), Max/Min pixel values, and their corresponding pixel indices.
+    * **Photometry:** Circular Aperture flux (fixed radius) and photometric errors.
 
-In this example we will use the pyBIA.Catalog.catalog class to generate a source catalog of extragalactic images. These include ten thousand galaxies undergoing strong gravitational lensing, and ten thousand galaxies that are not. These sources are simulated in the five bands LSST will observe (grizy), thus we will generate a catalog for all five bands which will then be combined to construct a comprehensive feature matrix to train a classifier for strong lensing detection. 
+Methodology & Parameters
+------------------------
 
-The images have been saved as binary files and are available for download here:
+For scientific workflows, precise control over the extraction window and background estimation is required. The `Catalog` class accepts specific coordinates via `x` and `y`, centering the analysis on your targets.
 
-- `lenses_10k <https://drive.google.com/file/d/1fpr1LIPD08qBkeER0q3hREhdi9g40pDm/view?usp=sharing>`_
-- `nonlenses_10k <https://drive.google.com/file/d/1EQK1o0INWbMpVr-2qh_8MLiDNzG6fyVT/view?usp=sharing>`_ 
+The pipeline follows this logic: **Crop** :math:`\rightarrow` **Background Subtraction** :math:`\rightarrow` **Convolve** :math:`\rightarrow` **Segment** :math:`\rightarrow` **Measure**.
 
-As we are processing individual images, we will construct individual catalogs for each source, one filter at a time. For each filter we will construct individual catalogs for the lenses first and append to a master catalog list, after which this will be repeated for the non-lenses. This master catalog will be merged at the end and saved as a full dataframe.
+.. list-table:: Key Parameters
+   :widths: 20 20 60
+   :header-rows: 1
+
+   * - Parameter
+     - Default
+     - Description
+   * - ``x``, ``y``
+     - None
+     - Pixel coordinates of the source center.
+   * - ``size``
+     - 100
+     - Size (in pixels) of the square cutout window to crop around the source.
+   * - ``bkg``
+     - None
+     - Background mode. Set to ``0`` if data is already background-subtracted. If ``None``, local background is estimated via annuli.
+   * - ``annulus_in``
+     - 20
+     - Inner radius of the background estimation annulus.
+   * - ``annulus_out``
+     - 35
+     - Outer radius of the background estimation annulus.
+   * - ``aperture``
+     - 15
+     - Radius of the circular aperture used for flux calculation.
+   * - ``nsig``
+     - 0.3
+     - Detection threshold (sigma above background) for a pixel to be included in the segmentation map.
+   * - ``deblend``
+     - ``False``
+     - If ``True``, attempts to deblend overlapping sources. ``False`` is recommended for capturing environmental features (e.g., proto-clusters).
+   * - ``threshold``
+     - 10
+     - Validation radius. The nearest segmentation patch is only accepted if it falls within this distance (pixels) from the input center.
+
+.. note::
+   **Non-Detections:** If no segmentation patch is found within the ``threshold`` radius (or if the source is too faint for ``nsig``), pyBIA flags the source as a non-detection. All morphological features (moments, shape) will be set to **-999**. However, forced aperture photometry (flux/magnitude) will still be recorded.
+
+Tutorial: Building an LSST Catalog
+----------------------------------
+
+In this example, we generate a source catalog for a dataset of 20,000 simulated extragalactic sources (10k strong lenses, 10k non-lenses). These sources are simulated in the five bands LSST will observe (*g, r, i, z, y*).
+
+**Data Access**
+You can download the sample binary files here:
+
+* `lenses_10k <https://drive.google.com/file/d/1fpr1LIPD08qBkeER0q3hREhdi9g40pDm/view?usp=sharing>`_
+* `nonlenses_10k <https://drive.google.com/file/d/1EQK1o0INWbMpVr-2qh_8MLiDNzG6fyVT/view?usp=sharing>`_
+
+**Processing Script**
+We will process each band individually, constructing separate catalogs for lenses and non-lenses, and then merging them.
 
 .. code-block:: python
+   :linenos:
 
    import numpy as np 
    import pandas as pd 
@@ -152,20 +223,19 @@ As we are processing individual images, we will construct individual catalogs fo
            df = pd.concat(master_catalog, ignore_index=True)
            df.to_csv(f'segm_catalog_{band}_band.csv', index=False)
 
-
 The five catalogs generated above are available for download here:
 
-- `segm_catalog_g_band <https://drive.google.com/file/d/11IE0XTBl-xI6VtL_6objv5G9IKKt1ZB6/view?usp=sharing>`_
-- `segm_catalog_r_band <https://drive.google.com/file/d/1--JoD2hB_sBb8AwtW4DZVllbQFolpe6v/view?usp=sharing>`_ 
-- `segm_catalog_i_band <https://drive.google.com/file/d/189rstaGZrSBT679SK2HVSBDMTslJPAJw/view?usp=sharing>`_ 
-- `segm_catalog_z_band <https://drive.google.com/file/d/1rqRXs05nPeKB9qQUtEw0BAipTQ9yZ3Y6/view?usp=sharing>`_ 
-- `segm_catalog_y_band <https://drive.google.com/file/d/1Zp0n1xed_EcUsgC3Y4G7GXgrUQOStFCH/view?usp=sharing>`_ 
-
+* `segm_catalog_g_band <https://drive.google.com/file/d/11IE0XTBl-xI6VtL_6objv5G9IKKt1ZB6/view?usp=sharing>`_
+* `segm_catalog_r_band <https://drive.google.com/file/d/1--JoD2hB_sBb8AwtW4DZVllbQFolpe6v/view?usp=sharing>`_
+* `segm_catalog_i_band <https://drive.google.com/file/d/189rstaGZrSBT679SK2HVSBDMTslJPAJw/view?usp=sharing>`_
+* `segm_catalog_z_band <https://drive.google.com/file/d/1rqRXs05nPeKB9qQUtEw0BAipTQ9yZ3Y6/view?usp=sharing>`_
+* `segm_catalog_y_band <https://drive.google.com/file/d/1Zp0n1xed_EcUsgC3Y4G7GXgrUQOStFCH/view?usp=sharing>`_
 
 These catalogs will be merged and used to train a binary classifier using the `ensemble_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html>`_ module. This example is provided in the `Supervised Learning Algorithms <https://pybia.readthedocs.io/en/latest/source/Supervised%20Learning%20Algorithms.html>`_ page. 
 
+**NOTE:** The catalog module also provides a standalone function to plot individual sources and the corresponding image segmentation patches given some set of parameter(s). The `plot_objects_segmentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_objects_segmentation>`_ function allows users to inspect the segmentation masks overlaid on the source. As the source morphological features are dependent on the resulting segmentation, it is important to ensure the generated patches are truly representative of the source morphology. This function allows users to input up to four segmentation detection thresholds (``sigma_values``), so as to visualize how different values affect the resulting source extent.
 
-**NOTE:** The catalog module also provides a standalone function to plot individual sources and the corresponding image segmentation patches given some set of parameter(s). The `plot_objects_segmentation <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.plot_objects_segmentation>`_ function allows users to visualize how the segmentation patches look like. As the source morphological features are dependent on the resulting segmentation, it is important to ensure the generated patches are truly representative of the source morphology. This function allows users to input up to four segmentation detection thresholds, so as to visualize how different values affect the resulting source extent. In the example below we can see how only the i-band imaging yields a positive detection at the strictest threshold of 5.0 sigma -- all other four filters at this detection level would be non-detections and would be cataloed with -999 values. 
+In the example below, we inspect a lens where only the *i-band* yields a positive detection at the strictest threshold (:math:`\sigma=5.0`). The other four filters at this detection level would be non-detections and the corresponding morphological features would thus be cataloged with -999 values. 
 
 .. code-block:: python
 
@@ -229,6 +299,7 @@ These catalogs will be merged and used to train a binary classifier using the `e
 
 .. figure:: _static/segm_example_lens.png
     :align: center
-|
+    :alt: Segmentation Example
+    :width: 800px
 
-
+    Visualization of segmentation maps across 5 bands. The binary masks illustrate the detected morphology at increasing sigma thresholds.

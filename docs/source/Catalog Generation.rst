@@ -3,7 +3,7 @@
 Morphological Catalog
 ===========
 
-.. admonition:: Under Construction (last updated 2025-10-26)
+.. admonition:: Under Construction (last updated 2026-01-04)
 
    This documentation is still being written and may change frequently!
 
@@ -19,7 +19,7 @@ If you have a 2D array, but no positions, creating a catalog is quick and easy u
     cat = catalog.Catalog(data)
     cat.create(save_file=True)
 
-The X and Y pixel arguments can be input if source locations are known, with optional parameters available to control background subtraction, source detection thresholds, and flux calculations. If the error map is provided, the output catalog will contain the photometric error as well; likewise, if the zeropoint (``zp``) is input, the catalog will contain the apparent magnitudes. The catalog that is generated can be accessed via the ``cat`` class attribute which will be a dataframe containing all of the source features. These computed features can then be used to train a machine learning model using the `ensemble_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html>`_ module. 
+Positional arguments can be input if source locations are known, with optional parameters available to control background subtraction, source detection thresholds, and flux calculations. If the error map is provided, the output catalog will contain the photometric error as well; likewise, if the zeropoint (``zp``) is input, the catalog will contain the apparent magnitudes. The catalog that is generated can be accessed via the ``cat`` class attribute which will be a dataframe containing all of the source features. These computed features can then be used to train a machine learning model using the `ensemble_model <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/ensemble_model/index.html>`_ module. 
 
 Overview
 -----------

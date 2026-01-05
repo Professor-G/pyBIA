@@ -19,7 +19,7 @@ By integrating **image segmentation** with **orthonormal moment analysis**, pyBI
 Quick Start
 -----------
 
-If you have a 2D image array containing many sources, and do not require specific positional extraction, you can generate a catalog immediately using the built-in auto-detection:
+If you have a 2D image array containing many sources, and do not require specific positional extraction, you can generate a catalog immediately by simply inputting the data. When no positional arguments are specified, the built-in auto-detection is automatically applied.
 
 .. code-block:: python
 
@@ -33,6 +33,22 @@ If you have a 2D image array containing many sources, and do not require specifi
 
     # The catalog is stored in the ``cat`` class attribute 
     print(cat.cat)
+
+If processing imaging data of single source, set the ``x`` and ``y`` arguments which correspond to the position (in relative pixels) of the source centroid. If the image size is 100 by 100 pixels, for example, and the source in the image center, set these arguments to 50:
+
+.. code-block:: python
+
+    from pyBIA import catalog
+
+    # Instantiate the Catalog class (data is the image)
+    cat = catalog.Catalog(data, x=50, y=50)
+
+    # Run the source-detection and image segmetation routine
+    cat.create(save_file=True)
+
+    # The catalog is stored in the ``cat`` class attribute 
+    print(cat.cat)
+
 
 Computed Features
 -----------------
@@ -62,7 +78,10 @@ For scientific workflows, precise control over the extraction window and backgro
 
 The pipeline follows this logic: **Crop** :math:`\rightarrow` **Background Subtraction** :math:`\rightarrow` **Convolve** :math:`\rightarrow` **Segment** :math:`\rightarrow` **Measure**.
 
-.. list-table:: Key Parameters
+Key Parameters
+~~~~~~~~~~~~~~
+
+.. list-table::
    :widths: 20 20 60
    :header-rows: 1
 
@@ -238,7 +257,8 @@ These catalogs will be merged and used to train a binary classifier using the `e
 In the example below, we inspect a lens where only the *i-band* yields a positive detection at the strictest threshold (:math:`\sigma=5.0`). The other four filters at this detection level would be non-detections and the corresponding morphological features would thus be cataloged with -999 values. 
 
 .. code-block:: python
-
+   :linenos:
+   
    import numpy as np
    from pyBIA import catalog
 

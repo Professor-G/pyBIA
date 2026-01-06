@@ -25,53 +25,41 @@ pyBIA is organized into four interconnected modules that streamline the transiti
 
    .. grid-item-card:: Catalog Generation
       :link: https://pybia.readthedocs.io/en/latest/source/Catalog%20Generation.html
-      :link-type: doc
       :text-align: center
-      :class-card: intro-card
 
       .. image:: _static/catalog_img_link.png
          :alt: Catalog Generation
-         :width: 150px
-         :class: no-scaled-link
+         :width: 200px
 
       Extract sources using segmentation maps, compute morphological moments, and generate photometric/morphological catalogs.
 
    .. grid-item-card:: Supervised Learning
       :link: https://pybia.readthedocs.io/en/latest/source/Supervised%20Learning%20Algorithms.html
-      :link-type: doc
       :text-align: center
-      :class-card: intro-card
 
       .. image:: _static/supervised_model_img_link.png
          :alt: Supervised Learning
-         :width: 150px
-         :class: no-scaled-link
+         :width: 200px
 
       Train robust classifiers (XGBoost, Random Forest, etc.) with built-in **BorutaSHAP** feature selection and **Optuna** hyperparameter optimization.
 
    .. grid-item-card:: Anomaly Detection
       :link: https://pybia.readthedocs.io/en/latest/source/Anomaly%20Detection.html
-      :link-type: doc
       :text-align: center
-      :class-card: intro-card
 
       .. image:: _static/outlier_img_link.png
          :alt: Anomaly Detection
-         :width: 150px
-         :class: no-scaled-link
+         :width: 200px
 
       Identify and remove imaging artifacts/outliers using Isolation Forests on extracted feature vectors (HOG, FFT, Wavelet).
 
    .. grid-item-card:: Deep Learning Classification
       :link: https://pybia.readthedocs.io/en/latest/source/Deep%20Learning%20Algorithms.html
-      :link-type: doc
       :text-align: center
-      :class-card: intro-card
 
       .. image:: _static/cnn_model_img_link.png
          :alt: Deep Learning Classification
-         :width: 150px
-         :class: no-scaled-link
+         :width: 200px
 
       Train pre-built CNN architectures (AlexNet, ResNet18, VGG16) on single or multi-band imaging (up to 5 channels), with automated augmentation and cross-validation.
 

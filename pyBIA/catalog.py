@@ -73,6 +73,10 @@ class Catalog:
     deblend : bool, optional
         If True, enables deblending of overlapping sources. Default is False
         (recommended for diffuse, extended objects).
+    size : int, optional
+        Side length (pixels) of the square cutout used per source. If the image is
+        smaller than `size` along any axis, the largest square that fits is used.
+        Default is 100.
     obj_name : array-like or None, optional
         List of object names for catalog rows.
     field_name : array-like or None, optional
@@ -107,7 +111,6 @@ class Catalog:
         x: np.ndarray | list | None = None,
         y: np.ndarray | list | None = None,
         bkg: float | None = None,
-        size: int = 100,
         error: np.ndarray | None = None,
         zp: float | None = None,
         exptime: float | None = None,
@@ -115,6 +118,7 @@ class Catalog:
         nsig: float = 0.3,
         threshold: int = 10,
         deblend: bool = False,
+        size: int = 100,
         obj_name=None,
         field_name=None,
         flag=None,

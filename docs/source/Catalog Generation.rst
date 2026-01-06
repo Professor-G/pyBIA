@@ -177,9 +177,6 @@ The Catalog class includes the following parameters:
 .. note::
    **Non-detections (morphology):** if the segmentation does not contain a valid central object, pyBIA flags the source as a non-detection and sets all morphology columns to **-999**. Aperture photometry is still recorded.
 
-.. note::
-   **Cutout size:** morphology is measured on local cutouts using an internal default cutout size of 100 pixels (automatically reduced to fit smaller stamps). This cutout size is currently not exposed as a ``Catalog`` initialization parameter.
-
 Example
 ----------------------------------
 

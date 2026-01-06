@@ -1,31 +1,31 @@
-.. pyBIA documentation master file, created by
-   sphinx-quickstart on Thu Mar 24 11:15:14 2022.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Welcome to pyBIA
 ================
 
-.. admonition:: Under Construction (last updated 2026-01-04)
+.. admonition:: Documentation status (last updated |today|)
+   :class: note
 
-   This documentation is still being written and may change frequently!
+   This documentation is actively being developed and may change.
 
-**pyBIA** (Blob Identification Algorithm) is an open-source Python framework designed for the automated detection and classification of spatially extended and diffuse Lyman-alpha emission at high redshift (i.e., blob-like objects), such as Lyman-alpha blobs (LABs). The software was developed to support the research in **Godines, D. & Prescott, K. M. (2025, submitted)**. If you use this code for publication, we would appreciate citations to the paper.
+**pyBIA** (Blob Identification Algorithm) is an open-source Python framework for automated detection and classification of spatially extended, diffuse Lyman-alpha emission at high redshift (i.e., blob-like sources), such as Lyman-alpha blobs (LABs). The software was developed to support the analysis in **Godines, D. & Prescott, K. M. (2025, submitted)**. If you use pyBIA in a publication, we would appreciate citations to the paper as well as the `software release DOI <https://doi.org/10.5281/zenodo.17092327>`_.
 
-By integrating source detection, aperture photometry, morphological segmentation, and state-of-the-art machine learning, pyBIA provides a complete pipeline for reducing millions of cataloged sources into a small candidate list for follow-up study. While optimized for high-redshift astronomy, its modular architecture makes it a powerful tool for any domain requiring **image segmentation**, **anomaly detection**, or **classification**.
+By integrating source detection, aperture photometry, morphological segmentation, and machine learning, pyBIA provides an end-to-end pipeline for reducing large source catalogs into a prioritized candidate list for follow-up study. While optimized for high-redshift astronomy, its modular architecture is broadly useful for workflows requiring **image segmentation**, **anomaly detection**, or **classification**.
 
-Note that all stochastic processes (e.g., model initialization, data shuffling) are controlled by a global seed attribute, ``SEED_NO``, available in every core module. The default seed is set to **1909**. You can override this during class initialization to ensure your results are deterministic and reproducible (set to ``None`` for random runs.)
+Reproducibility
+---------------
+
+Stochastic processes (e.g., model initialization, data shuffling) are controlled by a global seed attribute, ``SEED_NO`` (**1909** by default). You can override this during class initialization to enable reproducible runs (or set it to ``None`` for random runs). Note that while the classical machine-learning workflows are reproducible given a fixed seed, exact determinism for the deep-learning models will still vary unless deterministic TensorFlow settings are explicitly enabled.
 
 Key Features
 ============
 
-pyBIA is built on four interconnected modules that streamline the transition from raw imaging to classified candidates.
+pyBIA is organized into four interconnected modules that streamline the transition from imaging to classified candidates.
 
 .. grid:: 2
    :gutter: 3
 
    .. grid-item-card:: Catalog Generation
-      :link: source/Catalog%20Generation.html
+      :link: source/Catalog Generation
+      :link-type: doc
       :text-align: center
       :class-card: intro-card
 
@@ -34,10 +34,11 @@ pyBIA is built on four interconnected modules that streamline the transition fro
          :width: 150px
          :class: no-scaled-link
 
-      Extract sources using segmentation maps, compute morphological moments, and generate photometric catalogs automatically.
+      Extract sources using segmentation maps, compute morphological moments, and generate photometric/morphological catalogs.
 
    .. grid-item-card:: Supervised Learning
-      :link: source/Supervised%20Learning%20Algorithms.html
+      :link: source/Supervised Learning Algorithms
+      :link-type: doc
       :text-align: center
       :class-card: intro-card
 
@@ -49,7 +50,8 @@ pyBIA is built on four interconnected modules that streamline the transition fro
       Train robust classifiers (XGBoost, Random Forest, etc.) with built-in **BorutaSHAP** feature selection and **Optuna** hyperparameter optimization.
 
    .. grid-item-card:: Anomaly Detection
-      :link: source/Anomaly%20Detection.html
+      :link: source/Anomaly Detection
+      :link-type: doc
       :text-align: center
       :class-card: intro-card
 
@@ -58,10 +60,11 @@ pyBIA is built on four interconnected modules that streamline the transition fro
          :width: 150px
          :class: no-scaled-link
 
-      Identify and remove imaging artifacts or outliers using Isolation Forests on extracted feature vectors (HOG, FFT, Wavelet).
+      Identify and remove imaging artifacts/outliers using Isolation Forests on extracted feature vectors (HOG, FFT, Wavelet).
 
    .. grid-item-card:: Deep Learning Classification
-      :link: source/Deep%20Learning%20Algorithms.html
+      :link: source/Deep Learning Algorithms
+      :link-type: doc
       :text-align: center
       :class-card: intro-card
 
@@ -70,7 +73,7 @@ pyBIA is built on four interconnected modules that streamline the transition fro
          :width: 150px
          :class: no-scaled-link
 
-      Train pre-built convolutional neural networks (AlexNet, ResNet18, VGG16) on single or multi-band imaging (up to 3 channels), with automated data augmentation and cross-validation.
+      Train pre-built CNN architectures (AlexNet, ResNet18, VGG16) on single or multi-band imaging (up to 5 channels), with automated augmentation and cross-validation.
 
 Quick Start
 ===========
@@ -84,7 +87,7 @@ pyBIA requires **Python 3.12+**. Install the latest stable release via pip:
 
     pip install pyBIA
 
-Alternatively, install the development version directly from GitHub:
+Alternatively, install the development version from GitHub:
 
 .. code-block:: bash
 
@@ -95,15 +98,15 @@ Alternatively, install the development version directly from GitHub:
 Citation
 --------
 
-If you use pyBIA in your research, please cite the following paper:
+If you use pyBIA in your research, please cite:
 
-    **Godines, D. & Prescott, K. M. (2025, submitted)** 
+- **Godines, D. & Prescott, K. M. (2025, submitted)**
+- **Godines (2025), Zenodo DOI: https://doi.org/10.5281/zenodo.17092327**
 
 User Guide
 ==========
 
-These sections provide detailed tutorials, API references, and the specific workflows used in our research.
-To learn more about pyBIA's machine learning routines, consult the pages listed below. These pages provide high-level technical details on the program’s core functionality, as well as a dedicated section describing how **Godines, D. & Prescott, K. M. (2025, submitted)**  was produced, including figure-by-figure generation details.
+The pages below provide tutorials, API references, and high-level technical details on the program’s core functionality, as well as a dedicated section describing how **Godines, D. & Prescott, K. M. (2025, submitted)** was produced, including figure-by-figure generation details.
 
 .. toctree::
    :maxdepth: 2

@@ -3,7 +3,7 @@
 Supervised Machine Learning
 ===========
 
-.. admonition:: Under Construction (last updated 2026-01-04)
+.. admonition:: Documentation status (last updated |today|)
 
    This documentation is still being written and may change frequently!
 
@@ -70,16 +70,118 @@ The merged catalog generated above is available for download here:
 
 - `merged_dataframe_five_bands <https://drive.google.com/file/d/11bsdYGTbBjVvnudLRgHcQz8oH6sdtfxB/view?usp=sharing>`_
 
-The code below loads this merged dataframe and constructs the feature matrix and class label arrays.
+The code below loads this merged dataframe and constructs the feature matrix and class label arrays, which are input when instantiating the class. When optimization routines are disabled, the default models are trained, using default hyperparameters.
 
 .. code-block:: python
 
-   import numpy as np
+   import numpy as np  
    import pandas as pd
+   from pyBIA import ensemble_model  
+
+   # Load the dataframe
+   training_data = pd.read_csv('merged_dataframe_five_bands.csv')
+
+   # Select only the columns representing source features (i.e., remove identifiers)
+   columns = [col for col in training_data.columns if col not in ('obj_name', 'flag', 'xpix', 'ypix')]
+
+   # Now construct the training data arrays
+   data_x, data_y = np.array(training_data[columns]), np.array(training_data['flag'])
+
+   # Will run the optimization routine all at once, feature selection first followed by engine hyperparameter optimization
+   # Enabling 10-fold cross validation which increases the hyperparameter optimization time ten-fold
+
+   # XGB-BASED BorutaSHAP
+   SEED_NO = 1909 # The seed number that will initialize the stochastic process (e.g., model training)
+   clf = 'xgb' # The classification model that will be trined, this option trains an XGBoost classifier
+   impute = True # Whether to impute missing values (NaN)
+   optimize = False # Will enable the optimization routine
+
+   # Instantiate the Classifier class
+   model = ensemble_model.Classifier(
+           data_x,
+           data_y,
+           clf=clf,
+           impute=impute,
+           optimize=optimize,
+           SEED_NO=SEE_NO
+           )
+
+   # Create the model (and do the optimizations that were enabled)
+   model.create()
+
+With the model trained, performance via a confusion matrix and/or ROC curves can be visualized. Note that the confusion matrix takes in an optional ``data_y`` argument, which can be a list containing the class labels as you wish them to appear in the image. This is useful if the class labels in the original labels array is numerical, as models like the XGBoost do not allow text-based class labels. Therefore, in this example we construct a list containing the text-based class labels (corresponding to the originally input ``data_y`` labels array), and input when constructing the confusion matrix. Otherwise, in this example the confusion matrix would instead show 1 for the Lens class and 0 for the Non-Lens class. 
+
+
+.. code-block:: python
+
+   k_fold=10
+   title='Confusion Matrix' 
+   savefig=False
+   data_y_labels = ['Lens' if label == 1 else 'Non-Lens' for label in model.data_y]
+
+   model.plot_conf_matrix(
+      data_y=data_y_labels,
+      k_fold=k_fold,
+      title=title,
+      savefig=savefig
+      )
+
+.. figure:: _static/xgb_conf_matrix.png
+    :align: center
+|
+
+.. figure:: _static/xgb_roc.png
+    :align: center
+|
 
 
 
+.. code-block:: python
 
+   import numpy as np  
+   import pandas as pd
+   from pyBIA import ensemble_model  
 
+   # Load the dataframe
+   training_data = pd.read_csv('merged_dataframe_five_bands.csv')
 
+   # Select only the columns representing source features (i.e., remove identifiers)
+   columns = [col for col in training_data.columns if col not in ('obj_name', 'flag', 'xpix', 'ypix')]
+
+   # Now construct the training data arrays
+   data_x, data_y = np.array(training_data[columns]), np.array(training_data['flag'])
+
+   # Will run the optimization routine all at once, feature selection first followed by engine hyperparameter optimization
+   # Enabling 10-fold cross validation which increases the hyperparameter optimization time ten-fold
+
+   # XGB-BASED BorutaSHAP
+   SEED_NO = 1909 # The seed number that will initialize the stochastic process (e.g., model training)
+   clf = 'xgb' # The classification model that will be trined, this option trains an XGBoost classifier
+   impute = True # Whether to impute missing values (NaN)
+   optimize = False # Will enable the optimization routine
+   scoring_metric = 'f1' # The optimization trials will be assessed according to the F1 Score
+   opt_cv = 3 # The number of folds to perform during cross validation, ONLY used during optimization (`optimize`=True)
+   boruta_trials = 100 # Number of feature selection trials to perform (This is fast especially with `boruta_model`='xgb')
+   boruta_model = 'rf' # The model to use when assessing feautre importances during feature selection (either 'rf' or 'xgb', DOES NOT have to match the `clf`)
+   n_iter = 100 # Number of hyperparameter optimization trials to perform, can set to 0 to disable hyperparam tuning
+   limit_search = True # Set to False to expand the hyperparameter search space (will take longer)
+
+   # Instantiate the Classifier class
+   model = ensemble_model.Classifier(
+           data_x,
+           data_y,
+           clf=clf,
+           impute=impute,
+           optimize=optimize,
+           boruta_trials=boruta_trials,
+           boruta_model=boruta_model,
+           n_iter=n_iter,
+           scoring_metric=scoring_metric,
+           opt_cv=opt_cv,
+           limit_search=limit_search,
+           SEED_NO=SEED_NO
+           )
+
+   # Create the model (and do the optimizations that were enabled)
+   model.create()
 

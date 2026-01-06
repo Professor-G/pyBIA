@@ -4,131 +4,186 @@ Morphological Catalog
 =====================
 
 .. admonition:: Documentation status (last updated |today|)
+   :class: note
 
    This documentation is still being written and may change frequently!
 
-The `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module is the engine of pyBIA’s feature extraction and catalog generation pipeline. It handles source detection, photometry, and the calculation of advanced morphological descriptors necessary for machine learning classification.
+The `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module is the core of pyBIA’s feature extraction and catalog-generation pipeline. It performs source detection, aperture photometry, and segmentation-based morphology measurements designed for downstream machine-learning workflows. This is all handled by the `Catalog class <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.Catalog>`_.
 
-By integrating **image segmentation** with **raw and orthonormal moment analysis**, pyBIA converts raw pixel data into a comprehensive feature matrix containing:
+This module combines **image segmentation** (via Astropy's ``photutils``) with **moment-based descriptors** (via the `image_moments <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/image_moments/index.html>`_ module) to convert pixel data into a feature matrix containing:
 
-* **Photometry:** Fluxes, magnitudes, and photometric errors.
-* **Geometric Invariants:** Hu moments, raw image moments, and covariance eigenvalues.
-* **Orthogonal Features:** Legendre moments for uncorrelated shape description.
-* **Morphometry:** Advanced shape parameters (Eccentricity, Gini Coefficient, Asymmetry) and bounding box coordinates.
+* **Photometry:** aperture fluxes and flux errors (and magnitudes if a zeropoint is provided).
+* **Moments:** raw, central, geometrically centered, Hu-invariant, and Legendre moments computed on the segmented source.
+* **Segmentation properties:** shape and intensity statistics (e.g., ellipticity, eccentricity, Gini, bounding box and extrema metadata).
 
 Quick Start
 -----------
 
-If you have a 2D image array containing many sources, and do not require specific positional extraction, you can generate a catalog immediately by simply inputting the data. When no positional arguments are specified, the built-in auto-detection is automatically applied.
+Automatic detection (no input positions)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you provide a 2D image containing many sources and do not specify positions, pyBIA will run segmentation on the full frame and build a catalog for all detected sources:
 
 .. code-block:: python
 
-    from pyBIA import catalog
+   from pyBIA import catalog
 
-    # Instantiate the Catalog class (data is the image)
-    cat = catalog.Catalog(data)
+   # Instantiate the Catalog class (data is the image)
+   cat = catalog.Catalog(data)
 
-    # Run the source-detection and image segmetation routine
-    cat.create(save_file=True)
+   # Run source detection, computing photometric and morphological features
+   cat.create(save_file=True)
 
-    # The catalog is stored in the ``cat`` class attribute 
-    print(cat.cat)
+   # The catalog is stored in the ``cat.cat`` attribute
+   print(cat.cat)
 
-If processing imaging data of single source, set the ``x`` and ``y`` arguments which correspond to the position (in relative pixels) of the source centroid. If the image size is 100 by 100 pixels, for example, and the source in the image center, set these arguments to 50:
+Targeted extraction (user-supplied positions)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you want to measure a specific source (or a set of sources) at known pixel positions, pass ``x`` and ``y`` coordinates (in *relative pixel coordinates* of the input image):
 
 .. code-block:: python
 
-    from pyBIA import catalog
+   from pyBIA import catalog
 
-    # Instantiate the Catalog class (data is the image)
-    cat = catalog.Catalog(data, x=50, y=50)
+   # Example: 100x100 stamp with a source at the center
+   cat = catalog.Catalog(data, x=50, y=50)
+   cat.create(save_file=True)
 
-    # Run the source-detection and image segmetation routine
-    cat.create(save_file=True)
-
-    # The catalog is stored in the ``cat`` class attribute 
-    print(cat.cat)
-
+   print(cat.cat)
 
 Computed Features
 -----------------
 
-The resulting catalog is comprehensive, containing approximately 50 columns per source. These are derived from two internal routines:
+The morphology measurements are produced by two internal components:
 
-1.  **Moments Analysis** (`pyBIA.image_moments`):
-    Calculates pixel-intensity weighted moments on the segmented source.
+When ``morph_params=True`` (default), pyBIA returns a morphology vector with **77 features per source**, produced by two internal components:
 
-    * **Raw & Central Moments:** (:math:`M_{00}` ... :math:`M_{03}`) describing spatial distribution.
-    * **Hu Moments:** Scale, translation, and rotation invariant moments (:math:`Hu_1` ... :math:`Hu_7`).
-    * **Legendre Moments:** Orthonormal moments (:math:`L_{00}` ... :math:`L_{21}`) computed up to the 3rd order. Unlike raw moments, these provide an orthogonal representation of the source profile, reducing feature correlation.
+1. **Moment features** (calculated via ``pyBIA.image_moments.make_moments_table``)
 
-2.  **Morphometry** (`photutils.segmentation`):
-    Shape, size, and photometric parameters compatible with SourceExtractor definitions.
+   Moments are computed on the **segmented source pixels** (all non-source pixels are zeroed prior to measurement). The moments table contains **47 features**:
 
-    * **Shape & Geometry:** Ellipticity, Elongation, Eccentricity, Orientation, Perimeter, and Equivalent Radius.
-    * **Covariance & Ellipse:** Covariance Eigenvalues (:math:`\lambda_1, \lambda_2`), Covariance Matrix elements (`covar_sigx2`, `covar_sigy2`, `covar_sigxy`), and SourceExtractor ellipse parameters (`cxx`, `cxy`, `cyy`).
-    * **Size & Distribution:** Area (pixels), FWHM (approximate), Semimajor/Semiminor Axis Sigma, and Gini Coefficient.
-    * **Indices & Bounds:** Bounding Box coordinates (`xmin`, `xmax`, `ymin`, `ymax`), Max/Min pixel values, and their corresponding pixel indices.
-    * **Photometry:** Circular Aperture flux (fixed radius) and photometric errors.
+   * **Raw moments** up to 3rd order:
+     ``M00, M10, M01, M20, M11, M02, M30, M21, M12, M03``
+   * **Central moments** up to 3rd order:
+     ``mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03``
+   * **Geometrically centered polynomial moments** up to 3rd order:
+     ``G00, G10, G01, G20, G11, G02, G30, G21, G12, G03``
+   * **Hu invariants**:
+     ``Hu1 ... Hu7``
+   * **Legendre moments** (orthonormal) up to total order 3 (n+m ≤ 3):
+     ``L00, L10, L01, L20, L11, L02, L30, L21, L12, L03``
 
-Methodology & Parameters
-------------------------
+2. **Segmentation properties** (computed using ``photutils.segmentation.SourceCatalog``)
 
-The `Catalog` module is designed to produce morphological measurements by isolating sources in local "postage stamp" cutouts. This approach minimizes contamination from neighboring objects and allows for precise local background estimation.
+   For each segmented source, pyBIA records **30** scalar properties, including:
 
-When analyzing specific targets (via input ``x`` and ``y`` coordinates), the pipeline executes the following sequence for each source:
+   * Shape/geometry: ``eccentricity, ellipticity, elongation, orientation, perimeter, equivalent_radius, fwhm``
+   * Intensity/statistics: ``gini, max_value, min_value`` plus index metadata for extrema
+   * Covariance/ellipse terms: ``covar_sigx2, covar_sigy2, covar_sigxy, cxx, cxy, cyy`` and two covariance eigenvalues
+   * Bounds: ``bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax``
+   * A scalar flag: ``isscalar`` (stored as 1 for True, 0 for False)
 
-1.  **Cutout Extraction:** A square sub-image (defined by ``size``) is extracted centered on the target coordinate.
-2.  **Background Subtraction:** The local sky background is estimated using a sigma-clipped annulus (radii ``annulus_in``, ``annulus_out``) and subtracted from the cutout.
-3.  **Signal Processing:** To enhance the signal-to-noise ratio of diffuse emission, the cutout is convolved with a Gaussian kernel prior to detection.
-4.  **Segmentation:** A source mask is generated by identifying all connected pixels above the specified sigma threshold (``nsig``). If ``deblend=True``, overlapping sources within the mask are separated.
-5.  **Feature Measurement:** All morphological features (moments, shape parameters) are computed exclusively on the segmented pixels, while aperture photometry is measured on the original data.
+In total, the default morphology vector contains **77 features per source** (**47** moment features + **30** segmentation properties), plus optional photometry and metadata columns (e.g., ``flux``, ``flux_err``, ``mag``, ``mag_err``, ``median_bkg``, ``xpix``, ``ypix``, ``obj_name``, ``field_name``, ``flag``), depending on which inputs are provided (e.g., ``zp``, ``error``, ``bkg``, and position mode).
+
+Methodology
+-----------
+
+Catalog generation follows one of two workflows depending on whether positions are provided:
+
+Auto-detect mode (``x``/``y`` not provided)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1. **Background subtraction (optional):** if ``bkg=None``, a robust global/tiled sigma-clipped background is subtracted from the full frame prior to segmentation.
+2. **Segmentation:** the background-subtracted image is convolved with a Gaussian kernel (FWHM = 9 pixels; window size set by ``kernel_size``), then thresholded at ``nsig`` using ``photutils.detect_sources`` (with an option to ``deblend`` the detected sources).
+3. **Photometry:** circular-aperture photometry is measured at the detected centroids using radius ``aperture`` (pixels).
+4. **Morphology:** for each detected centroid, a local square cutout of length ``size`` is extracted and morphology features are computed on the segmented pixels.
+
+Targeted mode (``x``/``y`` provided)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When positions are supplied, pyBIA treats each coordinate as an independent measurement:
+
+1. **Photometry:** circular-aperture flux is measured at ``(x, y)`` using radius ``aperture`` (pixels). If ``bkg=None``, a sigma-clipped annulus median (radii ``annulus_in`` and ``annulus_out`` in pixels) is used for local background subtraction and stored as ``median_bkg``.
+2. **Cutout extraction:** a square cutout of length ``size`` is cropped around the target coordinate (automatically reduced if the image is smaller than ``size``).
+3. **Segmentation (cutout):** the cutout is convolved with the Gaussian kernel and segmented using the same ``nsig``/``kernel_size``/``npixels``/``connectivity`` settings (with optional ``deblend``). If ``exptime`` is provided, the cutout is divided by ``exptime`` for segmentation and morphology only (photometry is measured on the original data).
+4. **Central validation:** the detection is accepted only if a segmented region is present near the cutout center. If ``threshold==0``, the central pixel must lie in the segmentation; otherwise, at least one segmented pixel must fall within a central circular mask of radius ``threshold``. The segmented object whose centroid is closest to the cutout center is retained.
+5. **Morphology:** moment features and segmentation properties are computed on the retained segmented pixels. If validation fails, morphology columns are set to ``-999`` while photometry is still reported.
 
 Key Parameters
-~~~~~~~~~~~~~~
+--------------
+
+The Catalog class includes the following parameters:
 
 .. list-table::
-   :widths: 20 20 60
+   :widths: 22 18 60
    :header-rows: 1
 
    * - Parameter
      - Default
      - Description
    * - ``x``, ``y``
-     - None
-     - Pixel coordinates of the source center.
-   * - ``size``
-     - 100
-     - Size (in pixels) of the square cutout window to crop around the source.
+     - ``None``
+     - Source center pixel coordinates. If ``None``, pyBIA runs automatic detection on the full frame.
    * - ``bkg``
-     - None
-     - Background mode. Set to ``0`` if data is already background-subtracted. If ``None``, local background is estimated via annuli.
-   * - ``annulus_in``
-     - 20
-     - Inner radius of the background estimation annulus.
-   * - ``annulus_out``
-     - 35
-     - Outer radius of the background estimation annulus.
-   * - ``aperture``
-     - 15
-     - Radius of the circular aperture used for flux calculation.
+     - ``None``
+     - Background handling. Use ``0`` if the image is already background-subtracted; use ``None`` to estimate local background (targeted mode) or subtract a global background (auto-detect mode).
+   * - ``error``
+     - ``None``
+     - Optional per-pixel error map (same shape as ``data``). Enables ``flux_err`` and ``mag_err``.
+   * - ``zp``
+     - ``None``
+     - Zeropoint for magnitude calculation. If provided, ``mag`` and ``mag_err`` are computed from aperture fluxes.
+   * - ``exptime``
+     - ``None``
+     - Exposure time (seconds). If provided, cutouts are divided by ``exptime`` for segmentation/morphology (photometry is measured on the original data).
+   * - ``morph_params``
+     - ``True``
+     - If ``True``, compute morphology features (moments + segmentation properties). If ``False``, only photometry/metadata columns are produced.
    * - ``nsig``
-     - 0.3
-     - Detection threshold (sigma above background) for a pixel to be included in the segmentation map.
+     - ``0.3``
+     - Segmentation detection threshold (in sigma above background).
+   * - ``threshold``
+     - ``10``
+     - Central validation radius (pixels). Use ``0`` to require exact central-pixel membership in a segment.
    * - ``deblend``
      - ``False``
-     - If ``True``, attempts to deblend overlapping sources. ``False`` is recommended for capturing environmental features (e.g., proto-clusters).
-   * - ``threshold``
-     - 10
-     - Validation radius. The nearest segmentation patch is only accepted if it falls within this distance (pixels) from the input center.
+     - If ``True``, attempt to split overlapping sources during segmentation.
+   * - ``size``
+     - ``100``
+     - Side length (pixels) of the square cutout used to segment each source when computing morphology.
+   * - ``aperture``
+     - ``15``
+     - Circular-aperture radius (pixels) for photometry.
+   * - ``annulus_in``
+     - ``20``
+     - Inner radius (pixels) of the background annulus (targeted mode; ``bkg=None``).
+   * - ``annulus_out``
+     - ``35``
+     - Outer radius (pixels) of the background annulus.
+   * - ``kernel_size``
+     - ``21``
+     - Gaussian convolution window size (pixels) used prior to segmentation.
+   * - ``npixels``
+     - ``9``
+     - Minimum number of connected pixels required to define a detection.
+   * - ``connectivity``
+     - ``8``
+     - Pixel connectivity (4 = edge-connected, 8 = edge+corner-connected).
+   * - ``invert``
+     - ``False``
+     - If ``True``, swap (x, y) ordering when cropping cutouts (useful for row/column-style indexing).
 
 .. note::
-   **Non-Detections:** If no segmentation patch is found within the ``threshold`` radius (or if the source is too faint for ``nsig``), pyBIA flags the source as a non-detection. All morphological features (moments, shape) will be set to **-999**. However, forced aperture photometry (flux/magnitude) will still be recorded.
+   **Non-detections (morphology):** if the segmentation does not contain a valid central object, pyBIA flags the source as a non-detection and sets all morphology columns to **-999**. Aperture photometry is still recorded.
+
+.. note::
+   **Cutout size:** morphology is measured on local cutouts using an internal default cutout size of 100 pixels (automatically reduced to fit smaller stamps). This cutout size is currently not exposed as a ``Catalog`` initialization parameter.
 
 Example
 ----------------------------------
 
-In this example, we generate a source catalog for a dataset of 20,000 simulated extragalactic sources (10k strong lenses, 10k non-lenses). These sources are simulated in the five bands LSST will observe (*g, r, i, z, y*).
+In this example, we generate a source catalog for a dataset of 20,000 simulated extragalactic sources (10k strong gravitational lenses, 10k non-lensed galaxies). These sources are simulated in the five bands LSST will observe (*g, r, i, z, y*).
 
 **Data Access**
 You can download the sample binary files here:
@@ -159,8 +214,8 @@ We will process each band individually, constructing separate catalogs for lense
    annulus_in = 15 # Inner radius (in pixels) of background annulus for local sky estimation
    annulus_out = 50 # Outer radius (in pixels) of background annulus. 
    nsig = 0.3 # The image segmentation detection threshold 
-   threshold = 1 # Will plot the closest object within a circular mask of radius 10 (pixels) within the center
-   exptime = 1 # Radius (in pixels) around the source center used to validate detection. If no object is found within this region, the source is flagged as a non-detection.
+   threshold = 1 # Will plot the closest object within a circular mask of radius 1 (pixels) within the center
+   exptime = 1 # Exposure time to normalize the flux
    zp = 27 # The instrumental zeropoint, for computing the apparent magnitudes
    deblend = False # Whether to deblend detected source(s)
    kernel_size = 21 # Gaussian filter kernel size used to convolve the data prior to segmentation
@@ -290,7 +345,7 @@ In the example below, we inspect a lens where only the *i-band* yields a positiv
    kernel_size = 21 # Gaussian filter kernel size used to convolve the data prior to segmentation
    npixels = 9 # Required number of pixels above the sigma threshold required to detect a source
    connectivity = 8 # Scheme to determine how pixels are grouped into a detected source, either 4 (touch along edges) or 8 (edges and corners)
-   threshold = 0 # Will plot the closest object within a circular mask of radius 10 (pixels) within the center
+   threshold = 0 # Will plot the object present within the image center
    savefig = True # Whether to save the figure, it False it will show instead
    savepath = 'segm_example_lens.png' # Path (and/or filename) to save in/as
 
@@ -328,4 +383,5 @@ In the example below, we inspect a lens where only the *i-band* yields a positiv
     :alt: Segmentation Example
     :width: 800px
 
-    Visualization of segmentation maps across 5 bands. The binary masks illustrate the detected morphology at increasing sigma thresholds.
+    Visualization of segmentation maps across 5 bands. The binary masks illustrate the detected morphology at increasing sigma thresholds, computed from the ``sigma_values``.
+

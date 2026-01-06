@@ -24,7 +24,7 @@ pyBIA is organized into four interconnected modules that streamline the transiti
    :gutter: 3
 
    .. grid-item-card:: Catalog Generation
-      :link: source/Catalog%20Generation.html
+      :link: https://pybia.readthedocs.io/en/latest/source/Catalog%20Generation.html
       :link-type: doc
       :text-align: center
       :class-card: intro-card
@@ -37,7 +37,7 @@ pyBIA is organized into four interconnected modules that streamline the transiti
       Extract sources using segmentation maps, compute morphological moments, and generate photometric/morphological catalogs.
 
    .. grid-item-card:: Supervised Learning
-      :link: source/Supervised%20Learning%20Algorithms.html
+      :link: https://pybia.readthedocs.io/en/latest/source/Supervised%20Learning%20Algorithms.html
       :link-type: doc
       :text-align: center
       :class-card: intro-card
@@ -50,7 +50,7 @@ pyBIA is organized into four interconnected modules that streamline the transiti
       Train robust classifiers (XGBoost, Random Forest, etc.) with built-in **BorutaSHAP** feature selection and **Optuna** hyperparameter optimization.
 
    .. grid-item-card:: Anomaly Detection
-      :link: source/Anomaly%20Detection.html
+      :link: https://pybia.readthedocs.io/en/latest/source/Anomaly%20Detection.html
       :link-type: doc
       :text-align: center
       :class-card: intro-card
@@ -63,7 +63,7 @@ pyBIA is organized into four interconnected modules that streamline the transiti
       Identify and remove imaging artifacts/outliers using Isolation Forests on extracted feature vectors (HOG, FFT, Wavelet).
 
    .. grid-item-card:: Deep Learning Classification
-      :link: source/Deep%20Learning%20Algorithms.html
+      :link: https://pybia.readthedocs.io/en/latest/source/Deep%20Learning%20Algorithms.html
       :link-type: doc
       :text-align: center
       :class-card: intro-card

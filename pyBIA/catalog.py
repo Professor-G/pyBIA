@@ -107,6 +107,7 @@ class Catalog:
         x: np.ndarray | list | None = None,
         y: np.ndarray | list | None = None,
         bkg: float | None = None,
+        size: int = 100,
         error: np.ndarray | None = None,
         zp: float | None = None,
         exptime: float | None = None,
@@ -145,6 +146,9 @@ class Catalog:
         self.connectivity = connectivity
         self.invert = invert
         self.bkg = bkg
+
+        # Adding the image-cutout size as an argument! Note that this was not included before 1.51
+        self.size = size
 
         # The catalog, can be input to extract obj_name, field_name and object flag (may remove in future versions)
         self.cat = cat
@@ -271,7 +275,7 @@ class Catalog:
         # morphological params
         if self.morph_params:
             props_list, moments, self.segm_map = morph_parameters(
-                self.data_bgsub, self.x, self.y, exptime=self.exptime,
+                self.data_bgsub, self.x, self.y, size=self.size, exptime=self.exptime,
                 nsig=self.nsig, kernel_size=self.kernel_size,
                 npixels=self.npixels, connectivity=self.connectivity, 
                 median_bkg=None, invert=self.invert, deblend=self.deblend, 
@@ -313,7 +317,7 @@ class Catalog:
         # morph params
         if self.morph_params:
             props_list, moments, self.segm_map = morph_parameters(
-                self.data, self.x, self.y, exptime=self.exptime,
+                self.data, self.x, self.y, size=self.size, exptime=self.exptime,
                 nsig=self.nsig, kernel_size=self.kernel_size,
                 npixels=self.npixels, connectivity=self.connectivity,
                 median_bkg=bkg, invert=self.invert, deblend=self.deblend,

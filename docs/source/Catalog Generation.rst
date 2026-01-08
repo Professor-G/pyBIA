@@ -8,13 +8,13 @@ Morphological Catalog
 
    This documentation is still being written and may change frequently!
 
-The `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module is the core of pyBIA’s feature extraction and catalog-generation pipeline. It performs source detection, aperture photometry, and segmentation-based morphology measurements designed for downstream machine-learning workflows. This is all handled by the `Catalog class <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.Catalog>`_.
+The `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module is the core of pyBIA’s morphological feature extraction and catalog-generation pipeline. It performs source detection, aperture photometry, and segmentation-based morphology measurements designed for training machine-learning models. This is all handled by the `Catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.Catalog>`_ class.
 
-This module combines **image segmentation** (via Astropy's ``photutils``) with **moment-based descriptors** (via the `image_moments <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/image_moments/index.html>`_ module) to convert pixel data into a feature matrix containing:
+This module combines **image segmentation** (via Astropy's ``photutils``) with **moment-based descriptors** (included in the `image_moments <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/image_moments/index.html>`_ module) to convert image data into a feature matrix containing:
 
 * **Photometry:** aperture fluxes and flux errors (and magnitudes if a zeropoint is provided).
 * **Moments:** raw, central, geometrically centered, Hu-invariant, and Legendre moments computed on the segmented source.
-* **Segmentation properties:** shape and intensity statistics (e.g., ellipticity, eccentricity, Gini, bounding box and extrema metadata).
+* **Segmentation properties:** shape and intensity statistics (e.g., ellipticity, eccentricity, Gini, bounding box and other metadata).
 
 Quick Start
 -----------
@@ -22,16 +22,16 @@ Quick Start
 Automatic detection (no input positions)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you provide a 2D image containing many sources and do not specify positions, pyBIA will run segmentation on the full frame and build a catalog for all detected sources:
+If you provide a 2D image containing various sources and do not specify positions, pyBIA will run segmentation on the full frame and build a catalog for all detected sources:
 
 .. code-block:: python
 
    from pyBIA import catalog
 
-   # Instantiate the Catalog class (data is the image)
+   # Instantiate the Catalog class (data is the image array)
    cat = catalog.Catalog(data)
 
-   # Run source detection, computing photometric and morphological features
+   # Run source detection and compute photometric and morphological features
    cat.create(save_file=True)
 
    # The catalog is stored in the ``cat.cat`` attribute
@@ -40,7 +40,7 @@ If you provide a 2D image containing many sources and do not specify positions, 
 Targeted extraction (user-supplied positions)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you want to measure a specific source (or a set of sources) at known pixel positions, pass ``x`` and ``y`` coordinates (in *relative pixel coordinates* of the input image):
+If you want to analyze a specific source (or a set of sources) at known pixel positions, pass the ``x`` and ``y`` arguments, which represent the source coordinate(s), in relative pixels of the input image:
 
 .. code-block:: python
 
@@ -55,36 +55,27 @@ If you want to measure a specific source (or a set of sources) at known pixel po
 Computed Features
 -----------------
 
-The morphology measurements are produced by two internal components:
+When ``morph_params=True`` (default), pyBIA returns a morphology vector containing various source properties including segmentation-based image moments:
 
-When ``morph_params=True`` (default), pyBIA returns a morphology vector with **77 features per source**, produced by two internal components:
+Moments are computed on the **segmented source pixels** (all non-source pixels are zeroed prior to measurement). The moments table contains **47 features**:
 
-1. **Moment features** (calculated via ``pyBIA.image_moments.make_moments_table``)
+* **Raw moments** up to 3rd order:
+``M00, M10, M01, M20, M11, M02, M30, M21, M12, M03``
+* **Central moments** up to 3rd order:
+``mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03``
+* **Geometrically centered polynomial moments** up to 3rd order:
+``G00, G10, G01, G20, G11, G02, G30, G21, G12, G03``
+* **Hu invariants**:
+``Hu1 ... Hu7``
+* **Legendre moments** (orthonormal) up to total order 3 (n+m ≤ 3):
+``L00, L10, L01, L20, L11, L02, L30, L21, L12, L03``
+* Shape/geometry: ``eccentricity, ellipticity, elongation, orientation, perimeter, equivalent_radius, fwhm``
+* Intensity/statistics: ``gini, max_value, min_value`` plus index metadata for extrema
+* Covariance/ellipse terms: ``covar_sigx2, covar_sigy2, covar_sigxy, cxx, cxy, cyy`` and two covariance eigenvalues
+* Bounds: ``bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax``
+* A scalar flag: ``isscalar`` (stored as 1 for True, 0 for False)
 
-   Moments are computed on the **segmented source pixels** (all non-source pixels are zeroed prior to measurement). The moments table contains **47 features**:
-
-   * **Raw moments** up to 3rd order:
-     ``M00, M10, M01, M20, M11, M02, M30, M21, M12, M03``
-   * **Central moments** up to 3rd order:
-     ``mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03``
-   * **Geometrically centered polynomial moments** up to 3rd order:
-     ``G00, G10, G01, G20, G11, G02, G30, G21, G12, G03``
-   * **Hu invariants**:
-     ``Hu1 ... Hu7``
-   * **Legendre moments** (orthonormal) up to total order 3 (n+m ≤ 3):
-     ``L00, L10, L01, L20, L11, L02, L30, L21, L12, L03``
-
-2. **Segmentation properties** (computed using ``photutils.segmentation.SourceCatalog``)
-
-   For each segmented source, pyBIA records **30** scalar properties, including:
-
-   * Shape/geometry: ``eccentricity, ellipticity, elongation, orientation, perimeter, equivalent_radius, fwhm``
-   * Intensity/statistics: ``gini, max_value, min_value`` plus index metadata for extrema
-   * Covariance/ellipse terms: ``covar_sigx2, covar_sigy2, covar_sigxy, cxx, cxy, cyy`` and two covariance eigenvalues
-   * Bounds: ``bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax``
-   * A scalar flag: ``isscalar`` (stored as 1 for True, 0 for False)
-
-In total, the default morphology vector contains **77 features per source** (**47** moment features + **30** segmentation properties), plus optional photometry and metadata columns (e.g., ``flux``, ``flux_err``, ``mag``, ``mag_err``, ``median_bkg``, ``xpix``, ``ypix``, ``obj_name``, ``field_name``, ``flag``), depending on which inputs are provided (e.g., ``zp``, ``error``, ``bkg``, and position mode).
+In total, the default morphology vector contains **77 features per source** (47 moment features + 30 segmentation properties), plus optional photometry and metadata columns (e.g., ``flux``, ``flux_err``, ``mag``, ``mag_err``, ``median_bkg``, ``xpix``, ``ypix``, ``obj_name``, ``field_name``, ``flag``), depending on which inputs are provided (e.g., ``zp``, ``error``, ``bkg``, and position mode).
 
 Methodology
 -----------
@@ -102,13 +93,13 @@ Auto-detect mode (``x``/``y`` not provided)
 Targeted mode (``x``/``y`` provided)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When positions are supplied, pyBIA treats each coordinate as an independent measurement:
+When positions are input, pyBIA treats each coordinate pair as an independent source/measurement:
 
 1. **Photometry:** circular-aperture flux is measured at ``(x, y)`` using radius ``aperture`` (pixels). If ``bkg=None``, a sigma-clipped annulus median (radii ``annulus_in`` and ``annulus_out`` in pixels) is used for local background subtraction and stored as ``median_bkg``.
 2. **Cutout extraction:** a square cutout of length ``size`` is cropped around the target coordinate (automatically reduced if the image is smaller than ``size``).
 3. **Segmentation (cutout):** the cutout is convolved with the Gaussian kernel and segmented using the same ``nsig``/``kernel_size``/``npixels``/``connectivity`` settings (with optional ``deblend``). If ``exptime`` is provided, the cutout is divided by ``exptime`` for segmentation and morphology only (photometry is measured on the original data).
 4. **Central validation:** the detection is accepted only if a segmented region is present near the cutout center. If ``threshold==0``, the central pixel must lie in the segmentation; otherwise, at least one segmented pixel must fall within a central circular mask of radius ``threshold``. The segmented object whose centroid is closest to the cutout center is retained.
-5. **Morphology:** moment features and segmentation properties are computed on the retained segmented pixels. If validation fails, morphology columns are set to ``-999`` while photometry is still reported.
+5. **Morphology:** moment features and segmentation properties are computed on the retained segmented pixels. If validation fails, morphology columns are set to **-999** while photometry is still reported.
 
 Key Parameters
 --------------

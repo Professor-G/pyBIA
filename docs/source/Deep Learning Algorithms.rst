@@ -5,7 +5,7 @@ Convolutional Neural Networks
 
 .. admonition:: Documentation status (last updated |today|)
 
-   This documentation is still being written and may change frequently!
+   This documentation is outdated and will change soon!
 
 Overview
 -----------

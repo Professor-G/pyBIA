@@ -1,4 +1,4 @@
-Welcome to pyBIA
+Welcome to pyBIA's Documentation!
 ================
 
 .. admonition:: Documentation status (last updated |today|)
@@ -18,7 +18,7 @@ Stochastic processes (e.g., model initialization, data shuffling) are controlled
 Key Features
 ============
 
-pyBIA is organized into four interconnected modules that streamline the transition from imaging to classified candidates.
+pyBIA is organized into four core modules that handle the image-based feature engineering as well as the subsequent training and optimization of the machine learning classifiers.
 
 .. grid:: 2
    :gutter: 3

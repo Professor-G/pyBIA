@@ -97,9 +97,8 @@ User Guide
 The pages below provide tutorials, API references, and high-level technical details on the program’s core functionality, as well as a dedicated section describing how **Godines, D. & Prescott, K. M. (2025, submitted)** was produced, including figure-by-figure generation details.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Core Modules
-   :titlesonly:
 
    source/Catalog Generation
    source/Supervised Learning Algorithms
@@ -107,15 +106,13 @@ The pages below provide tutorials, API references, and high-level technical deta
    source/Deep Learning Algorithms
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Case Studies
-   :titlesonly:
 
    source/Godines & Prescott 2025
 
 .. toctree::
    :maxdepth: 1
    :caption: API Reference
-   :titlesonly:
 
    source/pyBIA

@@ -88,8 +88,7 @@ Moments are computed on the **segmented source pixels** (all non-source pixels a
 
   .. code-block:: none
 
-     eccentricity, ellipticity, elongation, orientation, perimeter,
-     equivalent_radius, fwhm
+     eccentricity, ellipticity, elongation, orientation, perimeter, equivalent_radius, fwhm
 
 * **Intensity/statistics**:
 
@@ -101,8 +100,7 @@ Moments are computed on the **segmented source pixels** (all non-source pixels a
 
   .. code-block:: none
 
-     covar_sigx2, covar_sigy2, covar_sigxy, cxx, cxy, cyy,
-     covariance_eigval1, covariance_eigval2
+     covar_sigx2, covar_sigy2, covar_sigxy, cxx, cxy, cyy, covariance_eigval1, covariance_eigval2
 
 * **Bounds**:
 

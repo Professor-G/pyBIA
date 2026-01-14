@@ -3,11 +3,6 @@
 Morphological Catalog
 =====================
 
-.. admonition:: Documentation status (last updated |today|)
-   :class: note
-
-   This documentation is still being written and may change frequently!
-
 The `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module is the core of pyBIA’s morphological feature extraction and catalog-generation pipeline. It performs source detection, aperture photometry, and segmentation-based morphology measurements designed for training machine-learning models. This is all handled by the `Catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html#pyBIA.catalog.Catalog>`_ class.
 
 This module combines **image segmentation** (via Astropy's ``photutils``) with **moment-based descriptors** (included in the `image_moments <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/image_moments/index.html>`_ module) to convert image data into a feature matrix containing:
@@ -55,25 +50,71 @@ If you want to analyze a specific source (or a set of sources) at known pixel po
 Computed Features
 -----------------
 
-When ``morph_params=True`` (default), pyBIA returns a morphology vector containing various source properties including segmentation-based image moments:
+When ``morph_params=True`` (default), pyBIA returns a morphology vector containing various source properties including segmentation-based image moments.
 
 Moments are computed on the **segmented source pixels** (all non-source pixels are zeroed prior to measurement). The moments table contains **47 features**:
 
 * **Raw moments** up to 3rd order:
-``M00, M10, M01, M20, M11, M02, M30, M21, M12, M03``
+
+  .. code-block:: none
+
+     M00, M10, M01, M20, M11, M02, M30, M21, M12, M03
+
 * **Central moments** up to 3rd order:
-``mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03``
+
+  .. code-block:: none
+
+     mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03
+
 * **Geometrically centered polynomial moments** up to 3rd order:
-``G00, G10, G01, G20, G11, G02, G30, G21, G12, G03``
+
+  .. code-block:: none
+
+     G00, G10, G01, G20, G11, G02, G30, G21, G12, G03
+
 * **Hu invariants**:
-``Hu1 ... Hu7``
+
+  .. code-block:: none
+
+     Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7
+
 * **Legendre moments** (orthonormal) up to total order 3 (n+m ≤ 3):
-``L00, L10, L01, L20, L11, L02, L30, L21, L12, L03``
-* Shape/geometry: ``eccentricity, ellipticity, elongation, orientation, perimeter, equivalent_radius, fwhm``
-* Intensity/statistics: ``gini, max_value, min_value`` plus index metadata for extrema
-* Covariance/ellipse terms: ``covar_sigx2, covar_sigy2, covar_sigxy, cxx, cxy, cyy`` and two covariance eigenvalues
-* Bounds: ``bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax``
-* A scalar flag: ``isscalar`` (stored as 1 for True, 0 for False)
+
+  .. code-block:: none
+
+     L00, L10, L01, L20, L11, L02, L30, L21, L12, L03
+
+* **Shape/geometry**:
+
+  .. code-block:: none
+
+     eccentricity, ellipticity, elongation, orientation, perimeter,
+     equivalent_radius, fwhm
+
+* **Intensity/statistics**:
+
+  .. code-block:: none
+
+     gini, max_value, min_value, plus index metadata for extrema
+
+* **Covariance/ellipse terms**:
+
+  .. code-block:: none
+
+     covar_sigx2, covar_sigy2, covar_sigxy, cxx, cxy, cyy,
+     covariance_eigval1, covariance_eigval2
+
+* **Bounds**:
+
+  .. code-block:: none
+
+     bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax
+
+* **Scalar flag**:
+
+  .. code-block:: none
+
+     isscalar (stored as 1 for True, 0 for False)
 
 In total, the default morphology vector contains **77 features per source** (47 moment features + 30 segmentation properties), plus optional photometry and metadata columns (e.g., ``flux``, ``flux_err``, ``mag``, ``mag_err``, ``median_bkg``, ``xpix``, ``ypix``, ``obj_name``, ``field_name``, ``flag``), depending on which inputs are provided (e.g., ``zp``, ``error``, ``bkg``, and position mode).
 

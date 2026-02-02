@@ -152,7 +152,7 @@ To detect these anomalies caused by satellite trails, we train a single-band Iso
 
 Once the model is created, it can be saved using the `save <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/outlier_detection.html#Classifier.save>`_ class method (and can be loaded later using the `load <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/outlier_detection.html#Classifier.load>`_ method). This will save the trained model, the imputer (if fitted), and all other corresponding class attributes including the feature set and normalization parameters that were set, which are automatically applied to preprocess data during inference.
 
-We can now proceed with model validation. We will assess performance according to how many of the 75 outliers were correctly flagged as anoamlies, and how many of the inliers in the hold-out test set were identified as such. Predictions are made using the `predict <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/outlier_detection.html#Classifier.predict>`_ class method. As noted before, all input data will be normalized/inputed according to the pre-set Classifier settings.
+We can now proceed with model validation. We will assess performance according to how many of the 75 outliers were correctly flagged as anomalies, and how many of the inliers in the hold-out test set were classified correctly. Predictions are made using the `predict <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/outlier_detection.html#Classifier.predict>`_ class method, which will automatically normalized and impute the input data according to the Classifier configuration.
 
 .. code-block:: python
    

@@ -104,7 +104,90 @@ We can visualize these outliers/inliers using the `plot_images_grid_2x2 <https:/
 
 To detect these anomalies caused by satellite trails, we train a single-band Isolation Forest (iForest) model on the inlier class.
 
+.. code-block:: python
+
+   import numpy as np
+   from pyBIA import outlier_detection
+
+   feat_set = 'hog' # Will train on HOG features (Histogram of Oriented Gradients)
+
+   normalize = True # Will min-max normalize the image data
+   min_pixel = -1 # Minimum pixel value for normalization
+   max_pixel = 1 # Maximum pixel value for normalization
+   img_num_channels = 1 # Number of bands in the image array(s)
+   clf = 'iforest' # Model to train
+   impute = True # Whether to fit an imputer in case there are NaN pixels
+   imp_method = 'median' # The imputation method to employ
+   SEED_NO = 1909 # RNG for model determinism
+
+   # Load the inlier class
+   inliers = np.load('inliers.npy')
+
+   # Reserve the first 100 for testing
+   inliers_test = inliers[:100]
+
+   # Train with the other 200
+   inliers_train = inliers[100:]
+
+   # The input images must be 4-dimensional -- (No. Instances, Height, Width, No. Bands)
+   # Adding fourth dimension (number of bands)
+   inliers_test = np.expand_dims(inliers_test, axis=-1)
+   inliers_train = np.expand_dims(inliers_train, axis=-1)
+
+   # Instantiate the classifier
+   model = outlier_detection.Classifier(
+      data=inliers_train,
+      normalize=normalize,
+      min_pixel=min_pixel,
+      max_pixel=max_pixel,
+      img_num_channels=img_num_channels,
+      feat_set=feat_set,
+      clf=clf,
+      impute=impute,
+      imp_method=imp_method,
+      SEED_NO=SEED_NO
+   )
+   # Train the model
+   model.create()
+
+Once the model is created, it can be saved using the `save <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/outlier_detection.html#Classifier.save>`_ class method (and can be loaded later using the `load <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/outlier_detection.html#Classifier.load>`_ method). This will save the trained model, the imputer (if fitted), and all other corresponding class attributes including the feature set and normalization parameters that were set, which are automatically applied to preprocess data during inference.
+
+We can now proceed with model validation. We will assess performance according to how many of the 75 outliers were correctly flagged as anoamlies, and how many of the inliers in the hold-out test set were identified as such. Predictions are made using the `predict <https://pybia.readthedocs.io/en/latest/_modules/pyBIA/outlier_detection.html#Classifier.predict>`_ class method. As noted before, all input data will be normalized/inputed according to the pre-set Classifier settings.
+
+.. code-block:: python
+   
+   # Predict the inlier test set
+   inlier_predictions = model.predict(inliers_test)
+
+   # Load the outliers
+   outliers = np.load('satellite_streaks.npy')
+
+   # Need to add fourth dimension as before
+   outliers = np.expand_dims(outliers, axis=-1)
+   
+   # Predict the outliers
+   outlier_predictions = model.predict(outliers)
+
+The predict method returns the following three values, in order: the predicted class (1 for inlier, -1 for outliers), the corresponding decision function score (< 0 for outliers), and the raw anomaly scores (< -0.5 for outliers).
+
+**In this example we observe a 99% inlier retention rate, with 85% of the images containing satellite streaks correctly identified as outliers.** The decision function score distributions for both classes are shown below.
 
 
+.. code-block:: python
+   
+   import pylab as plt
 
+   plt.hist(inlier_predictions[:,1], alpha=0.6, label='Inliers')
+   plt.hist(outlier_predictions[:,1], alpha=0.6, label='Outliers')
+   plt.axvline(x = 0., linestyle='--', color='k', label='Decision Boundary')
+   plt.xlabel('Score'); plt.ylabel('No. of Objects')
+   plt.title('iForest Performance')
+   plt.legend()
+   plt.show()
 
+.. figure:: _static/iforest_scores_satellite_trails_example.png
+    :align: center
+    :alt: HSC-SSP Imaging Data
+    :width: 800px
+
+    Distribution of the decision scores from the inlier-trained iForest model, trained on g-band HOG features. 

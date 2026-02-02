@@ -3,10 +3,6 @@
 Outlier Detection
 ===========
 
-.. admonition:: Documentation status (last updated |today|)
-
-   This documentation is still being written and may change frequently!
-
 Overview
 -----------
 The `outlier_detection <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/outlier_detection/index.html>`_ module provides an end-to-end pipeline for image-based anomaly detection. Currently, pyBIA includes only the Isolation Forest (iForest) model, an unsupervised machine learning technique that trains only on a single class. While traditional anomaly detection trains on the inliers (i.e., the normal instances), training on the outlier class can also yield robust performance. 

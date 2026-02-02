@@ -28,23 +28,19 @@ Example
 
 This example will utilize broadband imaging in the COSMOS field, provided by the Hyper Suprime-Cam Subaru Strategic Program (HSC-SSP). A satellite trail effecting the image data of 75 sources has been identified in the Deep/Ultra-Deep layer, as shown in the image below:
 
-.. figure:: _static/xgb_conf_matrix.png
-    :align: center
-|
-
 .. figure:: _static/HSC_Imaging_Cosmos.png
     :align: center
     :alt: HSC-SSP Imaging Data
     :width: 800px
 
-    HSC-SSP Deep/Ultra-Deep broadband imaging of the COSMOS field in the $g$-band. The checker overlay indicates patches composing the individual tracts. The sources affected by satellite trails in one of the tracts are shown as red markers. 
+    HSC-SSP Deep/Ultra-Deep broadband imaging of the COSMOS field in the g-band. The checker overlay indicates patches composing the individual tracts. The sources affected by satellite trails in one of the tracts are shown as red markers. 
 
 The g-band imaging of these 75 anomalies, as well as their corresponding coordinates (RA & Dec in decimal degrees), is available for download here:
 
 * `satellite_streaks <https://drive.google.com/file/d/14C5ZVA1Jja-RN0kkERePBAzcjz93ITZd/view?usp=sharing>`_
-* :download:`satellite_streaks_ra_dec <satellite_streaks_ra_dec.txt>`.
+* :download:`satellite_streaks_ra_dec <satellite_streaks_ra_dec.txt>`
 
-The inlier sample used to train the classifier is composed of randomly selected sources that are unaffected by such satellite streaks, and can be downloaded here: 
+The inlier sample used to train the classifier is composed of 300 randomly selected sources that are unaffected by such satellite streaks, and can be downloaded here: 
 
 * `inliers <https://drive.google.com/file/d/18mOyLI_vH7nBXVFAFA64SYQCg8-IWbjv/view?usp=sharing>`_
 
@@ -99,18 +95,14 @@ We can visualize these outliers/inliers using the `plot_images_grid_2x2 <https:/
          :class: with-shadow with-border
          :width: 100%
 
-         **Example Outliers**
-
    .. grid-item::
 
       .. figure:: _static/Example_HSC_Inliers.png
          :class: with-shadow with-border
          :width: 100%
+|
 
-         **Example Inliers**
-
-
-
+To detect these anomalies caused by satellite trails, we train a single-band Isolation Forest (iForest) model on the inlier class.
 
 
 

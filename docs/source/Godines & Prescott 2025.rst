@@ -5,7 +5,7 @@ Godines & Prescott (2025)
 
 This page provides all of the code necessary to reproduce our analysis. The core modules of pyBIA handle the heavy computational work, while the scripts in this documentation serve as the front end. If anything is unclear, please feel free to contact me by email: danielgodinez123@gmail.com.
 
-The associated data products are supplied incrementally within the scripts, allowing users to follow the analysis step by step or replicate individual stages in a transparent, technical manner. For convenience, we also provide direct access to the complete and priority catalogs below.
+The associated data products are supplied incrementally within the scripts to enable step-by-step analysis and the replication of individual stages in a transparent, technical manner. For convenience, we also provide direct access to the complete and priority catalogs below.
 
 Our complete catalog of the Boötes field (~2.4 million sources), including probability prediction scores from the three machine learning models and the morphological features computed from the Bw imaging, is available for `download here <https://drive.google.com/file/d/1nshifEK3pIeILg0m7Wf4kmJE5hotoOZ8/view?usp=sharing>`_. 
 
@@ -4776,7 +4776,7 @@ Finally, we compare these four narrowband-selected LABs with the broadband-selec
 	import numpy as np
 	import matplotlib.pyplot as plt
 	from matplotlib.lines import Line2D
-	import scienceplots  # use your preferred style settings
+	import scienceplots  # for plot style
 	plt.style.use("science")
 	plt.rcParams.update({"font.size": 21})
 

@@ -469,6 +469,7 @@ We now re-train the optimal XGBoost model using the best-performing detection th
 |
 
 
+
 Optimized XGBoost Models
 -----------
 
@@ -5137,3 +5138,27 @@ Below, we provide the code used to generate the final table presented in the pap
     :class: with-shadow with-border
     :width: 600px
 |
+
+
+Appendix: Robustness Experiment
+-----------
+
+Given our limited training data, to take advantage of the full training signal, we adopt an internal 10-fold cross-validation strategy. However, to guard against overfitting we conduct a held-out test experiment, repeating our optimal detection threshold analysis but with a 70/30 train/test split. 
+
+
+
+These results are consistent with Fig 2, demonstrating that our internal cross-validation did not introduce severe overfitting. Using the same segmentation detection threshold of 0.32, we now tune the model using the same optimization routine (BorutaSHAP with XGBoost estimator + Optuna), but also using a 70/30 train/test partition. 
+
+
+
+
+Appendix: Morphology Only Model
+-----------
+
+Here we present the results of an XGBoost model trained only on the segmentation-based morphological descriptors. As such, the feature matrix used to train this model does not include the Bw Mag and corresponding error, as well as the min and max pixel value within the segmentation. Using the same segmentation detection threshold of 0.32, this model is tuned using the same optimization routine used to train XGBoost-8.
+
+
+
+
+
+

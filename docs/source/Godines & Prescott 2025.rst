@@ -5162,11 +5162,6 @@ Here we present the results of an XGBoost model trained only on the segmentation
 	import numpy as np
 	import pandas as pd
 	from pyBIA import ensemble_model, data_processing
-	import matplotlib.pyplot as plt
-	import scienceplots
-	plt.style.use("science")
-	plt.rcParams.update({"font.size": 21})
-
 
 	sig = 0.32 # The optimal sig threshold to apply as per Figure 2
 	df = pd.read_csv('nsigs/_Bw_training_set_nsig_'+str(sig))
@@ -5309,6 +5304,45 @@ Next we classify the full NDWFS catalog (saved above, see subsection Boötes Mor
 	# Now load the candidates output by the XGBoost-8 model and saved above (Predictions & LOO CV subsection)
 	xgboost_8_candidates = pd.read_csv('candidate_catalog_optimized_xgboost_8.csv')
 	mag_candidates_xgboost8 = xgboost_8_candidates.mag
+
+With the probability scores and corresponding Bw magnitudes, the magnitude distributions and the bin-averaged probability predictions as a function of magnitude.
+
+.. code-block:: python
+
+	import matplotlib.pyplot as plt
+	import scienceplots
+	plt.style.use("science")
+	plt.rcParams.update({"font.size": 21})
+
+	def step_fraction_hist(ax, x, bins, label, **step_kwargs):
+	    """
+	    Helper function to plot the histograms showing the fractional distributions.
+	    """
+	    hist, _ = np.histogram(x, bins=bins)
+	    frac = hist / hist.sum() if hist.sum() > 0 else np.zeros(len(bins) - 1)
+	    centers = 0.5 * (bins[:-1] + bins[1:])
+	    ax.step(centers, frac, where="mid", label=f"{label} (n={len(x):,})", **step_kwargs)
+	    return frac
+
+	# Combine the magnitudes from both candidate sets to compute global min/max for bins
+	all_ = np.concatenate([mag_candidates, mag_candidates_xgboost8])
+	min_, max_ = np.nanmin(all_), np.nanmax(all_)
+
+	# Set bins
+	num_bins = 100
+	bins = np.linspace(min_, max_, num_bins + 1)
+
+	# Plot
+	fig, ax = plt.subplots(figsize=(8, 8))
+	step_fraction_hist(ax, mag_candidates, bins, r"Model Without Flux Features", lw=2.5, ls="-")
+	step_fraction_hist(ax, mag_candidates_xgboost8, bins, f'XGBoost-8', lw=2.5, ls="-.")
+	ax.set_xlabel(r'$B_W$ Mag'); ax.set_ylabel('Fraction of Objects')
+	ax.set_xlim(bins[0], bins[-1])
+	ax.set_title('LAB Initial Candidates')
+	ax.legend(handlelength=1.2, frameon=True, fancybox=True)
+	ax.set_ylim((0,0.21))
+	plt.tight_layout()
+	plt.show()
 
 
 

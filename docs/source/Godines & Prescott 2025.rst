@@ -5269,7 +5269,6 @@ This optimized morphological-only XGBoost can be :download:`downloaded here <XGB
 
 Next we classify the full NDWFS catalog (saved above, see subsection Boötes Morphological Catalog) and compare the results with the adopted XGBoost-8 model.
 
-
 .. code-block:: python
 
 	# Now classify the full NDWFS Bootes catalog
@@ -5344,7 +5343,11 @@ With the probability scores and corresponding Bw magnitudes, the magnitude distr
 	plt.tight_layout()
 	plt.show()
 
-
+.. figure:: _static/xgboost_model_comparison.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
 
 

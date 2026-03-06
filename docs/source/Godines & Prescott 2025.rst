@@ -5157,6 +5157,158 @@ Appendix: Morphology Only Model
 
 Here we present the results of an XGBoost model trained only on the segmentation-based morphological descriptors. As such, the feature matrix used to train this model does not include the Bw Mag and corresponding error, as well as the min and max pixel value within the segmentation. Using the same segmentation detection threshold of 0.32, this model is tuned using the same optimization routine used to train XGBoost-8.
 
+.. code-block:: python
+
+	import numpy as np
+	import pandas as pd
+	from pyBIA import ensemble_model, data_processing
+	import matplotlib.pyplot as plt
+	import scienceplots
+	plt.style.use("science")
+	plt.rcParams.update({"font.size": 21})
+
+
+	sig = 0.32 # The optimal sig threshold to apply as per Figure 2
+	df = pd.read_csv('nsigs/_Bw_training_set_nsig_'+str(sig))
+	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
+
+	# Omit any non-detections
+	mask = np.where((df['area'] != -999) & np.isfinite(df['mag']) & np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
+
+	# Balance both classes to be of same size
+	blob_index = np.where(df['flag'].iloc[mask] == 1)[0]
+	other_index = np.where(df['flag'].iloc[mask] == 0)[0]
+	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
+
+	#These are the features to use, note that the catalog includes more than this!
+	# NOTE: Removing mag, mag_err, max_value, and min_value
+	columns = [
+	    #'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma'#, 'max_value', 'min_value'
+	]
+
+	# Training data arrays
+	data_x, data_y = np.array(df_filtered[columns]), np.array(df_filtered['flag'])
+
+	# XGB-BASED BorutaSHAP
+	SEED_NO = 1909 # The seed number that will initialize the stochastic process (e.g., model training)
+	clf = 'xgb' # The classification model that will be trined, options are: 'xgb', 'rf' and 'nn'
+	impute = False # Whether to impute missing values (NaN)
+	optimize = True # Will enable the optimization routine
+	scoring_metric = 'f1' # The optimization trials will be assessed according to the F1 Score
+	opt_cv = 10 # The number of folds to perform during cross validation, ONLY used during optimization (`optimize`=True)
+	boruta_trials = 100 # Number of feature selection trials to perform (This is fast especially with `boruta_model`='xgb')
+	boruta_model = 'xgb' # The model to use when assessing feautre importances during feature selection (either 'rf' or 'xgb', DOES NOT have to match the `clf`)
+	n_iter = 100 # Number of hyperparameter optimization trials to perform, can set to 0 to disable hyperparam tuning
+	limit_search = True # Set to False to expand the hyperparameter search space (will take longer)
+
+	model = ensemble_model.Classifier(
+	    data_x, 
+	    data_y, 
+	    clf=clf, 
+	    impute=impute, 
+	    optimize=optimize, 
+	    boruta_trials=boruta_trials, 
+	    boruta_model=boruta_model, 
+	    n_iter=n_iter, 
+	    scoring_metric=scoring_metric, 
+	    opt_cv=opt_cv, 
+	    limit_search=limit_search, 
+	    SEED_NO=SEED_NO
+	    )
+
+	model.create()
+	model.save('XGBoost_Morph_Only')
+
+	# The feature importance plot! Commenting out non-morph features
+	columns_formatted = [
+	    #r'$B_W$ Mag', r'$B_W$ MagErr', 
+	    r'$M_{00}$', r'$M_{10}$', r'$M_{01}$', r'$M_{20}$', r'$M_{11}$', r'$M_{02}$', r'$M_{30}$', r'$M_{21}$', r'$M_{12}$', r'$M_{03}$', 
+	    r'$\mu_{20}$', r'$\mu_{11}$', r'$\mu_{02}$', r'$\mu_{30}$', r'$\mu_{21}$', r'$\mu_{12}$', r'$\mu_{03}$', 
+	    r'$G_{10}$', r'$G_{01}$', r'$G_{20}$', r'$G_{11}$', r'$G_{02}$', r'$G_{30}$', r'$G_{21}$', r'$G_{12}$', r'$G_{03}$',
+	    r'$h_1$', r'$h_2$', r'$h_3$', r'$h_4$', r'$h_5$', r'$h_6$', r'$h_7$', 
+	    r'$L_{00}$', r'$L_{10}$', r'$L_{01}$', r'$L_{20}$', r'$L_{11}$', r'$L_{02}$', r'$L_{30}$', r'$L_{21}$', r'$L_{12}$', r'$L_{03}$', 
+	    'Area', r'$\sigma^2(x)$', r'$\sigma^2(y)$', r'$\sigma^2(xy)$', r'$\lambda_1$', r'$\lambda_2$', r'$C_{xx}$', r'$C_{xy}$', r'$C_{yy}$', 
+	    'Eccentricity', 'Ellipticity', 'Elongation', 'Equiv. Radius', 'FWHM', 'Gini Index', 'Orientation', 'Perimeter', 
+	    r'$\sigma_{\rm major}$', r'$\sigma_{\rm minor}$'#, 'Max Value', 'Min Value'
+	]
+
+	top = 'all' # Will show all accepted features
+	include_other = True # The other accepted will be shown as a single point (combined Z-Scores)
+	include_shadow = True # Whether to include a 'random performance' benchmark (i.e., the "shadow" feature)
+	include_rejected = False # Whether to show the features that were not deemed important
+	flip_axes = True # Set to False to plot the features on the x-axis (if you're plotting a lot of them)
+	title = 'Feature Importance (No Flux Features)' # Figure title
+	save_data = False # Whether to save the feature importances to a csv file
+	savefig = True # Whether to save the figure (note that current version of program always saves with same figname so careful about overwrites)
+
+	# First plot the XGBoost-based feature selection results
+	model.plot_feature_opt(
+	    feat_names=columns_formatted, 
+	    top=top, 
+	    include_other=include_other, 
+	    include_shadow=include_shadow, 
+	    include_rejected=include_rejected, 
+	    flip_axes=flip_axes, 
+	    save_data=save_data, 
+	    title=title, 
+	    savefig=True
+	    )
+
+.. figure:: _static/Feature_Importance_no_flux_features.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+This optimized morphological-only XGBoost can be :download:`downloaded here <XGBoost_Morph_Only.zip>`.
+
+Next we classify the full NDWFS catalog (saved above, see subsection Boötes Morphological Catalog) and compare the results with the adopted XGBoost-8 model.
+
+
+.. code-block:: python
+
+	# Now classify the full NDWFS Bootes catalog
+
+	# Load the catalog containing all 2 million other objects, extracted using sig=0.32
+	other_all = pd.read_csv('Other_Catalog_Master_0.32')
+
+	# Remove the 859 OTHER objects that are present in the training set, we will assess these individually using LoO
+	other_all = other_all[~other_all['obj_name'].isin(df_filtered['obj_name'])]
+
+	# Log transform the Hu moments
+	other_all[hu_cols] = other_all[hu_cols].apply(data_processing.signed_log_transform)
+
+	# Omit non-detections
+	mask = np.where((other_all['area'] != -999) & np.isfinite(other_all['mag']) & np.all(np.isfinite(other_all[[f'Hu{i}' for i in range(1, 8)]]), axis=1))[0]
+
+	other_all = other_all.iloc[mask]
+
+	# Create the data_x array
+	other_data_x = np.array(other_all[columns])
+
+	# Predict all samples to create a candidates catalog
+	predictions = model.predict(other_data_x)
+
+	# Filter for the positive predictions only (label == 1)
+	LAB_predictions = np.where(predictions[:,0] == 1)[0]
+
+	# Select those probability predictions only and corresponding Bw magnitudes
+	LAB_predictions_probas = predictions[:,1][LAB_predictions]
+	mag_candidates = other_all.mag.iloc[LAB_predictions]
+
+	# Now load the candidates output by the XGBoost-8 model and saved above (Predictions & LOO CV subsection)
+	xgboost_8_candidates = pd.read_csv('candidate_catalog_optimized_xgboost_8.csv')
+	mag_candidates_xgboost8 = xgboost_8_candidates.mag
 
 
 

@@ -5145,6 +5145,144 @@ Appendix: Robustness Experiment
 
 Given our limited training data, to take advantage of the full training signal, we adopt an internal 10-fold cross-validation strategy. However, to guard against overfitting we conduct a held-out test experiment, repeating our optimal detection threshold analysis but with a 70/30 train/test split. 
 
+.. code-block:: python
+
+	import numpy as np
+	import pandas as pd
+	from pyBIA import data_processing, ensemble_model
+	from sklearn.model_selection import train_test_split, StratifiedKFold, cross_validate
+	from sklearn.metrics import accuracy_score, f1_score
+	from sklearn.preprocessing import StandardScaler
+	from sklearn.pipeline import Pipeline
+	from sklearn.base import clone
+
+	SEED_NO = 1909
+	sigs = np.around(np.arange(0.1, 1.51, 0.01), decimals=2)
+	nsig_path = '/Users/daniel/Desktop/pyBIA_PLOTS/nsigs/'
+
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
+
+	classifiers = ['tree', 'rf', 'xgb', 'logreg', 'svc', 'nn']
+
+
+	all_metrics = {
+	    clf: {
+	        "nsig": [],
+	        "cv_accuracy": [], "cv_accuracy_std": [],
+	        "cv_f1": [], "cv_f1_std": [],
+	        "test_accuracy": [], "test_accuracy_std": [],
+	        "test_f1": [], "test_f1_std": []
+	    }
+	    for clf in classifiers
+	}
+
+	impute = False
+	num_cv_folds = 10
+	N_REPEATS = 10
+
+	for sig in sigs:
+	    print(sig)
+	    df = pd.read_csv(nsig_path + '_Bw_training_set_nsig_' + str(sig))
+	    # Hu transform
+	    hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+	    df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
+	    # mask detections
+	    mask = np.where(
+	        (df['area'] != -999) &
+	        np.isfinite(df['mag']) &
+	        np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1)
+	    )[0]
+	    #
+	    blob_index  = np.where(df['flag'].iloc[mask] == 1)[0]
+	    other_index = np.where(df['flag'].iloc[mask] == 0)[0]
+	    #
+	    df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
+	    #
+	    # shuffle once per sigma to avoid any ordering artifacts
+	    df_filtered = df_filtered.sample(frac=1, random_state=SEED_NO).reset_index(drop=True)
+	    #
+	    X_full = df_filtered[columns].to_numpy()
+	    y_full = df_filtered["flag"].to_numpy().astype(int)
+	    #
+	    for clf_name in classifiers:
+	        rep_cv_acc, rep_cv_f1 = [], []
+	        rep_test_acc, rep_test_f1 = [], []
+	        for rep in range(N_REPEATS):
+	            split_seed = SEED_NO + rep
+	            X_train, X_test, y_train, y_test = train_test_split(
+	                X_full, y_full,
+	                test_size=0.30,
+	                random_state=split_seed,
+	                shuffle=True,
+	                stratify=y_full
+	            )
+	            #
+	            # For test evaluation...scale using TRAIN-only scaler when needed
+	            if clf_name in ["logreg", "svc", "nn"]:
+	                scaler = StandardScaler().fit(X_train)
+	                X_train_fit = scaler.transform(X_train)
+	                X_test_fit  = scaler.transform(X_test)
+	            else:
+	                X_train_fit, X_test_fit = X_train, X_test
+	            #
+	            wrapper = ensemble_model.Classifier(X_train_fit, y_train, impute=impute)
+	            wrapper.clf = clf_name
+	            #
+	            wrapper.create(overwrite_training=False)   
+	            #
+	            # test metrics
+	            y_pred = wrapper.model.predict(X_test_fit)
+	            rep_test_acc.append(accuracy_score(y_test, y_pred))
+	            rep_test_f1.append(f1_score(y_test, y_pred, zero_division=0))
+	            #
+	            # CV metrics on ttrain
+	            class_counts = np.bincount(y_train, minlength=2)
+	            min_class = int(class_counts.min())
+	            n_splits = min(num_cv_folds, min_class)
+	            if n_splits < 2:
+	                continue
+	            #
+	            cv_splitter = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=split_seed)
+	            # CV for scaled models
+	            est = clone(wrapper.model)
+	            if clf_name in ["logreg", "svc", "nn"]:
+	                est_cv = Pipeline([("scaler", StandardScaler()), ("clf", est)])
+	                cv_X = X_train
+	            else:
+	                est_cv = est
+	                cv_X = X_train
+	            #
+	            cv = cross_validate(
+	                est_cv,
+	                cv_X, y_train,
+	                cv=cv_splitter,
+	                scoring=["accuracy", "f1"],
+	                n_jobs=-1
+	            )
+	            #
+	            rep_cv_acc.append(cv["test_accuracy"].mean())
+	            rep_cv_f1.append(cv["test_f1"].mean())
+	        #
+	        all_metrics[clf_name]["nsig"].append(sig)
+	        all_metrics[clf_name]["cv_accuracy"].append(np.mean(rep_cv_acc) if rep_cv_acc else np.nan)
+	        all_metrics[clf_name]["cv_accuracy_std"].append(np.std(rep_cv_acc) if rep_cv_acc else np.nan)
+	        all_metrics[clf_name]["cv_f1"].append(np.mean(rep_cv_f1) if rep_cv_f1 else np.nan)
+	        all_metrics[clf_name]["cv_f1_std"].append(np.std(rep_cv_f1) if rep_cv_f1 else np.nan)
+	        all_metrics[clf_name]["test_accuracy"].append(np.mean(rep_test_acc) if rep_test_acc else np.nan)
+	        all_metrics[clf_name]["test_accuracy_std"].append(np.std(rep_test_acc) if rep_test_acc else np.nan)
+	        all_metrics[clf_name]["test_f1"].append(np.mean(rep_test_f1) if rep_test_f1 else np.nan)
+	        all_metrics[clf_name]["test_f1_std"].append(np.std(rep_test_f1) if rep_test_f1 else np.nan)
 
 
 These results are consistent with Fig 2, demonstrating that our internal cross-validation did not introduce severe overfitting. Using the same segmentation detection threshold of 0.32, we now tune the model using the same optimization routine (BorutaSHAP with XGBoost estimator + Optuna), but also using a 70/30 train/test partition. 

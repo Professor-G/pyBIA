@@ -5488,4 +5488,110 @@ With the probability scores and corresponding Bw magnitudes, the magnitude distr
 |
 
 
+Finally we analyze the correlation between the Bw magnitude of a source and its probability prediction score. 
+
+.. code-block:: python
+
+	# Load the XGBoost-8 model and re-do the predictions on the full dataset
+	xgboost_8_model = ensemble_model.Classifier()
+	xgboost_8_model.load('ensemble_model_xgb_boruta_xgb')
+
+	# Need all features in this case
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
+
+	other_data_x = np.array(other_all[columns])
+
+	# Predict all samples to create a candidates catalog
+	predictions_xgboost8 = xgboost_8_model.predict(other_data_x)
+
+	# If the predicted label is 0 (negative), the positive class prob is (1 - prob).
+	p1 = np.where(predictions[:, 0] == 1, predictions[:, 1], 1 - predictions[:, 1])
+	p2 = np.where(predictions_xgboost8[:, 0] == 1, predictions_xgboost8[:, 1], 1 - predictions_xgboost8[:, 1])
+
+	# Magnitudes for the entire catalog 
+	mag_val = other_all["mag"].to_numpy(dtype=float)
+
+	# Set global range for the bins
+	valid_p = np.concatenate([p1[np.isfinite(p1)], p2[np.isfinite(p2)]])
+	min_prob = np.min(valid_p)
+	max_prob = np.max(valid_p)
+
+	# Using 49 bins (50 edges)
+	bins = np.linspace(min_prob, max_prob, 50)
+	bin_centers = (bins[:-1] + bins[1:]) / 2
+
+	def get_binned_stats(probs, values, bins):
+	    """
+	    Helper function to define the bin averages and variance
+	    """
+
+	    avg_arr, std_arr = [], []    
+
+	    # Compute the mean and std for each bin
+	    for i in range(len(bins) - 1):
+	        # Create the mask for specific bin slice
+	        mask_bin = (probs >= bins[i]) & (probs < bins[i+1])
+	        valid_indices = mask_bin & np.isfinite(values)
+	        subset = values[valid_indices]
+
+	        avg_arr.append(np.mean(subset))
+	        std_arr.append(np.std(subset)) 
+	    
+	    return np.array(avg_arr), np.array(std_arr)
+
+	# Calculate the bin stats
+	mean1, std1 = get_binned_stats(p1, mag_val, bins)
+	mean2, std2 = get_binned_stats(p2, mag_val, bins)
+
+	# Plot
+	fig, ax = plt.subplots(figsize=(8, 8))
+
+	# Model 1, No Flux Features
+	mask1 = np.isfinite(mean1)
+	ax.plot(bin_centers[mask1], mean1[mask1], lw=1.6, color='C0', label=f"Model Without Flux Features")
+	ax.fill_between(
+	    bin_centers[mask1], 
+	    mean1[mask1] - std1[mask1], 
+	    mean1[mask1] + std1[mask1], 
+	    color='C0', alpha=0.3
+	)
+
+	# Model 2, XGBoost-8
+	mask2 = np.isfinite(mean2)
+	ax.plot(bin_centers[mask2], mean2[mask2], lw=1.6, ls="-.", color='C1', label=f"XGBoost-8")
+	ax.fill_between(
+	    bin_centers[mask2], 
+	    mean2[mask2] - std2[mask2], 
+	    mean2[mask2] + std2[mask2], 
+	    color='C1', alpha=0.3
+	)
+
+	# Labels and formatting
+	ax.set_xlabel(r"$P(y =$ LAB $\mid \mathbf{X})$")
+	ax.set_ylabel(r"$B_W$ Mag")
+	ax.set_xlim(0.0, 1.0)
+	ax.invert_yaxis()
+	ax.set_title(r"Impact of Flux Features on Classification")
+	ax.legend(handlelength=1.2, frameon=True, fancybox=True, loc='lower right')
+	plt.tight_layout()
+	plt.show()
+
+.. figure:: _static/mag_vs_proba_model_comparison_noflux.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+
 

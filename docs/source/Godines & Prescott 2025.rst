@@ -3125,8 +3125,9 @@ We can then load this model and visualize its performance across epochs.
 	fig.subplots_adjust(top=0.9, hspace=0.02)
 
 	column = 2 # F1 score in third column
+	column_val = 0 # The binary accuracy column, used only for the validation data
 	train_mean, train_lower, train_upper = compute_range(train_metrics[:, :, column], use_full_range)
-	val_mean, val_lower, val_upper = compute_range(val_metrics[:, :, column], use_full_range)
+	val_mean, val_lower, val_upper = compute_range(val_metrics[:, :, column_val], use_full_range)
 
 	ax1.plot(epochs, train_mean, marker='o', color='blue', label='Training (F1 Score)')
 	ax1.fill_between(epochs, train_lower, train_upper, color='blue', alpha=0.3)
@@ -5363,7 +5364,136 @@ Below we plot the results of this robustness experiment.
 
 These results are consistent with Fig 2, demonstrating that our internal cross-validation did not introduce severe overfitting. Using the same segmentation detection threshold of 0.32, we now tune the model using the same optimization routine (BorutaSHAP with XGBoost estimator + Optuna), but also using a 70/30 train/test partition. 
 
+.. code-block:: python
 
+	import numpy as np
+	import pandas as pd
+	from pyBIA import data_processing, ensemble_model
+	from sklearn.model_selection import train_test_split
+	from sklearn.metrics import accuracy_score, f1_score
+
+	# Same set up as before
+	SEED_NO = 1909
+	sigs = np.around(np.arange(0.1, 1.51, 0.01), decimals=2)
+	nsig_path = 'nsigs/'
+
+	columns = [
+	    'mag', 'mag_err',
+	    'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
+	    'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
+	    'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
+	    'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
+	    'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+	    'area', 'covar_sigx2', 'covar_sigy2', 'covar_sigxy', 'covariance_eigval1', 'covariance_eigval2',
+	    'cxx', 'cxy', 'cyy', 'eccentricity', 'ellipticity', 'elongation',
+	    'equivalent_radius', 'fwhm', 'gini', 'orientation', 'perimeter',
+	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
+	]
+
+	# Load training data, using the optimal detection threshold chosen based on Fig. 2
+	sig = 0.32
+	df = pd.read_csv(nsig_path + '_Bw_training_set_nsig_' + str(sig))
+
+	# Log transform the Hu features
+	hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
+	df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
+
+	# Mask detections
+	mask = np.where(
+	    (df['area'] != -999) &
+	    np.isfinite(df['mag']) &
+	    np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1)
+	)[0]
+
+	# Training set for this sigma threshold
+	blob_index  = np.where(df['flag'].iloc[mask] == 1)[0]
+	other_index = np.where(df['flag'].iloc[mask] == 0)[0]
+	df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
+
+	# Shuffle
+	df_filtered = df_filtered.sample(frac=1, random_state=SEED_NO).reset_index(drop=True)
+	X_full = df_filtered[columns].to_numpy()
+	y_full = df_filtered["flag"].to_numpy().astype(int)
+
+	# Train/test split
+	split_seed = 1909
+	X_train, X_test, y_train, y_test = train_test_split(
+	    X_full, y_full,
+	    test_size=0.30,
+	    random_state=split_seed,
+	    shuffle=True,
+	    stratify=y_full
+	)
+
+	# Train and tune an XGBoost model, same set up as before
+	SEED_NO = 1909 # The seed number that will initialize the stochastic process (e.g., model training)
+	clf = 'xgb' # The classification model that will be trined, options are: 'xgb', 'rf' and 'nn'
+	impute = False # Whether to impute missing values (NaN)
+	optimize = True # Will enable the optimization routine
+	scoring_metric = 'f1' # The optimization trials will be assessed according to the F1 Score
+	opt_cv = 10 # The number of folds to perform during cross validation, ONLY used during optimization (`optimize`=True)
+	boruta_trials = 100 # Number of feature selection trials to perform (This is fast especially with `boruta_model`='xgb')
+	boruta_model = 'xgb' # The model to use when assessing feautre importances during feature selection (either 'rf' or 'xgb', DOES NOT have to match the `clf`)
+	n_iter = 100 # Number of hyperparameter optimization trials to perform, can set to 0 to disable hyperparam tuning
+	limit_search = True # Set to False to expand the hyperparameter search space (will take longer)
+
+	# Instantiate the Classifier
+	model = ensemble_model.Classifier(
+	    X_train, 
+	    y_train, 
+	    clf=clf, 
+	    impute=impute, 
+	    optimize=optimize, 
+	    boruta_trials=boruta_trials, 
+	    boruta_model=boruta_model, 
+	    n_iter=n_iter, 
+	    scoring_metric=scoring_metric, 
+	    opt_cv=opt_cv, 
+	    limit_search=limit_search, 
+	    SEED_NO=SEED_NO
+	    )
+
+	model.save('model_train_test_split')
+
+	# Plot roc curve
+	model.plot_roc_curve()
+
+	columns_formatted = [
+	    #r'$B_W$ Mag', r'$B_W$ MagErr', 
+	    r'$M_{00}$', r'$M_{10}$', r'$M_{01}$', r'$M_{20}$', r'$M_{11}$', r'$M_{02}$', r'$M_{30}$', r'$M_{21}$', r'$M_{12}$', r'$M_{03}$', 
+	    r'$\mu_{20}$', r'$\mu_{11}$', r'$\mu_{02}$', r'$\mu_{30}$', r'$\mu_{21}$', r'$\mu_{12}$', r'$\mu_{03}$', 
+	    r'$G_{10}$', r'$G_{01}$', r'$G_{20}$', r'$G_{11}$', r'$G_{02}$', r'$G_{30}$', r'$G_{21}$', r'$G_{12}$', r'$G_{03}$',
+	    r'$h_1$', r'$h_2$', r'$h_3$', r'$h_4$', r'$h_5$', r'$h_6$', r'$h_7$', 
+	    r'$L_{00}$', r'$L_{10}$', r'$L_{01}$', r'$L_{20}$', r'$L_{11}$', r'$L_{02}$', r'$L_{30}$', r'$L_{21}$', r'$L_{12}$', r'$L_{03}$', 
+	    'Area', r'$\sigma^2(x)$', r'$\sigma^2(y)$', r'$\sigma^2(xy)$', r'$\lambda_1$', r'$\lambda_2$', r'$C_{xx}$', r'$C_{xy}$', r'$C_{yy}$', 
+	    'Eccentricity', 'Ellipticity', 'Elongation', 'Equiv. Radius', 'FWHM', 'Gini Index', 'Orientation', 'Perimeter', 
+	    r'$\sigma_{\rm major}$', r'$\sigma_{\rm minor}$'#, 'Max Value', 'Min Value'
+	]
+
+	# Plot feature importance
+	model.plot_feature_opt(feat_names=columns_formatted)
+
+	# Now evaluate the held-out test set
+	y_pred = model.model.predict(X_test[:,model.feats_to_use])
+	print('Hold-out test F1 score', f1_score(y_test, y_pred, zero_division=0))
+
+.. figure:: _static/roc_curve_train_test_split_model.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+.. figure:: _static/Feature_Importance_train_test_split_model.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
+
+This tuned model, trained on 70% of the data, yields an F1 score of 0.9162 on the hold-out test set an 10-fold cross-validated F1 score of 0.939 on the training set (compared to 0.9336 for the original XGBoost-8 model that was trained using the full dataset).
+
+The cross-validated ROC curve yields an AUC of 0.98, consistent with the original XGBoost-8 model. Furthermore, in this experiment, the selected features are very similar to XGBoost-8. The top three features remain the same, and 6 of the 8 features from the original XGBoost-8 model are retained in this new training configuration.
+
+This model can be :download:`downloaded here <model_train_test_split.zip>`.
 
 
 Appendix: Morphology Only Model

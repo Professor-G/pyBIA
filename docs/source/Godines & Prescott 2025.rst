@@ -5312,9 +5312,54 @@ Given our limited training data, to take advantage of the full training signal, 
 
 The dataframe saved above can be :download:`downloaded here <cv_vs_test_metrics.csv>`.
 
+Below we plot the results of this robustness experiment.
 
 
+.. code-block:: python
 
+	import pandas as pd 
+	import matplotlib.pyplot as plt
+	import scienceplots
+	plt.style.use('science')
+	plt.rcParams.update({'font.size':21,})
+
+	# Load the saved dataframe
+	df_results = pd.read_csv('cv_vs_test_metrics.csv')
+
+
+	# Plot one subplot per model to show both train and test scores
+	fig, axes = plt.subplots(2, 3, figsize=(16, 10), sharex=True, sharey=True)
+	axes = axes.flatten()
+
+	# So the classifier names are consistent with Fig. 2
+	title_map = {
+	    'logreg': 'LogReg',
+	    'nn': 'MLP',
+	    'rf': 'RF',
+	    'svc': 'SVC',
+	    'tree': 'Tree',
+	    'xgb': 'XGBoost'
+	}
+
+	# Loop through each classifier and plot train and test scores
+	for idx, clf in enumerate(df_results['classifier'].unique()):
+	    ax = axes[idx]
+	    df_clf = df_results[df_results['classifier'] == clf].reset_index(drop=True)
+	    ax.plot(df_clf['nsig'], df_clf['cv_f1'], label='Train (10-Fold CV)', color='blue', linewidth=1.5)
+	    ax.fill_between(df_clf['nsig'], df_clf['cv_f1'] - df_clf['cv_f1_std'], df_clf['cv_f1'] + df_clf['cv_f1_std'], color='blue', alpha=0.2)
+	    ax.plot(df_clf['nsig'], df_clf['test_f1'], label='Hold-out Test', linestyle='--', color='red', linewidth=1.5)
+	    ax.set_title(title_map.get(clf, clf))
+	    if idx == 1: ax.legend(loc='lower center', handlelength=1, frameon=True, fancybox=True)
+	    if idx == 0 or idx == 3: ax.set_ylabel('F1 Score')
+
+	plt.tight_layout()
+	plt.show()
+
+.. figure:: _static/f1_curves_train_test.png
+    :align: center
+    :class: with-shadow with-border
+    :width: 600px
+|
 
 These results are consistent with Fig 2, demonstrating that our internal cross-validation did not introduce severe overfitting. Using the same segmentation detection threshold of 0.32, we now tune the model using the same optimization routine (BorutaSHAP with XGBoost estimator + Optuna), but also using a 70/30 train/test partition. 
 

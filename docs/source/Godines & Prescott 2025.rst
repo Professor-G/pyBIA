@@ -5150,15 +5150,17 @@ Given our limited training data, to take advantage of the full training signal, 
 	import numpy as np
 	import pandas as pd
 	from pyBIA import data_processing, ensemble_model
+
 	from sklearn.model_selection import train_test_split, StratifiedKFold, cross_validate
 	from sklearn.metrics import accuracy_score, f1_score
 	from sklearn.preprocessing import StandardScaler
 	from sklearn.pipeline import Pipeline
 	from sklearn.base import clone
 
+	# Same set up as before
 	SEED_NO = 1909
 	sigs = np.around(np.arange(0.1, 1.51, 0.01), decimals=2)
-	nsig_path = '/Users/daniel/Desktop/pyBIA_PLOTS/nsigs/'
+	nsig_path = 'nsigs/'
 
 	columns = [
 	    'mag', 'mag_err',
@@ -5173,9 +5175,8 @@ Given our limited training data, to take advantage of the full training signal, 
 	    'semimajor_sigma', 'semiminor_sigma', 'max_value', 'min_value'
 	]
 
+	# The six models (from Fig. 2)
 	classifiers = ['tree', 'rf', 'xgb', 'logreg', 'svc', 'nn']
-
-
 	all_metrics = {
 	    clf: {
 	        "nsig": [],
@@ -5187,39 +5188,47 @@ Given our limited training data, to take advantage of the full training signal, 
 	    for clf in classifiers
 	}
 
+	# No imputation since all features are valid
 	impute = False
+
+	# Number of cross-validation folds for internal train assesment
 	num_cv_folds = 10
-	N_REPEATS = 10
+
+	# Number of random 70/30 train/test split partitions
+	N_REPEATS = 10 
 
 	for sig in sigs:
-	    print(sig)
+
+	    # Load the particular file
 	    df = pd.read_csv(nsig_path + '_Bw_training_set_nsig_' + str(sig))
-	    # Hu transform
+
+	    # Log transform the Hu features
 	    hu_cols = ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7']
 	    df[hu_cols] = df[hu_cols].apply(data_processing.signed_log_transform)
-	    # mask detections
+
+	    # Mask away the non-detections
 	    mask = np.where(
 	        (df['area'] != -999) &
 	        np.isfinite(df['mag']) &
 	        np.all(np.isfinite(df[[f'Hu{i}' for i in range(1, 8)]]), axis=1)
 	    )[0]
-	    #
+	    
+	    # Training set
 	    blob_index  = np.where(df['flag'].iloc[mask] == 1)[0]
 	    other_index = np.where(df['flag'].iloc[mask] == 0)[0]
-	    #
 	    df_filtered = df.iloc[mask[np.concatenate((blob_index, other_index[:len(blob_index)]))]]
-	    #
-	    # shuffle once per sigma to avoid any ordering artifacts
+	    
+	    # Shuffle once per sigma_det to avoid any ordering artifacts
 	    df_filtered = df_filtered.sample(frac=1, random_state=SEED_NO).reset_index(drop=True)
-	    #
 	    X_full = df_filtered[columns].to_numpy()
 	    y_full = df_filtered["flag"].to_numpy().astype(int)
-	    #
+	    
+	    # Loop through and assess each engine
 	    for clf_name in classifiers:
 	        rep_cv_acc, rep_cv_f1 = [], []
 	        rep_test_acc, rep_test_f1 = [], []
 	        for rep in range(N_REPEATS):
-	            split_seed = SEED_NO + rep
+	            split_seed = SEED_NO + rep # To ensure each train/test split is unique
 	            X_train, X_test, y_train, y_test = train_test_split(
 	                X_full, y_full,
 	                test_size=0.30,
@@ -5227,32 +5236,32 @@ Given our limited training data, to take advantage of the full training signal, 
 	                shuffle=True,
 	                stratify=y_full
 	            )
-	            #
-	            # For test evaluation...scale using TRAIN-only scaler when needed
+	            
+	            # For test evaluation, need to scale using the scaler fitted on train data (only for logred, svc, and nn)
 	            if clf_name in ["logreg", "svc", "nn"]:
 	                scaler = StandardScaler().fit(X_train)
 	                X_train_fit = scaler.transform(X_train)
 	                X_test_fit  = scaler.transform(X_test)
 	            else:
 	                X_train_fit, X_test_fit = X_train, X_test
-	            #
+	            
+	            # Instantiate the Classifier and train
 	            wrapper = ensemble_model.Classifier(X_train_fit, y_train, impute=impute)
 	            wrapper.clf = clf_name
-	            #
 	            wrapper.create(overwrite_training=False)   
-	            #
-	            # test metrics
+	            
+	            # Hold out test set metrics
 	            y_pred = wrapper.model.predict(X_test_fit)
 	            rep_test_acc.append(accuracy_score(y_test, y_pred))
 	            rep_test_f1.append(f1_score(y_test, y_pred, zero_division=0))
-	            #
-	            # CV metrics on ttrain
+	            
+	            # Internal metrics based on 10-fold CV
 	            class_counts = np.bincount(y_train, minlength=2)
 	            min_class = int(class_counts.min())
 	            n_splits = min(num_cv_folds, min_class)
 	            if n_splits < 2:
 	                continue
-	            #
+	            
 	            cv_splitter = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=split_seed)
 	            # CV for scaled models
 	            est = clone(wrapper.model)
@@ -5262,7 +5271,8 @@ Given our limited training data, to take advantage of the full training signal, 
 	            else:
 	                est_cv = est
 	                cv_X = X_train
-	            #
+
+	            # Cross-validation
 	            cv = cross_validate(
 	                est_cv,
 	                cv_X, y_train,
@@ -5270,10 +5280,12 @@ Given our limited training data, to take advantage of the full training signal, 
 	                scoring=["accuracy", "f1"],
 	                n_jobs=-1
 	            )
-	            #
+	            
+	            # Save train and test metrics for this particular split
 	            rep_cv_acc.append(cv["test_accuracy"].mean())
 	            rep_cv_f1.append(cv["test_f1"].mean())
-	        #
+
+	        # Save all metrics for this classifier
 	        all_metrics[clf_name]["nsig"].append(sig)
 	        all_metrics[clf_name]["cv_accuracy"].append(np.mean(rep_cv_acc) if rep_cv_acc else np.nan)
 	        all_metrics[clf_name]["cv_accuracy_std"].append(np.std(rep_cv_acc) if rep_cv_acc else np.nan)
@@ -5283,6 +5295,25 @@ Given our limited training data, to take advantage of the full training signal, 
 	        all_metrics[clf_name]["test_accuracy_std"].append(np.std(rep_test_acc) if rep_test_acc else np.nan)
 	        all_metrics[clf_name]["test_f1"].append(np.mean(rep_test_f1) if rep_test_f1 else np.nan)
 	        all_metrics[clf_name]["test_f1_std"].append(np.std(rep_test_f1) if rep_test_f1 else np.nan)
+
+	# Flatten the dict and save to a dataframe
+	rows = []
+	for clf_name, metrics in all_metrics.items():
+	    # 'nsig' dictates the number of data points per classifier
+	    for i in range(len(metrics['nsig'])):
+	        row = {'classifier': clf_name}
+	        for metric_name, values_list in metrics.items():
+	            row[metric_name] = values_list[i]
+	        rows.append(row)
+
+	df_results = pd.DataFrame(rows)
+	df_results.to_csv('cv_vs_test_metrics.csv', index=False)
+
+
+The dataframe saved above can be :download:`downloaded here <cv_vs_test_metrics.csv>`.
+
+
+
 
 
 These results are consistent with Fig 2, demonstrating that our internal cross-validation did not introduce severe overfitting. Using the same segmentation detection threshold of 0.32, we now tune the model using the same optimization routine (BorutaSHAP with XGBoost estimator + Optuna), but also using a 70/30 train/test partition. 
@@ -5403,7 +5434,7 @@ Here we present the results of an XGBoost model trained only on the segmentation
     :width: 600px
 |
 
-This optimized morphological-only XGBoost can be :download:`downloaded here <XGBoost_Morph_Only.zip>`.
+This optimized morphological-only XGBoost model can be :download:`downloaded here <XGBoost_Morph_Only.zip>`.
 
 Next we classify the full NDWFS catalog (saved above, see subsection Boötes Morphological Catalog) and compare the results with the adopted XGBoost-8 model.
 

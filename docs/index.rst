@@ -222,7 +222,7 @@ This final example provides an overview of the `cnn_model <https://pybia.readthe
 
    # Run the data augmentation/training pipeline and save
    model.create()
-   model.save(dirname='delalexnet_model')
+   model.save(dirname='alexnet_model')
 
 Citation
 --------

@@ -235,7 +235,7 @@ If you use pyBIA in your research, please cite:
 User Guide
 ==========
 
-The pages below provide tutorials, API references, and high-level technical details on the program’s core functionality, as well as a dedicated section describing how **Godines, D. & Prescott, K. M. (2025, submitted)** was produced, including figure-by-figure generation details.
+The pages below provide tutorials, API references, and high-level technical details on the program’s core functionality, as well as a dedicated section describing how **Godines, D. & Prescott, K. M. (2026, accepted in PASP)** was produced, including figure-by-figure generation details.
 
 .. toctree::
    :maxdepth: 1

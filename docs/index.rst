@@ -212,7 +212,7 @@ This final example provides an overview of the `cnn_model <https://pybia.readthe
        augment_data=True,          # Whether to augment the training data
        batch_positive=10,          # Number of augmentations per positive instance
        batch_negative=0,           # Number of augmentations per negative instance
-       epochs=3, batch_size=16,   # Training epochs and mini-batch size
+       epochs=3, batch_size=16,    # Training epochs and mini-batch size
        optimizer='sgd', lr=1e-4,   # Optimizer and learning rate
        patience=3,                 # Patience parameter for early-stopping
        opt_cv=5,                   # Cross-validation folds; set to None for a single model

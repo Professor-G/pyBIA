@@ -6,7 +6,7 @@ Welcome to pyBIA's Documentation!
 
    This documentation is actively being developed and may change.
 
-**pyBIA** (Blob Identification Algorithm) is an open-source Python framework for automated detection and classification of spatially extended, diffuse emission at high redshift (i.e., blob-like sources), such as Lyman-alpha blobs (LABs). The software was developed to support the analysis in **Godines, D. & Prescott, K. M. (2025, submitted)**. If you use pyBIA in a publication, we would appreciate citations to the paper as well as the `software release DOI <https://doi.org/10.5281/zenodo.17092327>`_.
+**pyBIA** (Blob Identification Algorithm) is an open-source Python framework for automated detection and classification of spatially extended, diffuse emission at high redshift (i.e., blob-like sources), such as Lyman-alpha blobs (LABs). The software was developed to support the analysis in **Godines, D. & Prescott, K. M. (2026, accepted in PASP)**. If you use pyBIA in a publication, we would appreciate citations to the paper as well as the `software release DOI <https://doi.org/10.5281/zenodo.17092327>`_.
 
 By integrating source detection, aperture photometry, morphological segmentation, and machine learning, pyBIA provides an end-to-end pipeline for reducing large source catalogs into a prioritized candidate list for follow-up study. While optimized for high-redshift astronomy, its modular architecture makes it a flexible software tool for workflows requiring **image segmentation**, **anomaly detection**, or **classification**.
 
@@ -229,7 +229,7 @@ Citation
 
 If you use pyBIA in your research, please cite:
 
-- **Godines, D. & Prescott, K. M. (2025, submitted)**
+- **Godines, D. & Prescott, K. M. (2026, submitted)**
 - **Godines (2025), Zenodo DOI: https://doi.org/10.5281/zenodo.17092327**
 
 User Guide
@@ -250,7 +250,7 @@ The pages below provide tutorials, API references, and high-level technical deta
    :maxdepth: 1
    :caption: Case Studies
 
-   source/Godines & Prescott 2025
+   source/Godines & Prescott 2026
 
 .. toctree::
    :maxdepth: 1

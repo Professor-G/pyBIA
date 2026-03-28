@@ -5658,6 +5658,7 @@ Below we plot the results of this robustness experiment.
 	    ax.set_title(title_map.get(clf, clf))
 	    if idx == 1: ax.legend(loc='lower center', handlelength=1, frameon=True, fancybox=True)
 	    if idx == 0 or idx == 3: ax.set_ylabel('F1 Score')
+	    if idx >= 3: ax.set_xlabel(r'$\sigma_{\rm det}$')
 
 	plt.tight_layout()
 	plt.show()

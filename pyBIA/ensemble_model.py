@@ -1138,15 +1138,23 @@ class Classifier:
             ax.set_ylim((np.arange(len(x_names))[0]-0.5, np.arange(len(x_names))[-1]+0.5))
             #ax.set_xlim((np.min(y)-1, np.max(y)+1))
             ax.invert_yaxis(); ax.invert_xaxis()
+
         else:
             lns, = ax.plot(np.arange(len(x_names)), y, 'k*--', lw=0.77)#, label='XGBoost', lw=0.77)
-            lns_sigma = ax.fill_between(np.arange(len(x_names)), y-y_err, y+y_err, color="grey", alpha=0.2)
-            ax.set_ylabel('Z Score', alpha=1, color='k'); ax.set_xticks(np.arange(len(x_names)), x_names, rotation=90)
+            lns_sigma = ax.fill_between(np.arange(len(x_names)), y-3*y_err, y+3*y_err, color="grey", alpha=0.2)
+            ax.set_ylabel('Z Score', alpha=1, color='k')
+            ax.set_xticks(np.arange(len(x_names)), x_names, rotation=45, ha='right') # Added ha='right' for neatness
+            
             for t in ax.get_xticklabels():
                 txt = t.get_text()
                 if 'Max Shadow' in txt:
                     t.set_color('red')
-                    ax.plot(np.arange(len(x_names))[-1], y[-1], marker='*', color='red')
+                    if include_rejected is False:
+                        ax.plot(np.arange(len(x_names))[-1], y[-1], marker='*', color='red')
+                    else:
+                        idx = 1 + len(rejected_indices)
+                        ax.plot(np.arange(len(x_names))[-idx], y[-idx], marker='*', color='red')
+                        
             ax.set_xlim((np.arange(len(x_names))[0]-0.5, np.arange(len(x_names))[-1]+0.5))
             #ax.set_ylim((np.min(y)-1, np.max(y)+1))
 

@@ -18,6 +18,10 @@ from sklearn.ensemble import IsolationForest
 from pyBIA.data_processing import process_class
 from pyBIA.optimization import impute_missing_values
 
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import RobustScaler, StandardScaler 
+
+
 class Classifier:
     """
     Build and apply an outlier-detection classifier on image cutouts.
@@ -56,6 +60,18 @@ class Classifier:
         Default is True.
     imp_method : {'knn','mean','median','mode','constant'}, optional
         Imputation strategy used by `impute_missing_values`. Default is 'knn'.
+    scale_features : bool, optional
+        If True, scales extracted features before PCA and model fitting. 
+        Default is True.
+    scaler_type : {'robust', 'standard'}, optional
+        Type of scaler to use. Default is 'robust'.
+    apply_pca : bool, optional
+        If True, performs Principal Component Analysis on the extracted features.
+        Default is False.
+    pca_components : int or float, optional
+        Number of components to keep. If 0 < pca_components < 1, select the 
+        number of components such that the amount of variance that needs to be 
+        explained is greater than the percentage specified. Default is None which keeps all.
     SEED_NO : int, optional
         Random seed used for model initialization. Default is 1909.
 
@@ -65,6 +81,10 @@ class Classifier:
         Trained model after `create()`.
     imputer : object or None
         Fitted imputer returned by `impute_missing_values` when `impute=True`.
+    scaler_model : object or None
+        Fitted scaler when `scale_features=True`.
+    pca_model : PCA or None
+        Fitted PCA model when `apply_pca=True`.
     data_x : ndarray
         Feature matrix derived from `data` after preprocessing and extraction.
     """
@@ -79,6 +99,10 @@ class Classifier:
         clf='iforest', 
         impute=True, 
         imp_method='knn', 
+        scale_features=True,
+        scaler_type='robust',
+        apply_pca=False,
+        pca_components=None,
         SEED_NO=1909
         ):
 
@@ -91,13 +115,19 @@ class Classifier:
         self.clf = clf
         self.impute = impute
         self.imp_method = imp_method
+        self.apply_pca = apply_pca
+        self.pca_components = pca_components
         self.SEED_NO = SEED_NO
 
         self.model = None
         self.imputer = None
+        self.scaler_model = None
+        self.pca_model = None
 
         if feat_set not in ('hog', 'lbp', 'fft', 'wavelet', 'stats'):
             raise ValueError('The `feat_set` input is invalid, options are: "hog", "lbp", "fft", "wavelet", "stats"')
+        if scaler_type not in ('robust', 'standard'):
+            raise ValueError('The `scaler_type` input is invalid, options are: "robust", "standard"')
 
     def create(self):
         """
@@ -161,6 +191,21 @@ class Classifier:
 
         self.data_x, self.imputer = impute_missing_values(self.data_x, strategy=self.imp_method)
         
+        if self.scale_features:
+            if self.scaler_type == 'robust':
+                self.scaler_model = RobustScaler()
+            elif self.scaler_type == 'standard':
+                self.scaler_model = StandardScaler()
+            
+            self.data_x = self.scaler_model.fit_transform(self.data_x)
+            print(f"Applied {self.scaler_type} scaling to features.")
+
+        if self.apply_pca:
+            self.pca_model = PCA(n_components=self.pca_components, random_state=self.SEED_NO)
+            self.data_x = self.pca_model.fit_transform(self.data_x)
+            print(f"PCA applied. Reduced features to {self.data_x.shape[1]} components.")
+
+
         self.model.fit(self.data_x)
                         
         print(f"Returning base {self.clf} model...")
@@ -169,7 +214,7 @@ class Classifier:
         
     def save(self, dirname=None, path=None, overwrite=False):
         """
-        Save the trained model (and imputer) to disk.
+        Save the trained model (and imputer/scaler/pca) to disk.
 
         Creates a directory `pyBIA_outlier_model` under `path[/dirname]/` and
         writes the IsolationForest model and the fitted imputer (if applicable).
@@ -197,7 +242,8 @@ class Classifier:
             If attempting to create an existing directory without `overwrite=True`.
         """
 
-        if self.model is None and self.imputer is None and self.feats_to_use is None:
+        # Replace the first two lines of your save() method with this:
+        if self.model is None and self.imputer is None and self.scaler_model is None and self.pca_model is None:
             raise ValueError('The models have not been created! Run the create() method first.')
 
         path = str(Path.home()) if path is None else path 
@@ -230,6 +276,10 @@ class Classifier:
             joblib.dump(self.model, path+'Model')
         if self.imputer is not None:
             joblib.dump(self.imputer, path+'Imputer')
+        if self.scaler_model is not None:
+            joblib.dump(self.scaler_model, path+'Scaler')
+        if self.pca_model is not None:
+            joblib.dump(self.pca_model, path+'PCA')
 
         print(f'Files saved in: {path}')
 
@@ -239,7 +289,7 @@ class Classifier:
 
     def load(self, path=None):
         """ 
-        Load a saved model/imputer from disk.
+        Load a saved model/imputer/pca from disk.
 
         Looks for a folder named `pyBIA_outlier_model` under `path` (or the user’s
         home directory if `path` is None) and attempts to load `Model` and `Imputer`
@@ -259,21 +309,34 @@ class Classifier:
         path = path+'/' if path[-1] != '/' else path 
         path += 'pyBIA_outlier_model/'
 
+        loaded_components = []
+
         try:
             self.model = joblib.load(path+'Model')
-            model = 'model'
+            loaded_components.append('model')
         except FileNotFoundError:
-            model = ''
             pass
 
         try:
             self.imputer = joblib.load(path+'Imputer')
-            imputer = ', imputer'
+            loaded_components.append('imputer')
         except FileNotFoundError:
-            imputer = ''
             pass 
 
-        print('Successfully loaded the following class attributes: {}{}'.format(model, imputer))
+        try:
+            self.scaler_model = joblib.load(path+'Scaler')
+            loaded_components.append('scaler')
+        except FileNotFoundError:
+            pass
+
+        try:
+            self.pca_model = joblib.load(path+'PCA')
+            loaded_components.append('pca')
+        except FileNotFoundError:
+            pass
+
+        loaded_str = ", ".join(loaded_components) if loaded_components else "None"
+        print(f'Successfully loaded the following class attributes: {loaded_str}')
         
         self.path = path
 
@@ -337,6 +400,12 @@ class Classifier:
 
         if len(data_x.shape) == 1:
             data_x = data_x.reshape(1, -1)
+
+        if self.scaler_model is not None:
+            data_x = self.scaler_model.transform(data_x)
+
+        if self.pca_model is not None:
+            data_x = self.pca_model.transform(data_x)
 
         decision_function_scores = self.model.decision_function(data_x)
         raw_anomaly_scores = decision_function_scores + self.model.offset_

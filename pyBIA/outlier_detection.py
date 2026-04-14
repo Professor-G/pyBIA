@@ -61,8 +61,8 @@ class Classifier:
     imp_method : {'knn','mean','median','mode','constant'}, optional
         Imputation strategy used by `impute_missing_values`. Default is 'knn'.
     scale_features : bool, optional
-        If True, scales extracted features before PCA and model fitting. 
-        Default is True.
+        If True, scales extracted features, should be True if using PCA. 
+        Default is False.
     scaler_type : {'robust', 'standard'}, optional
         Type of scaler to use. Default is 'robust'.
     apply_pca : bool, optional
@@ -99,7 +99,7 @@ class Classifier:
         clf='iforest', 
         impute=True, 
         imp_method='knn', 
-        scale_features=True,
+        scale_features=False,
         scaler_type='robust',
         apply_pca=False,
         pca_components=None,
@@ -115,6 +115,8 @@ class Classifier:
         self.clf = clf
         self.impute = impute
         self.imp_method = imp_method
+        self.scale_features = scale_features
+        self.scaler_type = scaler_type
         self.apply_pca = apply_pca
         self.pca_components = pca_components
         self.SEED_NO = SEED_NO

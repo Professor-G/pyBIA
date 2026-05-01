@@ -192,7 +192,6 @@ class Classifier:
             The number (or proportion if float) of training features to draw from the feature matrix when training the model.
             Defaults to 1.0
 
-
         Returns
         -------
         None

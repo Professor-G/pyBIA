@@ -24,69 +24,60 @@ from sklearn.preprocessing import RobustScaler, StandardScaler
 
 class Classifier:
     """
-    Build and apply an outlier-detection classifier on image cutouts.
+    Build and apply an ensemble outlier-detection classifier on image cutouts.
 
     The classifier workflow supports optional min–max normalization, feature
     extraction (HOG, LBP, FFT, Wavelet, or simple statistics), optional
     imputation of missing values, and model fitting using an Isolation Forest
-    (`clf='iforest'`). Multi-channel inputs are supported (features are computed
-    per channel and concatenated), up to three channels.
+    (`clf='iforest'`). 
+
+    If multiple feature sets are provided, an independent pipeline (imputer, 
+    scaler, PCA, and model) is trained for each feature set. Predictions are 
+    made by either averaging the anomaly scores across all independent models
+    or by selecting only the most anomolous score across all models.
 
     Parameters
     ----------
     data : ndarray or None, optional
-        Image tensor with shape (N, H, W, C), where N is the number of samples,
-        H×W are spatial dimensions, and C is the number of channels (C ≤ 3).
-        Default is None (set later).
+        Image tensor with shape (N, H, W, C).
     normalize : bool, optional
         If True, min–max normalize each image/channel before feature extraction.
-        Default is False.
     min_pixel : float, optional
-        Lower bound for min–max normalization (used only if `normalize=True`).
-        Default is 0.
+        Lower bound for min–max normalization.
     max_pixel : float, optional
-        Upper bound for min–max normalization (used only if `normalize=True`).
-        If multi-channel, the value is broadcast per channel. Default is 10.
+        Upper bound for min–max normalization.
     img_num_channels : int, optional
-        Number of channels in the input tensor (last dimension). Must be set
-        explicitly for legacy compatibility. Default is 1.
-    feat_set : {'hog','lbp','fft','wavelet','stats'}, optional
-        Feature family to compute for training. Default is 'hog'.
+        Number of channels in the input tensor.
+    feat_set : str or list/tuple of str, optional
+        Feature family (or families) to compute for training. 
+        Options: 'hog','lbp','fft','wavelet','stats'. 
     clf : {'iforest'}, optional
         Classifier to train. Currently only Isolation Forest is supported.
-        Default is 'iforest'.
     impute : bool, optional
         If True, impute missing feature values before fitting/predicting.
-        Default is True.
     imp_method : {'knn','mean','median','mode','constant'}, optional
-        Imputation strategy used by `impute_missing_values`. Default is 'knn'.
+        Imputation strategy used by `impute_missing_values`.
     scale_features : bool, optional
-        If True, scales extracted features, should be True if using PCA. 
-        Default is False.
+        If True, scales extracted features.
     scaler_type : {'robust', 'standard'}, optional
         Type of scaler to use. Default is 'robust'.
     apply_pca : bool, optional
         If True, performs Principal Component Analysis on the extracted features.
-        Default is False.
     pca_components : int or float, optional
-        Number of components to keep. If 0 < pca_components < 1, select the 
-        number of components such that the amount of variance that needs to be 
-        explained is greater than the percentage specified. Default is None which keeps all.
+        Number of components to keep.
     SEED_NO : int, optional
         Random seed used for model initialization. Default is 1909.
 
     Attributes
     ----------
-    model : IsolationForest or None
-        Trained model after `create()`.
-    imputer : object or None
-        Fitted imputer returned by `impute_missing_values` when `impute=True`.
-    scaler_model : object or None
-        Fitted scaler when `scale_features=True`.
-    pca_model : PCA or None
-        Fitted PCA model when `apply_pca=True`.
-    data_x : ndarray
-        Feature matrix derived from `data` after preprocessing and extraction.
+    models : dict
+        Dictionary of trained models keyed by feature name.
+    imputers : dict
+        Dictionary of fitted imputers keyed by feature name.
+    scalers : dict
+        Dictionary of fitted scalers keyed by feature name.
+    pcas : dict
+        Dictionary of fitted PCA models keyed by feature name.
     """
 
     def __init__(self, 
@@ -111,7 +102,6 @@ class Classifier:
         self.min_pixel = min_pixel
         self.max_pixel = max_pixel
         self.img_num_channels = img_num_channels
-        self.feat_set = feat_set
         self.clf = clf
         self.impute = impute
         self.imp_method = imp_method
@@ -121,26 +111,87 @@ class Classifier:
         self.pca_components = pca_components
         self.SEED_NO = SEED_NO
 
-        self.model = None
-        self.imputer = None
-        self.scaler_model = None
-        self.pca_model = None
+        # Dicts to hold independent pipelines for each feature set
+        self.models = {}
+        self.imputers = {}
+        self.scalers = {}
+        self.pcas = {}
 
-        if feat_set not in ('hog', 'lbp', 'fft', 'wavelet', 'stats'):
-            raise ValueError('The `feat_set` input is invalid, options are: "hog", "lbp", "fft", "wavelet", "stats"')
+        if isinstance(feat_set, str):
+            self.feat_set = [feat_set]
+        elif isinstance(feat_set, (list, tuple)):
+            self.feat_set = list(feat_set)
+        else:
+            raise ValueError('The `feat_set` must be a string or a list/tuple of strings.')
+
+        valid_feats = {'hog', 'lbp', 'fft', 'wavelet', 'stats'}
+        for feat in self.feat_set:
+            if feat not in valid_feats:
+                raise ValueError(f'The `feat_set` input "{feat}" is invalid, options are: {valid_feats}')
+
         if scaler_type not in ('robust', 'standard'):
             raise ValueError('The `scaler_type` input is invalid, options are: "robust", "standard"')
 
-    def create(self):
+    def _extract_single_feature(self, data, feat: str) -> np.ndarray:
         """
-        Initialize, featurize, (optionally) impute, and fit the classifier.
+        Extract a single feature matrix.
 
-        This method:
-        1) Instantiates the requested model (Isolation Forest).
-        2) Optionally normalizes `self.data` using min–max bounds.
-        3) Extracts features according to `self.feat_set`.
-        4) Replaces ±inf with NaN, then optionally imputes missing values.
-        5) Fits the model on the resulting feature matrix.
+        Parameters
+        ----------
+        data : ndarray
+            Input image tensor of shape (N, H, W, C).
+        feat : {'hog', 'lbp', 'fft', 'wavelet', 'stats'}
+            Feature extraction method to apply:
+            - 'hog' : Histogram of Oriented Gradients
+            - 'lbp' : Local Binary Patterns
+            - 'fft' : Fourier-based energy features
+            - 'wavelet' : Wavelet energy features
+            - 'stats' : Simple statistical features
+
+        Returns
+        -------
+        f_data : ndarray
+            Extracted feature matrix of shape (N, D), where D depends on the
+            selected feature type.
+        """
+
+        if feat == 'hog':
+            f_data = hog_feature_extraction(data)
+        elif feat == 'lbp':
+            f_data = lbp_feature_extraction(data)
+        elif feat == 'wavelet':
+            f_data = wavelet_energy_feature_extraction(data)
+        elif feat == 'fft':
+            f_data = fft_energy_feature_extraction(data)
+        elif feat == 'stats':
+            f_data = statistical_feature_extraction(data)
+        
+        if len(f_data.shape) == 1:
+            f_data = f_data.reshape(1, -1)
+            
+        return f_data
+
+    def create(self, n_estimators=100, max_samples='auto', contamination='auto', max_features=1.0):
+        """
+        Initialize, featurize, optionally impute, and fit the classifier.
+        This method instantiates the model, optionally normalizes the data using the min-max bounds,
+        extracts the features, replaces inf with NaNs, and then optionally imputes missing values.
+        The model is then fitted on the resulting feature matrix. The optional arguments are
+        iForest hyperparameters, which by default are the scikit-learn defaults.
+
+        Parameters
+        ----------
+        n_estimators : int
+            Number of trees to fit. Defaults to 100.
+        max_samples : 'auto' or int
+            The number of training instances to use to train the model. Defaults to 'auto'.
+        contamination : float
+            The expected ratio of outliers present in the training data. Sets what the anomaly 
+            score threshold should be. Defaults to 'auto'.
+        max_features : int or float
+            The number (or proportion if float) of training features to draw from the feature matrix when training the model.
+            Defaults to 1.0
+
 
         Returns
         -------
@@ -153,10 +204,8 @@ class Classifier:
         ValueError
             If `impute=False` and the feature matrix contains NaNs or infs.
         """
-        
-        if self.clf == 'iforest':
-            self.model = IsolationForest(random_state=self.SEED_NO)
-        else:
+    
+        if self.clf != 'iforest':
             raise ValueError('Only IsolationForest is currently supported! Set `clf`="iforest" and run again.')
         
         if self.normalize:
@@ -167,59 +216,51 @@ class Classifier:
                 max_pixel=[self.max_pixel]*self.img_num_channels, 
                 img_num_channels=self.img_num_channels
                 )
-        
-        if self.feat_set == 'hog':
-            self.data_x = hog_feature_extraction(self.data)
-        elif self.feat_set == 'lbp':
-            self.data_x = lbp_feature_extraction(self.data)
-        elif self.feat_set == 'wavelet':
-            self.data_x = wavelet_energy_feature_extraction(self.data)
-        elif self.feat_set == 'fft':
-            self.data_x = fft_energy_feature_extraction(self.data)
-        elif self.feat_set == 'stats':
-            self.data_x = statistical_feature_extraction(self.data)
 
-        self.data_x[np.isinf(self.data_x)] = np.nan
+        # Train an independent pipeline for each feature set
+        for feat in self.feat_set:
+            print(f"Training pipeline for feature: {feat}")
+            data_x = self._extract_single_feature(self.data, feat)
+            data_x[np.isinf(data_x)] = np.nan
 
-        if self.impute is False:
-
-            if np.any(np.isfinite(self.data_x) == False):
-                raise ValueError('data_x array contains nan values but `impute` is set to False! Set `impute`=True and run again.')
-                        
-            self.model.fit(self.data_x)            
-            print(f"Returning base {self.clf} model...")
-
-            return
-
-        self.data_x, self.imputer = impute_missing_values(self.data_x, strategy=self.imp_method)
-        
-        if self.scale_features:
-            if self.scaler_type == 'robust':
-                self.scaler_model = RobustScaler()
-            elif self.scaler_type == 'standard':
-                self.scaler_model = StandardScaler()
+            if self.impute is False:
+                if np.any(np.isfinite(data_x) == False):
+                    raise ValueError(f'Feature array for {feat} contains nan values but `impute` is False!')
+            else:
+                data_x, imputer = impute_missing_values(data_x, strategy=self.imp_method)
+                self.imputers[feat] = imputer
             
-            self.data_x = self.scaler_model.fit_transform(self.data_x)
-            print(f"Applied {self.scaler_type} scaling to features.")
+            if self.scale_features:
+                scaler = RobustScaler() if self.scaler_type == 'robust' else StandardScaler()
+                data_x = scaler.fit_transform(data_x)
+                self.scalers[feat] = scaler
 
-        if self.apply_pca:
-            self.pca_model = PCA(n_components=self.pca_components, random_state=self.SEED_NO)
-            self.data_x = self.pca_model.fit_transform(self.data_x)
-            print(f"PCA applied. Reduced features to {self.data_x.shape[1]} components.")
+            if self.apply_pca:
+                pca = PCA(n_components=self.pca_components, random_state=self.SEED_NO)
+                data_x = pca.fit_transform(data_x)
+                self.pcas[feat] = pca
 
+            # Fit independent Isolation Forest
+            model = IsolationForest(
+                n_estimators=n_estimators, 
+                max_samples=max_samples, 
+                contamination=contamination, 
+                max_features=max_features, 
+                random_state=self.SEED_NO
+                )
 
-        self.model.fit(self.data_x)
-                        
-        print(f"Returning base {self.clf} model...")
+            model.fit(data_x)
+            self.models[feat] = model
 
+        print(f"Successfully trained {len(self.models)} independent models for ensemble.")
         return
         
     def save(self, dirname=None, path=None, overwrite=False):
         """
-        Save the trained model (and imputer/scaler/pca) to disk.
+        Save the trained model (and imputer/scaler/pca if present) to disk.
 
         Creates a directory `pyBIA_outlier_model` under `path[/dirname]/` and
-        writes the IsolationForest model and the fitted imputer (if applicable).
+        writes the IsolationForest model and the fitted imputer/scaler/pca, if applicable.
 
         Parameters
         ----------
@@ -244,8 +285,7 @@ class Classifier:
             If attempting to create an existing directory without `overwrite=True`.
         """
 
-        # Replace the first two lines of your save() method with this:
-        if self.model is None and self.imputer is None and self.scaler_model is None and self.pca_model is None:
+        if not self.models:
             raise ValueError('The models have not been created! Run the create() method first.')
 
         path = str(Path.home()) if path is None else path 
@@ -263,35 +303,32 @@ class Classifier:
             os.mkdir(path + 'pyBIA_outlier_model')
         except FileExistsError:
             if overwrite:
-                try:
-                    os.rmdir(path+'pyBIA_outlier_model')
-                except OSError:
-                    for file in os.listdir(path+'pyBIA_outlier_model'):
-                        os.remove(path+'pyBIA_outlier_model/'+file)
-                    os.rmdir(path+'pyBIA_outlier_model')
-                os.mkdir(path+'pyBIA_outlier_model')
+                import shutil
+                shutil.rmtree(path + 'pyBIA_outlier_model')
+                os.mkdir(path + 'pyBIA_outlier_model')
             else:
-                raise ValueError('Tried to create "pyBIA_outlier_model" directory in specified path but folder already exists! If you wish to overwrite set `overwrite`=True.')
+                raise ValueError('Directory already exists! Overwrite=False.')
         
         path += 'pyBIA_outlier_model/'
-        if self.model is not None:
-            joblib.dump(self.model, path+'Model')
-        if self.imputer is not None:
-            joblib.dump(self.imputer, path+'Imputer')
-        if self.scaler_model is not None:
-            joblib.dump(self.scaler_model, path+'Scaler')
-        if self.pca_model is not None:
-            joblib.dump(self.pca_model, path+'PCA')
+
+        # Save artifacts per feature
+        for feat in self.feat_set:
+            if feat in self.models:
+                joblib.dump(self.models[feat], path + f'Model_{feat}')
+            if feat in self.imputers:
+                joblib.dump(self.imputers[feat], path + f'Imputer_{feat}')
+            if feat in self.scalers:
+                joblib.dump(self.scalers[feat], path + f'Scaler_{feat}')
+            if feat in self.pcas:
+                joblib.dump(self.pcas[feat], path + f'PCA_{feat}')
 
         print(f'Files saved in: {path}')
-
         self.path = path
-
         return 
 
     def load(self, path=None):
         """ 
-        Load a saved model/imputer/pca from disk.
+        Load a saved model (and imputer/scaler/pca if present) from disk.
 
         Looks for a folder named `pyBIA_outlier_model` under `path` (or the user’s
         home directory if `path` is None) and attempts to load `Model` and `Imputer`
@@ -311,67 +348,49 @@ class Classifier:
         path = path+'/' if path[-1] != '/' else path 
         path += 'pyBIA_outlier_model/'
 
+        self.models = {}
+        self.imputers = {}
+        self.scalers = {}
+        self.pcas = {}
+
         loaded_components = []
 
-        try:
-            self.model = joblib.load(path+'Model')
-            loaded_components.append('model')
-        except FileNotFoundError:
-            pass
+        for feat in self.feat_set:
+            if os.path.exists(path + f'Model_{feat}'):
+                self.models[feat] = joblib.load(path + f'Model_{feat}')
+                loaded_components.append(f'Model_{feat}')
+            
+            if os.path.exists(path + f'Imputer_{feat}'):
+                self.imputers[feat] = joblib.load(path + f'Imputer_{feat}')
+                
+            if os.path.exists(path + f'Scaler_{feat}'):
+                self.scalers[feat] = joblib.load(path + f'Scaler_{feat}')
+                
+            if os.path.exists(path + f'PCA_{feat}'):
+                self.pcas[feat] = joblib.load(path + f'PCA_{feat}')
 
-        try:
-            self.imputer = joblib.load(path+'Imputer')
-            loaded_components.append('imputer')
-        except FileNotFoundError:
-            pass 
-
-        try:
-            self.scaler_model = joblib.load(path+'Scaler')
-            loaded_components.append('scaler')
-        except FileNotFoundError:
-            pass
-
-        try:
-            self.pca_model = joblib.load(path+'PCA')
-            loaded_components.append('pca')
-        except FileNotFoundError:
-            pass
-
-        loaded_str = ", ".join(loaded_components) if loaded_components else "None"
-        print(f'Successfully loaded the following class attributes: {loaded_str}')
-        
+        print(f'Successfully loaded pipelines for: {list(self.models.keys())}')
         self.path = path
-
         return
 
-    def predict(self, data):
+    def predict(self, data, ensemble_method='strict'):
         """
-        Predict outlier/inlier labels and anomaly scores for new data.
-
-        The input images are optionally normalized, featurized using the same
-        `feat_set` as training, imputed (if an imputer was fitted), and passed
-        to the trained Isolation Forest. Returns labels and scores.
+        Predict outlier/inlier labels via ensemble aggregation.
 
         Parameters
         ----------
         data : ndarray
-            Image tensor with shape (N, H, W, C). If multi-channel, features are computed per channel and concatenated (≤ 3 channels supported).
-
-        Returns
-        -------
-        ndarray of shape (N, 3)
-            Array with predicted labels, decision function scores, and raw anomaly scores for each sample.
-
-        Raises
-        ------
-        ValueError
-            If `create()` has not been called (no trained model).
-        ValueError
-            If the feature matrix contains NaN/inf and no `imputer` is available.
+            Image tensor with shape (N, H, W, C).
+        ensemble_method : {'average', 'strict'}, optional
+            How to combine the scores from the independent models. 
+            'average' computes the mean of the scores.
+            'strict' takes the minimum score, therefore if any model 
+            flags the sample as an anomaly, it will be marked as an anomaly.
+            Default is 'strict'.
         """
 
-        if self.model is None:
-            raise ValueError('No `model` has been created! Run the create() method first!')
+        if not self.models:
+            raise ValueError('No models have been created or loaded! Run create() or load() first!')
 
         if self.normalize:
             data = process_class(
@@ -381,39 +400,50 @@ class Classifier:
                 max_pixel=[self.max_pixel]*self.img_num_channels, 
                 img_num_channels=self.img_num_channels
                 )
-        
-        if self.feat_set == 'hog':
-            data_x = hog_feature_extraction(data)
-        elif self.feat_set == 'lbp':
-            data_x = lbp_feature_extraction(data)
-        elif self.feat_set == 'wavelet':
-            data_x = wavelet_energy_feature_extraction(data)
-        elif self.feat_set == 'fft':
-            data_x = fft_energy_feature_extraction(data)
-        elif self.feat_set == 'stats':
-            data_x = statistical_feature_extraction(data)
 
-        if self.imputer is None:
-            if np.any(np.isfinite(data_x) == False):
-                print(self.feat_set, data_x)
-                raise ValueError('data_x array contains nan values but `impute` is set to False! Was `impute`=True when the model was created? If so, set `impute`=True and run again.')
+        all_decision_scores = []
+        all_raw_scores = []
+
+        for feat in self.feat_set:
+            if feat not in self.models:
+                raise ValueError(f"Feature '{feat}' was requested but no trained model exists for it.")
+
+            data_x = self._extract_single_feature(data, feat)
+
+            if feat in self.imputers:
+                data_x = self.imputers[feat].transform(data_x)
+            elif np.any(np.isfinite(data_x) == False):
+                 raise ValueError(f'data_x for {feat} contains nan but no imputer exists!')
+
+            if feat in self.scalers:
+                data_x = self.scalers[feat].transform(data_x)
+
+            if feat in self.pcas:
+                data_x = self.pcas[feat].transform(data_x)
+
+            # Get scores from this specific model
+            model = self.models[feat]
+            decision_scores = model.decision_function(data_x)
+            raw_scores = decision_scores + model.offset_
+
+            all_decision_scores.append(decision_scores)
+            all_raw_scores.append(raw_scores)
+
+        # Model aggregation options
+        if ensemble_method == 'average': # Average score from all models
+            agg_decision_scores = np.mean(all_decision_scores, axis=0)
+            agg_raw_scores = np.mean(all_raw_scores, axis=0)
+        elif ensemble_method == 'strict': # In this case the lowest score represents the highest confidence of an anomaly
+            agg_decision_scores = np.min(all_decision_scores, axis=0)
+            agg_raw_scores = np.min(all_raw_scores, axis=0)
+            
         else:
-            data_x = self.imputer.transform(data_x)
+            raise ValueError("ensemble_method must be either 'average' or 'strict'")
 
-        if len(data_x.shape) == 1:
-            data_x = data_x.reshape(1, -1)
-
-        if self.scaler_model is not None:
-            data_x = self.scaler_model.transform(data_x)
-
-        if self.pca_model is not None:
-            data_x = self.pca_model.transform(data_x)
-
-        decision_function_scores = self.model.decision_function(data_x)
-        raw_anomaly_scores = decision_function_scores + self.model.offset_
-        predictions = np.where(decision_function_scores < 0, -1, 1) #If the score is < 0 set -1 (outlier) other 1 (inlier)
+        # If the aggregated score is < 0 set -1 (outlier), otherwise 1 (inlier)
+        predictions = np.where(agg_decision_scores < 0, -1, 1) 
         
-        return np.c_[predictions, decision_function_scores, raw_anomaly_scores]
+        return np.c_[predictions, agg_decision_scores, agg_raw_scores]
 
 
 def hog_feature_extraction(

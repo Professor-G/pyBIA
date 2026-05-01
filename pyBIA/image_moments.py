@@ -1,7 +1,7 @@
 import numpy as np
 from astropy.table import Table
 from scipy.special import legendre
-
+from math import factorial
 
 def make_moments_table(image: np.ndarray) -> Table:
     """
@@ -22,32 +22,53 @@ def make_moments_table(image: np.ndarray) -> Table:
         A table with 47 features including raw, central, geometrically centered, Hu,
         and Legendre moments.
     """
+
     if image.ndim != 2:
         raise ValueError("Input image must be 2D.")
     if image.shape[0] != image.shape[1]:
         raise ValueError("Legendre moments require square input. Consider resizing or cropping.")
 
+    # Remove any NaNs and/or infs since even one bad pixel will yield NaN raw moments!
+    clean_image = np.nan_to_num(image, nan=0.0, posinf=0.0, neginf=0.0)
 
-    raw_moments = calculate_moments(image)
-    central_moments = calculate_central_moments(image)
-    geo_moments = calculate_geometrically_centered_moments(image)
-    hu_moments = calculate_hu_moments(image, central_moments=central_moments)
-    legendre_moments = calculate_legendre_moments(image)
+    # Generate the coordinate grids once since all moments need this
+    rows, cols = clean_image.shape
+    x, y = np.meshgrid(np.arange(cols), np.arange(rows))
 
-    features = raw_moments + central_moments + geo_moments + hu_moments + legendre_moments
+    # Compute the zeroth image moment it gets passed down when needed
+    m00 = np.sum(clean_image)
+
+    if m00 == 0: # In case of completely empty/masked cutouts
+        print("[WARNING]: Zero flux image encountered, returning zeros for moments...")
+        features = [0.0] * 57
+    else: # Compute the moments and pass the pre-computed grids 
+        raw_moments = calculate_moments(clean_image, x, y, m00)
+        central_moments = calculate_central_moments(clean_image, x, y, m00)
+        geo_moments = calculate_geometrically_centered_moments(clean_image, x, y)
+        hu_moments = calculate_hu_moments(clean_image, central_moments=central_moments)
+        zernike_moments = calculate_zernike_moments(clean_image, x=x, y=y)
+
+        if rows != cols:
+            legendre_moments = [np.nan] * 10
+            print('[WARNING]: Legendre moments require square input. Consider resizing or cropping. Returning NaN Legendre moments')
+        else:
+            legendre_moments = calculate_legendre_moments(clean_image)
+
+        features = raw_moments + central_moments + geo_moments + hu_moments + legendre_moments + zernike_moments
 
     col_names = [
         'M00', 'M10', 'M01', 'M20', 'M11', 'M02', 'M30', 'M21', 'M12', 'M03',
         'mu00', 'mu10', 'mu01', 'mu20', 'mu11', 'mu02', 'mu30', 'mu21', 'mu12', 'mu03',
         'G00', 'G10', 'G01', 'G20', 'G11', 'G02', 'G30', 'G21', 'G12', 'G03',
         'Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5', 'Hu6', 'Hu7',
-        'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03'
+        'L00', 'L10', 'L01', 'L20', 'L11', 'L02', 'L30', 'L21', 'L12', 'L03',
+        'Z0_0', 'Z1_m1', 'Z1_1', 'Z2_m2', 'Z2_0', 'Z2_2', 'Z3_m3', 'Z3_m1', 'Z3_1', 'Z3_3'
     ]
 
     dtype = ('f8',) * len(col_names)
-    return Table(data=np.array(features), names=np.array(col_names), dtype=dtype)
+    return Table(data=np.array([features]), names=np.array(col_names), dtype=dtype)
 
-def calculate_moments(image: np.ndarray) -> list:
+def calculate_moments(image: np.ndarray, x: np.ndarray = None, y: np.ndarray = None, m00: float = None) -> list:
     """
     Compute raw spatial moments up to 3rd order.
 
@@ -64,10 +85,12 @@ def calculate_moments(image: np.ndarray) -> list:
     if image.ndim != 2:
         raise ValueError("Input image must be 2D.")
 
-    rows, cols = image.shape
-    x, y = np.meshgrid(np.arange(cols), np.arange(rows))
+    if x is None or y is None:
+        rows, cols = image.shape
+        x, y = np.meshgrid(np.arange(cols), np.arange(rows))
+    if m00 is None:
+        m00 = np.sum(image)
 
-    m00 = np.sum(image)
     m10 = np.sum(x * image)
     m01 = np.sum(y * image)
     m20 = np.sum((x**2) * image)
@@ -80,7 +103,7 @@ def calculate_moments(image: np.ndarray) -> list:
 
     return [m00, m10, m01, m20, m11, m02, m30, m21, m12, m03]
 
-def calculate_central_moments(image: np.ndarray) -> list:
+def calculate_central_moments(image: np.ndarray, x: np.ndarray = None, y: np.ndarray = None, m00: float = None) -> list:
     """
     Compute central moments up to 3rd order.
 
@@ -97,10 +120,16 @@ def calculate_central_moments(image: np.ndarray) -> list:
     if image.ndim != 2:
         raise ValueError("Input image must be 2D.")
 
-    rows, cols = image.shape
-    x, y = np.meshgrid(np.arange(cols), np.arange(rows))
+    if x is None or y is None:
+        rows, cols = image.shape
+        x, y = np.meshgrid(np.arange(cols), np.arange(rows))
+    if m00 is None:
+        m00 = np.sum(image)
 
-    m00 = np.sum(image)
+    if m00 == 0:
+        print('[WARNING]: Zeroth image moment is zero! Raw image moments are set to zero...')
+        return [0.0] * 10
+
     x_bar = np.sum(x * image) / m00
     y_bar = np.sum(y * image) / m00
 
@@ -117,7 +146,7 @@ def calculate_central_moments(image: np.ndarray) -> list:
 
     return [mu00, mu10, mu01, mu20, mu11, mu02, mu30, mu21, mu12, mu03]
 
-def calculate_geometrically_centered_moments(image: np.ndarray, max_order: int = 3) -> list:
+def calculate_geometrically_centered_moments(image: np.ndarray, max_order: int = 3, x: np.ndarray = None, y: np.ndarray = None) -> list:
     """
     Compute raw polynomial moments centered on the geometric center of the image grid.
 
@@ -141,7 +170,9 @@ def calculate_geometrically_centered_moments(image: np.ndarray, max_order: int =
         raise ValueError("Order must be a non-negative integer.")
 
     rows, cols = image.shape
-    x, y = np.meshgrid(np.arange(cols), np.arange(rows))
+
+    if x is None or y is None:
+        x, y = np.meshgrid(np.arange(cols), np.arange(rows))
 
     # Shift pixel coordinates to geometric center of image grid
     x_centered = x - (cols - 1) / 2
@@ -245,4 +276,84 @@ def calculate_legendre_moments(image: np.ndarray, max_order: int = 3) -> list[fl
             moments.append(float(L_nm))
 
     return moments
+
+def zernike_radial_polynomial(n: int, m: int, r: np.ndarray) -> np.ndarray:
+    """
+    Compute the Zernike radial polynomial R_n^m(r).
+    """
+
+    m = abs(m)
+    if (n - m) % 2 != 0 or n < m:
+        return np.zeros_like(r)
+    
+    R = np.zeros_like(r)
+    for s in range((n - m) // 2 + 1):
+        numerator = (-1)**s * factorial(n - s)
+        denominator = factorial(s) * factorial((n + m) // 2 - s) * factorial((n - m) // 2 - s)
+        R += (numerator / denominator) * (r ** (n - 2 * s))
+
+    return R
+
+def calculate_zernike_moments(image: np.ndarray, max_order: int = 3, x: np.ndarray = None, y: np.ndarray = None) -> list:
+    """
+    Compute the magnitudes of Zernike moments up to a given order.
+    Zernike moments are evaluated on a unit disk and their magnitudes are rotationally invariant.
+
+    Parameters
+    ----------
+    image : ndarray
+        2D array representing a greyscale image.
+    max_order : int, optional
+        Maximum radial order (n) of the moments (default is 3).
+    x, y : ndarray, optional
+        Precomputed coordinate grids.
+
+    Returns
+    -------
+    list of float
+        Magnitudes of Zernike moments |Z_nm| for valid (n, m) pairs where n <= max_order.
+    """
+
+    if image.ndim != 2:
+        raise ValueError("Input image must be a 2D array.")
+
+    rows, cols = image.shape
+    if x is None or y is None:
+        x, y = np.meshgrid(np.arange(cols), np.arange(rows))
+
+    # Center coordinates and normalize to a unit disk
+    x_c = x - (cols - 1) / 2.0
+    y_c = y - (rows - 1) / 2.0
+    
+    # Calc polar coordinates
+    r = np.sqrt(x_c**2 + y_c**2)
+    theta = np.arctan2(y_c, x_c)
+    
+    # Normalize so the max radius in the image bounds fits in the unit disk
+    r_max = np.max(r)
+    if r_max > 0:
+        r = r / r_max
+
+    # Only need to evaluate pixels within r <= 1, should be ok since normalized above but masking just in case
+    mask = r <= 1.0
+
+    zernike_magnitudes = []
+    
+    for n in range(max_order + 1):
+        for m in range(-n, n + 1):
+            if (n - abs(m)) % 2 == 0:  # Zernike polynomials are only defined for (n - |m|) = even
+                R = zernike_radial_polynomial(n, m, r[mask])
+
+                # The Zernike basis function
+                V = R * np.exp(-1j * m * theta[mask]) # V_nm = R_n^m * exp(-j * m * theta)
+                
+                Z = ((n + 1) / np.pi) * np.sum(image[mask] * np.conj(V)) # Z_nm = (n + 1) / pi * sum(image * V*)
+                
+                # We append the magnitude of the complex moment for rotational invariance
+                zernike_magnitudes.append(float(np.abs(Z)))
+
+    return zernike_magnitudes
+
+
+
 

@@ -42,9 +42,9 @@ def make_moments_table(image: np.ndarray) -> Table:
         print("[WARNING]: Zero flux image encountered, returning zeros for moments...")
         features = [0.0] * 57
     else: # Compute the moments and pass the pre-computed grids 
-        raw_moments = calculate_moments(clean_image, x, y, m00)
-        central_moments = calculate_central_moments(clean_image, x, y, m00)
-        geo_moments = calculate_geometrically_centered_moments(clean_image, x, y)
+        raw_moments = calculate_moments(clean_image, x=x, y=y, m00=m00)
+        central_moments = calculate_central_moments(clean_image, x=x, y=y, m00=m00)
+        geo_moments = calculate_geometrically_centered_moments(clean_image, x=x, y=y)
         hu_moments = calculate_hu_moments(clean_image, central_moments=central_moments)
         zernike_moments = calculate_zernike_moments(clean_image, x=x, y=y)
 

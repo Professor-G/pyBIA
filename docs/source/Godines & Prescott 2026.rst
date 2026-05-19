@@ -3,7 +3,7 @@
 Godines & Prescott (2026)
 ===========
 
-This page provides all of the code necessary to reproduce our analysis. The core modules of pyBIA handle the heavy computational work, while the scripts in this documentation serve as the front end. If anything is unclear, please feel free to contact me by email: danielgodinez123@gmail.com.
+This page provides all of the code necessary to reproduce the analysis presented in `Godines and Prescott 2026 <https://iopscience.iop.org/article/10.1088/1538-3873/ae56be>`_. The core modules of pyBIA handle the heavy computational work, while the scripts in this documentation serve as the front end. If anything is unclear, please feel free to contact me by email: danielgodinez123@gmail.com.
 
 The associated data products are supplied incrementally within the scripts to enable step-by-step analysis and the replication of individual stages in a transparent, technical manner. For convenience, we also provide direct access to the complete and priority catalogs below.
 

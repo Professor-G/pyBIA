@@ -6,7 +6,7 @@ Welcome to pyBIA's Documentation!
 
    This documentation is actively being developed and may change.
 
-**pyBIA** (Blob Identification Algorithm) is an open-source Python framework for automated detection and classification of spatially extended, diffuse emission at high redshift (i.e., blob-like sources), such as Lyman-alpha blobs (LABs). The software was developed to support the analysis in **Godines, D. & Prescott, K. M. (2026, accepted in PASP)**. If you use pyBIA in a publication, we would appreciate citations to the paper as well as the `software release DOI <https://doi.org/10.5281/zenodo.17092327>`_.
+**pyBIA** (Blob Identification Algorithm) is an open-source Python framework for automated detection and classification of spatially extended, diffuse emission at high redshift (i.e., blob-like sources), such as Lyman-alpha blobs (LABs). The software was developed to support the analysis in `Godines and Prescott 2026 <https://iopscience.iop.org/article/10.1088/1538-3873/ae56be>`_. If you use pyBIA in a publication, we would appreciate citations to the paper as well as the `software release DOI <https://doi.org/10.5281/zenodo.17092327>`_.
 
 By integrating source detection, aperture photometry, morphological segmentation, and machine learning, pyBIA provides an end-to-end pipeline for reducing large source catalogs into a prioritized candidate list for follow-up study. While optimized for high-redshift astronomy, its modular architecture makes it a flexible software tool for workflows requiring **image segmentation**, **anomaly detection**, or **classification**.
 
@@ -227,15 +227,16 @@ This final example provides an overview of the `cnn_model <https://pybia.readthe
 Citation
 --------
 
-If you use pyBIA in your research, please cite:
+If you use pyBIA in your research, please cite the paper and the Zenodo DOI:
 
-- **Godines, D. & Prescott, K. M. (2026, submitted)**
-- **Godines (2025), Zenodo DOI: https://doi.org/10.5281/zenodo.17092327**
+- `Godines and Prescott 2026 <https://iopscience.iop.org/article/10.1088/1538-3873/ae56be>`_
+- `Godines 2025 <https://doi.org/10.5281/zenodo.17092327>`_
+
 
 User Guide
 ==========
 
-The pages below provide tutorials, API references, and high-level technical details on the program’s core functionality, as well as a dedicated section describing how **Godines, D. & Prescott, K. M. (2026, accepted in PASP)** was produced, including figure-by-figure generation details.
+The pages below provide tutorials, API references, and high-level technical details on the program’s core functionality, as well as a dedicated section describing how `Godines and Prescott 2026 <https://iopscience.iop.org/article/10.1088/1538-3873/ae56be>`_ was produced, including figure-by-figure generation details.
 
 .. toctree::
    :maxdepth: 1

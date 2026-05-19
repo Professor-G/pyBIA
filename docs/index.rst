@@ -88,7 +88,7 @@ Tutorial
 
 This section summarizes the pyBIA codebase through simplified examples of the core modules. These examples show how imaging data are used to generate source catalogs and to train machine learning models for classification and anomaly detection. 
 
-The `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module constructs photometric and segmentation-based morphological catalogs from single-band imaging. Catalog generation can be run in either targeted mode, where source centroids are provided, or detection mode, where sources are identified automatically when no coordinates are supplied. This example demonstrates initializing a ``Catalog`` with a 2D image (``data``) and uncertainty map (``error``), enabling background subtraction (``bkg``=None}), and computing the photometric and morphological features.
+The `catalog <https://pybia.readthedocs.io/en/latest/autoapi/pyBIA/catalog/index.html>`_ module constructs photometric and segmentation-based morphological catalogs from single-band imaging. Catalog generation can be run in either targeted mode, where source centroids are provided, or detection mode, where sources are identified automatically when no coordinates are supplied. This example demonstrates initializing a ``Catalog`` with a 2D image (``data``) and uncertainty map (``error``), enabling background subtraction (``bkg``=None), and computing the photometric and morphological features.
 
 .. code-block:: python
 
